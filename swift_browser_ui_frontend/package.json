@@ -23,7 +23,7 @@
     "@ygoe/msgpack": "^1.0.3",
     "allas-ui": "0.9.5",
     "cli-highlight": "^2.1.11",
-    "dexie": "^4.0.8",
+    "dexie": "^4.2.1",
     "eslint": "^9.9.0",
     "eslint-plugin-vue": "^9.27.0",
     "eslint-utils": "^3.0.0",

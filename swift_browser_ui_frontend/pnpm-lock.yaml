@@ -41,8 +41,8 @@ importers:
         specifier: ^2.1.11
         version: 2.1.11
       dexie:
-        specifier: ^4.0.8
-        version: 4.2.0
+        specifier: ^4.2.1
+        version: 4.2.1
       eslint:
         specifier: ^9.9.0
         version: 9.33.0
@@ -1680,8 +1680,8 @@ packages:
     resolution: {integrity: sha512-TLz+x/vEXm/Y7P7wn1EJFNLxYpUD4TgMosxY6fAVJUnJMbupHBOncxyWUG9OpTaH9EBD7uFI5LfEgmMOc54DsA==}
     engines: {node: '>=8'}
 
-  dexie@4.2.0:
-    resolution: {integrity: sha512-OSeyyWOUetDy9oFWeddJgi83OnRA3hSFh3RrbltmPgqHszE9f24eUCVLI4mPg0ifsWk0lQTdnS+jyGNrPMvhDA==}
+  dexie@4.2.1:
+    resolution: {integrity: sha512-Ckej0NS6jxQ4Po3OrSQBFddayRhTCic2DoCAG5zacOfOVB9P2Q5Xc5uL/nVa7ZVs+HdMnvUPzLFCB/JwpB6Csg==}
 
   diff-sequences@29.6.3:
     resolution: {integrity: sha512-EjePK1srD3P08o2j4f0ExnylqRs5B9tJjcp9t1krH2qRi8CCdsYfwe9JgSLurFBWwq4uOlipzfk5fHNvwFKr8Q==}
@@ -3565,6 +3565,7 @@ packages:
   vue-i18n@9.14.5:
     resolution: {integrity: sha512-0jQ9Em3ymWngyiIkj0+c/k7WgaPO+TNzjKSNq9BvBQaKJECqn9cd9fL4tkDhB5G1QBskGl9YxxbDAhgbFtpe2g==}
     engines: {node: '>= 16'}
+    deprecated: v9 and v10 no longer supported. please migrate to v11. about maintenance status, see https://vue-i18n.intlify.dev/guide/maintenance.html
     peerDependencies:
       vue: ^3.0.0
 
@@ -4883,17 +4884,17 @@ snapshots:
       '@webassemblyjs/ast': 1.14.1
       '@xtuc/long': 4.2.2
 
-  '@webpack-cli/configtest@2.1.1(webpack-cli@5.1.4(webpack@5.101.2))(webpack@5.101.2(webpack-cli@5.1.4))':
+  '@webpack-cli/configtest@2.1.1(webpack-cli@5.1.4)(webpack@5.101.2)':
     dependencies:
       webpack: 5.101.2(webpack-cli@5.1.4)
       webpack-cli: 5.1.4(webpack@5.101.2)
 
-  '@webpack-cli/info@2.0.2(webpack-cli@5.1.4(webpack@5.101.2))(webpack@5.101.2(webpack-cli@5.1.4))':
+  '@webpack-cli/info@2.0.2(webpack-cli@5.1.4)(webpack@5.101.2)':
     dependencies:
       webpack: 5.101.2(webpack-cli@5.1.4)
       webpack-cli: 5.1.4(webpack@5.101.2)
 
-  '@webpack-cli/serve@2.0.5(webpack-cli@5.1.4(webpack@5.101.2))(webpack@5.101.2(webpack-cli@5.1.4))':
+  '@webpack-cli/serve@2.0.5(webpack-cli@5.1.4)(webpack@5.101.2)':
     dependencies:
       webpack: 5.101.2(webpack-cli@5.1.4)
       webpack-cli: 5.1.4(webpack@5.101.2)
@@ -5469,7 +5470,7 @@ snapshots:
 
   detect-newline@3.1.0: {}
 
-  dexie@4.2.0: {}
+  dexie@4.2.1: {}
 
   diff-sequences@29.6.3: {}
 
@@ -7343,7 +7344,7 @@ snapshots:
 
   tapable@2.2.2: {}
 
-  terser-webpack-plugin@5.3.14(webpack@5.101.2(webpack-cli@5.1.4)):
+  terser-webpack-plugin@5.3.14(webpack@5.101.2):
     dependencies:
       '@jridgewell/trace-mapping': 0.3.30
       jest-worker: 27.5.1
@@ -7541,9 +7542,9 @@ snapshots:
   webpack-cli@5.1.4(webpack@5.101.2):
     dependencies:
       '@discoveryjs/json-ext': 0.5.7
-      '@webpack-cli/configtest': 2.1.1(webpack-cli@5.1.4(webpack@5.101.2))(webpack@5.101.2(webpack-cli@5.1.4))
-      '@webpack-cli/info': 2.0.2(webpack-cli@5.1.4(webpack@5.101.2))(webpack@5.101.2(webpack-cli@5.1.4))
-      '@webpack-cli/serve': 2.0.5(webpack-cli@5.1.4(webpack@5.101.2))(webpack@5.101.2(webpack-cli@5.1.4))
+      '@webpack-cli/configtest': 2.1.1(webpack-cli@5.1.4)(webpack@5.101.2)
+      '@webpack-cli/info': 2.0.2(webpack-cli@5.1.4)(webpack@5.101.2)
+      '@webpack-cli/serve': 2.0.5(webpack-cli@5.1.4)(webpack@5.101.2)
       colorette: 2.0.20
       commander: 10.0.1
       cross-spawn: 7.0.6
@@ -7589,7 +7590,7 @@ snapshots:
       neo-async: 2.6.2
       schema-utils: 4.3.2
       tapable: 2.2.2
-      terser-webpack-plugin: 5.3.14(webpack@5.101.2(webpack-cli@5.1.4))
+      terser-webpack-plugin: 5.3.14(webpack@5.101.2)
       watchpack: 2.4.4
       webpack-sources: 3.3.3
     optionalDependencies:
