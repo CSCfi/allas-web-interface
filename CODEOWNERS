@@ -1,21 +1,21 @@
 
 # Default code owners
 [Default][1]
-* @sds-dev/sd-connect
+* @cloud-solution/allas-ui
 
 # Code Owners sections
 # disabled for now till we have more refined groups
 # [Documentation]
-# /docs/ @sds-dev/sd-connect
-# README.md @sds-dev/sd-connect
+# /docs/ @cloud-solution/allas-ui
+# README.md @cloud-solution/allas-ui
 
 # [Backend]
-# /swift_browser_ui/ @sds-dev/sd-connect
+# /swift_browser_ui/ @cloud-solution/allas-ui
 
 # [Frontend]
-# /swift_browser_ui_frontend/ @sds-dev/sd-connect
+# /swift_browser_ui_frontend/ @cloud-solution/allas-ui
 
 # [Other]
-# /dockerfiles/ @sds-dev/sd-connect
-# /scripts/ @sds-dev/sd-connect
-# /tests/ @sds-dev/sd-connect
+# /dockerfiles/ @cloud-solution/allas-ui
+# /scripts/ @cloud-solution/allas-ui
+# /tests/ @cloud-solution/allas-ui
