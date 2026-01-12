@@ -6,7 +6,7 @@ settings:
 
 overrides:
   '@intlify/shared': 9.14.5
-  '@intlify/message-compiler': 9.14.5
+  '@intlify/message-compiler': 11.2.8
   '@intlify/core-base': 9.14.5
 
 importers:
@@ -14,8 +14,8 @@ importers:
   .:
     dependencies:
       '@intlify/message-compiler':
-        specifier: 9.14.5
-        version: 9.14.5
+        specifier: 11.2.8
+        version: 11.2.8
       '@intlify/shared':
         specifier: 9.14.5
         version: 9.14.5
@@ -545,8 +545,8 @@ packages:
     resolution: {integrity: sha512-5ah5FqZG4pOoHjkvs8mjtv+gPKYU0zCISaYNjBNNqYiaITxW8ZtVih3GS/oTOqN8d9/mDLyrjD46GBApNxmlsA==}
     engines: {node: '>= 16'}
 
-  '@intlify/message-compiler@9.14.5':
-    resolution: {integrity: sha512-IHzgEu61/YIpQV5Pc3aRWScDcnFKWvQA9kigcINcCBXN8mbW+vk9SK+lDxA6STzKQsVJxUPg9ACC52pKKo3SVQ==}
+  '@intlify/message-compiler@11.2.8':
+    resolution: {integrity: sha512-A5n33doOjmHsBtCN421386cG1tWp5rpOjOYPNsnpjIJbQ4POF0QY2ezhZR9kr0boKwaHjbOifvyQvHj2UTrDFQ==}
     engines: {node: '>= 16'}
 
   '@intlify/shared@9.14.5':
@@ -3565,6 +3565,7 @@ packages:
   vue-i18n@9.14.5:
     resolution: {integrity: sha512-0jQ9Em3ymWngyiIkj0+c/k7WgaPO+TNzjKSNq9BvBQaKJECqn9cd9fL4tkDhB5G1QBskGl9YxxbDAhgbFtpe2g==}
     engines: {node: '>= 16'}
+    deprecated: v9 and v10 no longer supported. please migrate to v11. about maintenance status, see https://vue-i18n.intlify.dev/guide/maintenance.html
     peerDependencies:
       vue: ^3.0.0
 
@@ -4111,7 +4112,7 @@ snapshots:
 
   '@intlify/bundle-utils@10.0.1(vue-i18n@9.14.5(vue@3.5.18(typescript@5.9.2)))':
     dependencies:
-      '@intlify/message-compiler': 9.14.5
+      '@intlify/message-compiler': 11.2.8
       '@intlify/shared': 9.14.5
       acorn: 8.15.0
       escodegen: 2.1.0
@@ -4125,10 +4126,10 @@ snapshots:
 
   '@intlify/core-base@9.14.5':
     dependencies:
-      '@intlify/message-compiler': 9.14.5
+      '@intlify/message-compiler': 11.2.8
       '@intlify/shared': 9.14.5
 
-  '@intlify/message-compiler@9.14.5':
+  '@intlify/message-compiler@11.2.8':
     dependencies:
       '@intlify/shared': 9.14.5
       source-map-js: 1.2.1
@@ -4883,17 +4884,17 @@ snapshots:
       '@webassemblyjs/ast': 1.14.1
       '@xtuc/long': 4.2.2
 
-  '@webpack-cli/configtest@2.1.1(webpack-cli@5.1.4(webpack@5.101.2))(webpack@5.101.2(webpack-cli@5.1.4))':
+  '@webpack-cli/configtest@2.1.1(webpack-cli@5.1.4)(webpack@5.101.2)':
     dependencies:
       webpack: 5.101.2(webpack-cli@5.1.4)
       webpack-cli: 5.1.4(webpack@5.101.2)
 
-  '@webpack-cli/info@2.0.2(webpack-cli@5.1.4(webpack@5.101.2))(webpack@5.101.2(webpack-cli@5.1.4))':
+  '@webpack-cli/info@2.0.2(webpack-cli@5.1.4)(webpack@5.101.2)':
     dependencies:
       webpack: 5.101.2(webpack-cli@5.1.4)
       webpack-cli: 5.1.4(webpack@5.101.2)
 
-  '@webpack-cli/serve@2.0.5(webpack-cli@5.1.4(webpack@5.101.2))(webpack@5.101.2(webpack-cli@5.1.4))':
+  '@webpack-cli/serve@2.0.5(webpack-cli@5.1.4)(webpack@5.101.2)':
     dependencies:
       webpack: 5.101.2(webpack-cli@5.1.4)
       webpack-cli: 5.1.4(webpack@5.101.2)
@@ -7343,7 +7344,7 @@ snapshots:
 
   tapable@2.2.2: {}
 
-  terser-webpack-plugin@5.3.14(webpack@5.101.2(webpack-cli@5.1.4)):
+  terser-webpack-plugin@5.3.14(webpack@5.101.2):
     dependencies:
       '@jridgewell/trace-mapping': 0.3.30
       jest-worker: 27.5.1
@@ -7541,9 +7542,9 @@ snapshots:
   webpack-cli@5.1.4(webpack@5.101.2):
     dependencies:
       '@discoveryjs/json-ext': 0.5.7
-      '@webpack-cli/configtest': 2.1.1(webpack-cli@5.1.4(webpack@5.101.2))(webpack@5.101.2(webpack-cli@5.1.4))
-      '@webpack-cli/info': 2.0.2(webpack-cli@5.1.4(webpack@5.101.2))(webpack@5.101.2(webpack-cli@5.1.4))
-      '@webpack-cli/serve': 2.0.5(webpack-cli@5.1.4(webpack@5.101.2))(webpack@5.101.2(webpack-cli@5.1.4))
+      '@webpack-cli/configtest': 2.1.1(webpack-cli@5.1.4)(webpack@5.101.2)
+      '@webpack-cli/info': 2.0.2(webpack-cli@5.1.4)(webpack@5.101.2)
+      '@webpack-cli/serve': 2.0.5(webpack-cli@5.1.4)(webpack@5.101.2)
       colorette: 2.0.20
       commander: 10.0.1
       cross-spawn: 7.0.6
@@ -7589,7 +7590,7 @@ snapshots:
       neo-async: 2.6.2
       schema-utils: 4.3.2
       tapable: 2.2.2
-      terser-webpack-plugin: 5.3.14(webpack@5.101.2(webpack-cli@5.1.4))
+      terser-webpack-plugin: 5.3.14(webpack@5.101.2)
       watchpack: 2.4.4
       webpack-sources: 3.3.3
     optionalDependencies:
