@@ -1,16 +1,7 @@
-## swift-browser-ui
-
-![Python Unit Tests](https://github.com/CSCfi/swift-browser-ui/workflows/Python%20Unit%20Tests/badge.svg)
-![Javascript ESLint check](https://github.com/CSCfi/swift-browser-ui/workflows/Javascript%20ESLint%20check/badge.svg)
-![Python style check](https://github.com/CSCfi/swift-browser-ui/workflows/Python%20style%20check/badge.svg)
-![Chrome UI check](https://github.com/CSCfi/swift-browser-ui/workflows/Chrome%20UI%20check/badge.svg)
-![Firefox UI check](https://github.com/CSCfi/swift-browser-ui/workflows/Firefox%20UI%20check/badge.svg)
-[![Coverage Status](https://coveralls.io/repos/github/CSCfi/swift-browser-ui/badge.svg?branch=HEAD)](https://coveralls.io/github/CSCfi/swift-browser-ui?branch=HEAD)
-[![Documentation Status](https://readthedocs.org/projects/swift-browser-ui/badge/?version=latest)](https://swift-browser-ui.readthedocs.io/en/latest/?badge=latest)
-
+## allas-web-interface
 
 ### Notice:
-> **⚠️ Notice:** This repository is using a modified version that omits the Encryption & Decryption. The original swift-browser-ui can be found [in this repo](https://github.com/CSCfi/swift-browser-ui).
+> **⚠️ Notice:** This repository is using a modified version that omits the Encryption & Decryption. The original can be found [in this repo](https://github.com/CSCfi/swift-browser-ui).
 
 
 
@@ -19,15 +10,6 @@
 
 A web frontend for browsing and downloading objects saved in [SWIFT](https://docs.openstack.org/swift/latest/)
 compliant object storage, supporting SSO with SAML2 federated authentication.
-
-Project documentation is hosted on readthedocs: https://swift-browser-ui.rtfd.io
-
-Information on the additional APIs for container sharing, access requests, and
-better upload and download functionality are in their separate files.
-
-* [Container sharing](README-sharing.md)
-* [Container access requests](README-request.md)
-* [Additional upload and download functionality](README-runner.md)
 
 ### Requirements
 
@@ -38,68 +20,7 @@ Python 3.12+ required.
 - PostgreSQL
 - Redis
 
-### Usage – UI
-
-At the current state the program configs can be specified either via environment
-variables or command line arguments. These usage directions assume envvars to be used.
-
-Creating environment variable file for stand-alone use (no TLS proxy):
-```
-# Replace the example URLs with correct ones
-echo '
-export BROWSER_START_AUTH_ENDPOINT_URL="https://keystone-url.example.com:5001/v3"
-export BROWSER_START_PORT="8080"'\
-|tee -a envs.sh && chmod u+x envs.sh
-```
-
-Getting started:
-```
-git clone git@github.com:CSCfi/swift-browser-ui.git
-cd swift-browser-ui
-cd swift_browser_ui_frontend
-npm install -g pnpm@8
-pnpm install
-pnpm run build
-cd ..
-pip install -r requirements.txt
-pip install .[]
-```
-
-After install there should be `swift-browser-ui` command available:
-```
-➜ swift-browser-ui --help
-Usage: swift-browser-ui [OPTIONS] COMMAND [ARGS]...
-
-  Command line interface for managing swift-browser-ui.
-
-Options:
-  --version       Show the version and exit.
-  -v, --verbose   Increase program verbosity.
-  -D, --debug     Enable debug level logging.
-  --logfile TEXT  Write program logs to a file.
-  --help          Show this message and exit.
-
-Commands:
-  start    Start the browser backend and server
-```
-
-In order to start the server use `swift-browser-ui start`.
-
-Additional options can be found with
-```
-swift-browser-ui --help
-swift-browser-ui start --help
-```
-
-The current frontend can be found at: `127.0.0.1:8080`.
-
 ### Development
-swift-browser-ui is composed of 4 components: `request`, `sharing`, `ui`, and `upload`.
-All of them must be run to have access to all features.
-They depend on a Redis instance for session cache, Postgres database for the sharing and
-request functionality, and the object storage backend.
-You will also need docker with Buildkit to build the keystone-swift docker image.
-
 To start all required services, you can use the `docker-compose` files from https://github.com/CSCfi/swift-ui-deployment,
 or the provided `Procfile`, as shown bellow.
 
@@ -222,110 +143,6 @@ cert_path=$(python -c "import certifi;print(certifi.where())")
 cat oidc-cert.pem >> ${cert_path}
 rm oidc-cert.pem
 ```
-
-#### Encrypted uploads
-Encrypted uploads require that Hashicorp Vault is running and configured to use the `crypt4gh` transit encryption plugin.
-
-With that done, set the policies and permissions to an account, so that they can use it, and set the account token to
-the environment variables `VAULT_ROLE`, `VAULT_SECRET`, and `VAULT_URL`.
-
-During development, you can configure and run Vault locally
-
-Follow instructions for starting vault local dev server https://gitlab.ci.csc.fi/sds-dev/c4gh-transit#usage
-
-##### Setting up API authentication
-Enable `approle` module
-```
-vault auth enable approle
-```
-
-Create [policy](.github/config/vault_policy.hcl) to give access rights to the role
-```
-vault policy write swiftbrowser .github/config/vault_policy.hcl
-```
-
-Create a new role
-```
-vault write auth/approle/role/swiftbrowser \
-    secret_id_ttl=0 \
-    secret_id_num_uses=0 \
-    token_ttl=5m \
-    token_max_ttl=5m \
-    token_num_uses=0 \
-    token_policies=swiftbrowser \
-    role_id=swiftbrowserui
-```
-
-Get role and secret (= username and password), set them to the environment variables mentioned above
-```
-vault read auth/approle/role/swiftbrowser/role-id
-vault write -f auth/approle/role/swiftbrowser/custom-secret-id secret_id=swiftui
-```
-
-### Testing
-
-#### Backend
-The backend `python` tests can be run with `tox`. Start the mock server in one terminal, and run tox in another.
-
-```bash
-cd swift-browser-ui
-source venv/bin/activate
-python tests/ui_unit/mock_server.py
-```
-
-and in another terminal
-
-```bash
-cd swift-browser-ui
-source venv/bin/activate
-pip install tox
-tox
-```
-
-#### Frontend
-The frontend tests are run with `cypress`, and you will need
-
-1. Full backend running, as shown above
-2. Building the `wasm` code for encryption support
-3. Having `Openstack command-line client` installed
-4. using a specific command for generating data (optional)
-
-The wasm code is built automatically when using `npm` commands. It can also be triggered by running `npm run build-wasm`
-
-`Openstack command-line client` can be installed with `pip` by running
-
-    pip install python-openstackclient
-
-> NOTE: Remember that the encrypted upload features cannot be used without
-> having trusted TLS set up on all backend services.
-
-The `keystone-swift` image comes with a script to generate data in the object storage server. With the services running, run these commands:
-```bash
-docker exec keystone-swift generate_data.py --keystone --username swift --password veryfast --containers 15
-docker exec keystone-swift generate_data.py --keystone --username swift --password veryfast --project "swift-project"
-```
-
-After following the development steps above, `cypress` should already be installed.
-
-    cd swift_browser_ui_frontend
-
-You can run the tests in headless mode
-
-    pnpm cypress run
-
-Or you can use the interactive version
-
-    pnpm cypress open
-
-It's possible to set the host to run against by using the environment variable `CYPRESS_BASE_URL`, so that it may run against the development frontend server, for e.g.
-
-    CYPRESS_BASE_URL=http://localhost:8081 pnpm cypress open
-
-#### WebAssembly C Code Unit Tests
-C code is tested using a unit tests collection built using `ceedling`. They can be ran by
-navigating to the `swift_browser_ui_frontend/wasm` directory and running the `ceedling` command.
-You'll have to install `ceedling` first, which can be found [here](https://www.throwtheswitch.org/ceedling)
-
 ### License
 
-``swift-browser-ui`` and all it sources are released under *MIT License*.
+``allas-web-interface`` and all it sources are released under *MIT License*.
