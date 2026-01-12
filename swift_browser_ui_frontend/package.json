@@ -19,7 +19,7 @@
     "@intlify/unplugin-vue-i18n": "^6.0.0",
     "@mdi/js": "^7.4.47",
     "@vitejs/plugin-vue": "^5.1.2",
-    "@vueuse/rxjs": "^11.0.0",
+    "@vueuse/rxjs": "^14.1.0",
     "@ygoe/msgpack": "^1.0.3",
     "allas-ui": "0.9.5",
     "cli-highlight": "^2.1.11",
