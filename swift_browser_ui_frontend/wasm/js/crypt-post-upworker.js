@@ -29,6 +29,32 @@ let progressInterval = undefined;
 let uploadCount = 0;
 let uploadCancelled = false;
 
+// Content type fallback for uploaded files
+function guessMimeFromName(name) {
+  const ext = (name.split(".").pop() || "").toLowerCase();
+  const map = {
+    pdf: "application/pdf",
+    png: "image/png",
+    jpg: "image/jpeg",
+    jpeg: "image/jpeg",
+    gif: "image/gif",
+    webp: "image/webp",
+    svg: "image/svg+xml",
+    txt: "text/plain; charset=utf-8",
+    csv: "text/csv; charset=utf-8",
+    json: "application/json; charset=utf-8",
+    html: "text/html; charset=utf-8",
+    htm: "text/html; charset=utf-8",
+    md:   "text/markdown; charset=utf-8",
+    mp4: "video/mp4",
+    mp3: "audio/mpeg",
+    zip: "application/zip",
+    tar: "application/x-tar",
+  };
+  return map[ext] || "application/octet-stream";
+}
+
+
 // Create an upload session
 function createUploadSession(container, projectName) {
 
@@ -263,6 +289,12 @@ async function addFiles(files, container) {
     totalLeft += handle.size;
     totalFiles++;
 
+    const contentType =
+      (handle.type && handle.type.trim().length)
+        ? handle.type
+        : guessMimeFromName(path);
+
+
     // Add the chunks that need to be uploaded
     let chunks = [];
     for (let i = 0; i < totalChunks; i++) {
@@ -286,6 +318,7 @@ async function addFiles(files, container) {
       object: path,
       name: uploads[container].projectName,
       total: totalBytes,
+      content_type: contentType,
     };
 
     if (uploads[container].owner !== "") {

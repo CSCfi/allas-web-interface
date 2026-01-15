@@ -263,6 +263,9 @@ class ObjectReplicationProxy:
                 LOGGER.debug("Uploading manifest")
                 # Add manifest headers
                 headers["X-Object-Manifest"] = manifest
+                headers["Content-Type"] = resp_g.headers.get(
+                    "Content-Type", "application/octet-stream"
+                )
 
                 if _is_cancelled(app, job_id):
                     raise asyncio.CancelledError()
