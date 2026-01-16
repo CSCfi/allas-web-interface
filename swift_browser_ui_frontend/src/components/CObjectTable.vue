@@ -174,10 +174,6 @@ export default {
       checkIfItemIsLastOnPage(this.paginationOptions);
   },
   methods: {
-    normalizeHeaders(metaHeaders) {
-      const h = metaHeaders || {};
-      return Object.fromEntries(Object.entries(h).map(([k, v]) => [String(k).toLowerCase(), v]));
-    },
     async buildInfoForItem(item) {
       const isFolder = !!item?.subfolder;
 
@@ -191,9 +187,8 @@ export default {
           : "-",
         contentType: item.content_type || item.type || (isFolder ? "application/x-directory" : "-"),
         created: "-",
-        etag: item.etag || "-",
+        etag: isFolder ? undefined : (item.etag || "-"),
         checksum: "-",
-        meta: {},
         isFolder,
       };
 
@@ -206,53 +201,33 @@ export default {
       const url = makeGetObjectsMetaURL(projectID, container, [...objects]);
       if (this.owner) url.searchParams.append("owner", this.owner);
 
-      const meta = await getObjectsMeta(projectID, container, objects, url);
-      const headers = meta?.[0]?.[1] || {};
-      const lower = this.normalizeHeaders(headers);
+      const meta = await getObjectsMeta(projectID, container, objects, url, undefined,
+        this.owner || "");
+      console.log("META RESPONSE", meta); // remove
+      const metaObj = meta?.[0]?.[1] || {};
 
-      const contentType =
-        lower["content-type"] ||
-        lower["x-object-meta-content-type"] ||
-        base.contentType;
 
-      const lastMod =
-        lower["last-modified"] ||
-        item.last_modified ||
-        "";
-
-      const ts = lower["x-timestamp"] || lower["x-object-meta-created"] || "";
       let created = "-";
-      if (ts && !Number.isNaN(Number(ts))) {
-        created = parseDateTime(
-          this.locale,
-          DateTime.fromSeconds(Number(ts)).toISO(),
-          this.$t,
-          false
-        );
+
+      const createdSec = Number.parseInt(metaObj?.Created ?? "", 10);
+      if (Number.isFinite(createdSec) && createdSec > 0) {
+        const iso = DateTime.fromSeconds(createdSec).toUTC().toISO();
+        if (iso) {
+          created = parseDateTime(this.locale, iso, this.$t, false);
+        }
       }
 
-      const etag = (lower["etag"] || "").replaceAll('"', "") || base.etag;
+      const etag =
+        (metaObj.etag || "").toString().replaceAll('"', "") || base.etag;
 
-      const checksum =
-        lower["x-object-meta-sha256"] ||
-        lower["x-object-meta-checksum"] ||
-        "-";
+      const checksum = metaObj.Sha256 || base.checksum;
 
-      const customMeta = {};
-      for (const [k, v] of Object.entries(lower)) {
-        if (k.startsWith("x-object-meta-")) customMeta[k] = v;
-      }
 
       return {
         ...base,
-        contentType,
-        lastModified: lastMod
-          ? parseDateTime(this.locale, lastMod, this.$t, false)
-          : base.lastModified,
         created,
         etag,
         checksum,
-        meta: customMeta,
       };
     },
     async onOpenInfoModal(item, keypress) {
@@ -266,7 +241,8 @@ export default {
           disableFocusOutsideModal(modal);
         }
       } catch (e) {
-        addErrorToastOnMain(this.$t("message.objects.metaFetchFailed") || "Failed to fetch object metadata.");
+        console.error("Info modal failed:", e);
+        addErrorToastOnMain("Failed to fetch object metadata.");
       }
     },
     handlePopState(event) {

@@ -1,11 +1,13 @@
 """Class for session crypt upload/download websocket."""
 
 import asyncio
+import hashlib
 import logging
 import os
 import random
 import secrets
 import ssl
+import time
 import typing
 
 import aiohttp.client
@@ -64,6 +66,8 @@ class FileUpload:
         self.owner = owner
         self.owner_name = owner_name
         self.content_type = content_type or "application/octet-stream"
+        self.sha256 = hashlib.sha256()
+        self.created_epoch = int(time.time())
 
         # Initialize backend generated values
         self.segment_id = secrets.token_urlsafe(32)
@@ -219,6 +223,7 @@ class FileUpload:
                         pass
             self.done_chunks.add(i)
             chunk = self.chunk_cache.pop(i)
+            self.sha256.update(chunk)
             yield chunk
 
         # Finally yield eof
@@ -293,6 +298,8 @@ class FileUpload:
                 "X-Object-Manifest": f"{self.container}{common.SEGMENTS_CONTAINER}/{self.path}/{self.segment_id}/",
                 "Content-Length": "0",
                 "Content-Type": self.content_type,
+                "X-Object-Meta-Created": str(self.created_epoch),
+                "X-Object-Meta-SHA256": self.sha256.hexdigest(),
             },
             ssl=ssl_context,
         ) as resp:

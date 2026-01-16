@@ -296,6 +296,8 @@ let default_translations = {
         created: "Created",
         checksum: "Checksum",
         items: "Items",
+        createdChecksumNote:"*Creation time and checksum are available only"
+         + " for objects uploaded via this UI.",
         upOneLevel: "back to parent folder",
         backToBuckets: "back to all buckets",
         createFolder: "Create folder",
@@ -870,6 +872,9 @@ let default_translations = {
         created: "Luotu",
         checksum: "Tarkistussumma",
         items: "Kohteet",
+        createdChecksumNote:
+          "*Luontiaika ja tarkistussumma ovat saatavilla " +
+          "vain käyttöliittymän kautta ladatuissa objekteissa.",
         upOneLevel: "takaisin ylempään kansioon",
         backToBuckets: "takaisin kaikkiin ämpäreihin",
         overwriteConfirm:

@@ -211,6 +211,11 @@ export async function getObjectsMeta (
   if (signal?.aborted) {
     return [];
   }
+  // remove
+   if (!ret.ok) {
+    const text = await ret.text().catch(() => "");
+    throw new Error(`getObjectsMeta failed: ${ret.status} ${ret.statusText} | ${text.slice(0, 200)}`);
+  }
   return ret.json();
 }
 

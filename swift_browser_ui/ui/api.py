@@ -374,17 +374,17 @@ async def _swift_get_object_metadata_wrapper(
         if ret.status != 200:
             raise aiohttp.web.HTTPInternalServerError(reason="Failed to fetch metadata.")
 
-        # remove
-        request.app["Log"].info(
-            f"HEAD headers for {container}/{obj}: {dict(ret.headers)}"
-        )
-
         meta = dict(filter(lambda i: "X-Object-Meta" in i[0], ret.headers.items()))
         meta = {k.replace("X-Object-Meta-", ""): v for k, v in meta.items()}
         if "s3cmd-attrs" in meta.keys():
             meta["s3cmd-attrs"] = dict(
                 [j.split(":") for j in meta["s3cmd-attrs"].split("/")]
             )
+
+        etag = ret.headers.get("Etag") or ret.headers.get("ETag")
+        if etag is not None:
+            meta["etag"] = etag
+
     return (obj, meta)
 
 
@@ -431,11 +431,6 @@ async def swift_get_metadata_container(
             "X-Auth-Token": session["projects"][project]["token"],
         },
     ) as ret:
-
-        # remove
-        request.app["Log"].info(
-            f"HEAD container headers for {container}: {dict(ret.headers)}"
-        )
 
         headers = ret.headers
     return aiohttp.web.json_response(
