@@ -270,3 +270,9 @@ export function moveToast(toastToMove, otherElement, restore) {
     toastToMove.style.marginBottom = h + "px";
   }
 }
+
+export function toggleObjectInfoModal(objectInfo, containerName) {
+  if (objectInfo) store.commit("setSelectedObjectInfo", objectInfo);
+  if (containerName) store.commit("setFolderName", containerName);
+  store.commit("toggleObjectInfoModal", true);
+}

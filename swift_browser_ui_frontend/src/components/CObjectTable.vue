@@ -34,6 +34,7 @@ import {
   parseDateFromNow,
   getHumanReadableSize,
   DEV,
+  makeGetObjectsMetaURL,
 } from "@/common/conv";
 
 import {
@@ -44,6 +45,7 @@ import {
   getPaginationOptions,
   checkIfItemIsLastOnPage,
   addErrorToastOnMain,
+  toggleObjectInfoModal,
 } from "@/common/globalFunctions";
 import {
   setPrevActiveElement,
@@ -55,7 +57,12 @@ import {
   mdiDeleteOutline,
   mdiFolder,
   mdiFileOutline,
+  mdiInformationOutline,
+  mdiEyeOutline,
 } from "@mdi/js";
+
+import { getObjectsMeta } from "@/common/api";
+import { DateTime } from "luxon";
 
 export default {
   name: "CObjectTable",
@@ -167,6 +174,101 @@ export default {
       checkIfItemIsLastOnPage(this.paginationOptions);
   },
   methods: {
+    normalizeHeaders(metaHeaders) {
+      const h = metaHeaders || {};
+      return Object.fromEntries(Object.entries(h).map(([k, v]) => [String(k).toLowerCase(), v]));
+    },
+    async buildInfoForItem(item) {
+      const isFolder = !!item?.subfolder;
+
+      const base = {
+        name: this.renderFolders ? getFolderName(item.name, this.$route) : item.name,
+        fullPath: `${this.container}/${item.name}`,
+        sizeHuman: getHumanReadableSize(Number(item.bytes) || 0, this.locale),
+        itemCount: isFolder ? item.itemCount ?? "-" : undefined,
+        lastModified: item.last_modified
+          ? parseDateTime(this.locale, item.last_modified, this.$t, false)
+          : "-",
+        contentType: item.content_type || item.type || (isFolder ? "application/x-directory" : "-"),
+        created: "-",
+        etag: item.etag || "-",
+        checksum: "-",
+        meta: {},
+        isFolder,
+      };
+
+      if (isFolder) return base;
+
+      const projectID = this.owner || this.active?.id;
+      const container = this.container;
+      const objects = [item.name];
+
+      const url = makeGetObjectsMetaURL(projectID, container, [...objects]);
+      if (this.owner) url.searchParams.append("owner", this.owner);
+
+      const meta = await getObjectsMeta(projectID, container, objects, url);
+      const headers = meta?.[0]?.[1] || {};
+      const lower = this.normalizeHeaders(headers);
+
+      const contentType =
+        lower["content-type"] ||
+        lower["x-object-meta-content-type"] ||
+        base.contentType;
+
+      const lastMod =
+        lower["last-modified"] ||
+        item.last_modified ||
+        "";
+
+      const ts = lower["x-timestamp"] || lower["x-object-meta-created"] || "";
+      let created = "-";
+      if (ts && !Number.isNaN(Number(ts))) {
+        created = parseDateTime(
+          this.locale,
+          DateTime.fromSeconds(Number(ts)).toISO(),
+          this.$t,
+          false
+        );
+      }
+
+      const etag = (lower["etag"] || "").replaceAll('"', "") || base.etag;
+
+      const checksum =
+        lower["x-object-meta-sha256"] ||
+        lower["x-object-meta-checksum"] ||
+        "-";
+
+      const customMeta = {};
+      for (const [k, v] of Object.entries(lower)) {
+        if (k.startsWith("x-object-meta-")) customMeta[k] = v;
+      }
+
+      return {
+        ...base,
+        contentType,
+        lastModified: lastMod
+          ? parseDateTime(this.locale, lastMod, this.$t, false)
+          : base.lastModified,
+        created,
+        etag,
+        checksum,
+        meta: customMeta,
+      };
+    },
+    async onOpenInfoModal(item, keypress) {
+      try {
+        const info = await this.buildInfoForItem(item);
+        toggleObjectInfoModal(info, this.container);
+
+        if (keypress) {
+          setPrevActiveElement();
+          const modal = document.getElementById("object-info-modal");
+          disableFocusOutsideModal(modal);
+        }
+      } catch (e) {
+        addErrorToastOnMain(this.$t("message.objects.metaFetchFailed") || "Failed to fetch object metadata.");
+      }
+    },
     handlePopState(event) {
       // reset page to 1 after reversing a page
       if (event.type === "popstate") {
@@ -296,6 +398,39 @@ export default {
               },
             },
             {
+              value: this.$t("message.objects.info") || "Info",
+              component: {
+                tag: "c-button",
+                params: {
+                  testid: "object-info",
+                  text: true,
+                  size: "small",
+                  title: "Info",
+                  path: mdiInformationOutline,
+                  onClick: () => this.onOpenInfoModal(item),
+                  onKeyUp: (event) => {
+                    if (event.keyCode === 13) this.onOpenInfoModal(item, true);
+                  },
+                  disabled: this.owner != undefined && this.accessRights.length === 0,
+                },
+              },
+            },
+            {
+              value: this.$t("message.objects.preview") || "Preview",
+              component: {
+                tag: "c-button",
+                params: {
+                  testid: "object-preview",
+                  text: true,
+                  size: "small",
+                  title: "Preview",
+                  path: mdiEyeOutline,
+                  disabled: true, // Preview not implemented yet
+                  onClick: () => {},
+                },
+              },
+            },
+            {
               value: this.$t("message.table.editTags"),
               component: {
                 tag: "c-button",
@@ -409,6 +544,7 @@ export default {
               last_modified: subfolderObjs[0].last_modified,
               tags: [],
               subfolder: true,
+              itemCount: subfolderObjs.length,
             };
             items.push(subfolder);
           }

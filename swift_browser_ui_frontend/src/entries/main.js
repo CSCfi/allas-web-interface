@@ -16,6 +16,8 @@ import CopyFolderModal from "@/components/CopyFolderModal.vue";
 import DeleteModal from "@/components/DeleteModal.vue";
 import TokenModal from "@/components/TokenModal.vue";
 import CopyProgressToast from "@/components/CopyProgressToast.vue";
+import ObjectInfoModal from "@/components/ObjectInfoModal.vue";
+
 
 
 // CSC UI things
@@ -97,6 +99,7 @@ const app = createApp({
     TokenModal,
     DownloadStartedToast,
     CopyProgressToast,
+    ObjectInfoModal,
   },
   data: function () {
     return {
@@ -193,6 +196,10 @@ const app = createApp({
     },
     socket() {
       return this.$store.state.socket;
+    },
+    openObjectInfoModal: {
+      get() { return this.$store.state.openObjectInfoModal; },
+      set() {},
     },
   },
   watch: {

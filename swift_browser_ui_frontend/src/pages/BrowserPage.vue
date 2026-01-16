@@ -12,6 +12,15 @@
       role="main"
     >
       <c-modal
+        id="object-info-modal"
+        v-model="openObjectInfoModal"
+        v-csc-control
+        disable-backdrop-blur
+        width="64vw"
+      >
+        <ObjectInfoModal />
+      </c-modal>
+      <c-modal
         v-model="openConfirmRouteModal"
         v-csc-control
         disable-backdrop-blur
