@@ -29,16 +29,17 @@
           <p v-if="info.etag" class="inline-copy">
             <b>ETag:</b>
             <span class="inline-copy-value">{{ info.etag }}</span>
-            <c-button
-              ghost
-              class="copy-icon-btn"
-              title="Copy ETag"
-              :aria-label="'Copy ETag'"
-              @click="copyToClipboard(info.etag)"
-              @keyup.enter="copyToClipboard(info.etag)"
-            >
-              <c-icon slot="icon" :path="mdiContentCopy" />
-            </c-button>
+              <c-button
+                v-if="info.checksum && info.checksum !== '-'"
+                ghost
+                class="copy-icon-btn"
+                title="Copy checksum"
+                aria-label="Copy checksum"
+                @click="copyToClipboard(info.checksum)"
+                @keyup.enter="copyToClipboard(info.checksum)"
+              >
+                <c-icon slot="icon" :path="mdiContentCopy" />
+              </c-button>
           </p>
           <p><b>{{ $t("message.table.modified") || "Last modified" }}:</b> {{ info.lastModified || "-" }}</p>
           <p v-if="info && !info.isFolder">
