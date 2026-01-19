@@ -26,13 +26,38 @@
           </p>
           <p><b>{{ $t("message.objects.fullPath") || "Full path" }}:</b> {{ info.fullPath || "-" }}</p>
           <p><b>{{ $t("message.objects.contentType") || "Content-Type" }}:</b> {{ info.contentType || "-" }}</p>
-          <p v-if="info.etag"><b>ETag:</b> {{ info.etag }}</p>
+          <p v-if="info.etag" class="inline-copy">
+            <b>ETag:</b>
+            <span class="inline-copy-value">{{ info.etag }}</span>
+            <c-button
+              ghost
+              class="copy-icon-btn"
+              title="Copy ETag"
+              :aria-label="'Copy ETag'"
+              @click="copyToClipboard(info.etag)"
+              @keyup.enter="copyToClipboard(info.etag)"
+            >
+              <c-icon slot="icon" :path="mdiContentCopy" />
+            </c-button>
+          </p>
           <p><b>{{ $t("message.table.modified") || "Last modified" }}:</b> {{ info.lastModified || "-" }}</p>
           <p v-if="info && !info.isFolder">
             <b>{{ $t("message.objects.created") || "Created" }}:</b> {{ info.created || "-" }}
           </p>
-          <p v-if="!info.isFolder">
-            <b>{{ $t("message.objects.checksum") || "Checksum" }} (SHA-256):</b> {{ info.checksum || "-" }}
+          <p v-if="!info.isFolder" class="inline-copy">
+            <b>{{ $t("message.objects.checksum") || "Checksum" }} (SHA-256):</b>
+            <span class="inline-copy-value">{{ info.checksum || "-" }}</span>
+            <c-button
+              ghost
+              class="copy-icon-btn"
+              title="Copy checksum"
+              :aria-label="'Copy checksum'"
+              :disabled="!info.checksum || info.checksum === '-'"
+              @click="copyToClipboard(info.checksum)"
+              @keyup.enter="copyToClipboard(info.checksum)"
+            >
+              <c-icon slot="icon" :path="mdiContentCopy" />
+            </c-button>
           </p>
           <p class="info-note" v-if="info && !info.isFolder">
             {{ $t("message.objects.createdChecksumNote")}}
@@ -59,7 +84,7 @@ import {
   keyboardNavigationInsideModal,
   moveFocusOutOfModal,
 } from "@/common/keyboardNavigation";
-import { mdiFolder, mdiFileOutline } from "@mdi/js";
+import { mdiFolder, mdiFileOutline, mdiContentCopy } from "@mdi/js";
 
 
 export default {
@@ -76,9 +101,24 @@ export default {
     return {
       mdiFolder,
       mdiFileOutline,
+      mdiContentCopy,
     };
   },
   methods: {
+    async copyToClipboard(value) {
+      if (!value || value === "-") return;
+
+      try {
+        await navigator.clipboard.writeText(value);
+      } catch (e) {
+        const el = document.createElement("textarea");
+        el.value = value;
+        document.body.appendChild(el);
+        el.select();
+        document.execCommand("copy");
+        document.body.removeChild(el);
+      }
+    },
     close() {
       this.$store.commit("toggleObjectInfoModal", false);
       this.$store.commit("setSelectedObjectInfo", null);
@@ -132,6 +172,21 @@ ul {
 .title-icon-link {
   line-height: 1;
 }
-
-
+.inline-copy {
+  display: flex;
+  gap: 0.4rem;
+  margin-bottom: -25px;
+}
+.inline-copy-value {
+  word-break: break-all;
+}
+.copy-icon-btn {
+  transform: scale(0.65);
+  margin-left: 0.2rem;
+  position: relative;
+  top: -12px;
+}
+.copy-icon-btn:hover {
+  opacity: 1;
+}
 </style>
