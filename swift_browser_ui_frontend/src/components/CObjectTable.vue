@@ -203,13 +203,13 @@ export default {
 
       const meta = await getObjectsMeta(projectID, container, objects, url, undefined,
         this.owner || "");
-      console.log("META RESPONSE", meta); // remove
       const metaObj = meta?.[0]?.[1] || {};
 
 
       let created = "-";
 
-      const createdSec = Number.parseInt(metaObj?.Created ?? "", 10);
+      const createdRaw = metaObj?.Created ?? metaObj?.created ?? "";
+      const createdSec = Number.parseInt(createdRaw, 10);
       if (Number.isFinite(createdSec) && createdSec > 0) {
         const iso = DateTime.fromSeconds(createdSec).toUTC().toISO();
         if (iso) {
@@ -220,7 +220,7 @@ export default {
       const etag =
         (metaObj.etag || "").toString().replaceAll('"', "") || base.etag;
 
-      const checksum = metaObj.Sha256 || base.checksum;
+      const checksum = (metaObj?.Sha256 ?? metaObj?.sha256 ?? base.checksum);
 
 
       return {

@@ -32,7 +32,7 @@
             <b>{{ $t("message.objects.created") || "Created" }}:</b> {{ info.created || "-" }}
           </p>
           <p v-if="!info.isFolder">
-            <b>{{ $t("message.objects.checksum") || "Checksum" }}:</b> {{ info.checksum || "-" }}
+            <b>{{ $t("message.objects.checksum") || "Checksum" }} (SHA-256):</b> {{ info.checksum || "-" }}
           </p>
           <p class="info-note" v-if="info && !info.isFolder">
             {{ $t("message.objects.createdChecksumNote")}}

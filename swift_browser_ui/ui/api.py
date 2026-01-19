@@ -374,9 +374,18 @@ async def _swift_get_object_metadata_wrapper(
         if ret.status != 200:
             raise aiohttp.web.HTTPInternalServerError(reason="Failed to fetch metadata.")
 
-        meta = dict(filter(lambda i: "X-Object-Meta" in i[0], ret.headers.items()))
-        meta = {k.replace("X-Object-Meta-", ""): v for k, v in meta.items()}
-        if "s3cmd-attrs" in meta.keys():
+        meta = {}
+        for k, v in ret.headers.items():
+            lk = k.lower()
+            if lk.startswith("x-object-meta-"):
+                meta_key = lk[len("x-object-meta-") :]
+                meta[meta_key] = v
+
+        if "created" in meta:
+            meta["Created"] = meta["created"]
+        if "sha256" in meta:
+            meta["Sha256"] = meta["sha256"]
+        if "s3cmd-attrs" in meta:
             meta["s3cmd-attrs"] = dict(
                 [j.split(":") for j in meta["s3cmd-attrs"].split("/")]
             )
