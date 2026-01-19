@@ -29,6 +29,24 @@
           <p v-if="info.etag" class="inline-copy">
             <b>ETag:</b>
             <span class="inline-copy-value">{{ info.etag }}</span>
+            <c-button
+              ghost
+              class="copy-icon-btn"
+              title="Copy ETag"
+              :aria-label="'Copy ETag'"
+              @click="copyToClipboard(info.etag)"
+              @keyup.enter="copyToClipboard(info.etag)"
+            >
+              <c-icon slot="icon" :path="mdiContentCopy" />
+            </c-button>
+          </p>
+          <p><b>{{ $t("message.table.modified") || "Last modified" }}:</b> {{ info.lastModified || "-" }}</p>
+          <p v-if="info && !info.isFolder">
+            <b>{{ $t("message.objects.created") || "Created" }}:</b> {{ info.created || "-" }}
+          </p>
+          <p v-if="!info.isFolder" class="inline-copy">
+            <b>{{ $t("message.objects.checksum") || "Checksum" }} (SHA-256):</b>
+            <span class="inline-copy-value">{{ info.checksum || "-" }}</span>
               <c-button
                 v-if="info.checksum && info.checksum !== '-'"
                 ghost
@@ -40,25 +58,6 @@
               >
                 <c-icon slot="icon" :path="mdiContentCopy" />
               </c-button>
-          </p>
-          <p><b>{{ $t("message.table.modified") || "Last modified" }}:</b> {{ info.lastModified || "-" }}</p>
-          <p v-if="info && !info.isFolder">
-            <b>{{ $t("message.objects.created") || "Created" }}:</b> {{ info.created || "-" }}
-          </p>
-          <p v-if="!info.isFolder" class="inline-copy">
-            <b>{{ $t("message.objects.checksum") || "Checksum" }} (SHA-256):</b>
-            <span class="inline-copy-value">{{ info.checksum || "-" }}</span>
-            <c-button
-              ghost
-              class="copy-icon-btn"
-              title="Copy checksum"
-              :aria-label="'Copy checksum'"
-              :disabled="!info.checksum || info.checksum === '-'"
-              @click="copyToClipboard(info.checksum)"
-              @keyup.enter="copyToClipboard(info.checksum)"
-            >
-              <c-icon slot="icon" :path="mdiContentCopy" />
-            </c-button>
           </p>
           <p class="info-note" v-if="info && !info.isFolder">
             {{ $t("message.objects.createdChecksumNote")}}
