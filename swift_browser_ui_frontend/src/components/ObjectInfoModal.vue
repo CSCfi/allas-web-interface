@@ -167,7 +167,6 @@ ul {
   pointer-events: none;
   display: inline-flex;
   margin-right: 0.25rem;
-  opacity: 0.7;
 }
 .title-icon-link {
   line-height: 1;

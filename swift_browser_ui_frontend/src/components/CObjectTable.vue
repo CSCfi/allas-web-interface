@@ -58,7 +58,6 @@ import {
   mdiFolder,
   mdiFileOutline,
   mdiInformationOutline,
-  mdiEyeOutline,
 } from "@mdi/js";
 
 import { getObjectsMeta } from "@/common/api";
@@ -388,21 +387,6 @@ export default {
                     if (event.keyCode === 13) this.onOpenInfoModal(item, true);
                   },
                   disabled: this.owner != undefined && this.accessRights.length === 0,
-                },
-              },
-            },
-            {
-              value: this.$t("message.objects.preview") || "Preview",
-              component: {
-                tag: "c-button",
-                params: {
-                  testid: "object-preview",
-                  text: true,
-                  size: "small",
-                  title: "Preview",
-                  path: mdiEyeOutline,
-                  disabled: true, // Preview not implemented yet
-                  onClick: () => {},
                 },
               },
             },
