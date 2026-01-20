@@ -153,7 +153,7 @@ ul {
   padding-left: 1.2rem;
 }
 .info-note {
-  margin-top: 1.5rem;
+  margin-top: 1.8rem;
   font-size: 0.9rem;
   font-style: italic;
   opacity: 0.75;
