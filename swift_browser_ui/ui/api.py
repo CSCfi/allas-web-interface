@@ -350,6 +350,70 @@ async def swift_download_object(request: aiohttp.web.Request) -> aiohttp.web.Res
     )
 
 
+async def swift_preview_object(
+    request: aiohttp.web.Request,
+) -> aiohttp.web.StreamResponse:
+    """Stream an object for in-browser preview (inline). Supports shared owner=."""
+    session = await aiohttp_session.get_session(request)
+    client = request.app["api_client"]
+
+    project = request.match_info["project"]
+    container = request.match_info["container"]
+    object_name = request.match_info["object"]
+
+    # Avoid double-encoding (frontend may already encode the path)
+    object_name = urllib.parse.unquote(object_name)
+
+    endpoint = session["projects"][project]["endpoint"]
+    owner = request.query.get("owner")
+    if owner:
+        endpoint = endpoint.replace(project, owner)
+
+    url = (
+        f"{endpoint}/"
+        f"{urllib.parse.quote(container, safe='')}/"
+        f"{urllib.parse.quote(object_name, safe='/')}"
+    )
+
+    # Forward Range for PDF/video seeking if present
+    headers = {"X-Auth-Token": session["projects"][project]["token"]}
+    range_hdr = request.headers.get("Range")
+    if range_hdr:
+        headers["Range"] = range_hdr
+
+    async with client.get(url, headers=headers) as upstream:
+        # StreamResponse so we don't buffer the whole file in UI server
+        resp = aiohttp.web.StreamResponse(status=upstream.status)
+
+        # Content-Type from Swift
+        ctype = upstream.headers.get("Content-Type", "application/octet-stream")
+        if ";" in ctype:
+            ctype = ctype.split(";", 1)[0].strip()
+        resp.content_type = ctype
+
+        # Force inline preview
+        filename = object_name.split("/")[-1]
+        resp.headers["Content-Disposition"] = f'inline; filename="{filename}"'
+
+        # Pass through Range/length headers if present
+        passthrough = [
+            "Accept-Ranges",
+            "Content-Range",
+            "Content-Length",
+            "ETag",
+            "Last-Modified",
+        ]
+        for h in passthrough:
+            if h in upstream.headers:
+                resp.headers[h] = upstream.headers[h]
+
+        await resp.prepare(request)
+        async for chunk in upstream.content.iter_chunked(65536):
+            await resp.write(chunk)
+        await resp.write_eof()
+        return resp
+
+
 async def _swift_get_object_metadata_wrapper(
     request: aiohttp.web.Request, obj: str
 ) -> typing.Tuple[str, typing.Dict[str, typing.Any]]:

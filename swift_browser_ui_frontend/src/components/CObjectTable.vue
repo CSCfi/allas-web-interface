@@ -60,7 +60,7 @@ import {
   mdiInformationOutline,
 } from "@mdi/js";
 
-import { getObjectsMeta } from "@/common/api";
+import { getObjectsMeta, getPreviewUrl } from "@/common/api";
 import { DateTime } from "luxon";
 
 export default {
@@ -295,6 +295,12 @@ export default {
                 iconStyle: {
                   marginRight: "1rem",
                   flexShrink: "0",
+                },
+                onClick: () => {
+                  const projectID = this.owner || this.active?.id;
+                  const owner = this.owner || "";
+                  const previewUrl = getPreviewUrl(projectID, this.container, item.name, owner);
+                  window.open(previewUrl, "_blank");
                 },
               },
             },
