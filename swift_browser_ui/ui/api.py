@@ -360,8 +360,6 @@ async def swift_preview_object(
     project = request.match_info["project"]
     container = request.match_info["container"]
     object_name = request.match_info["object"]
-
-    # Avoid double-encoding (frontend may already encode the path)
     object_name = urllib.parse.unquote(object_name)
 
     endpoint = session["projects"][project]["endpoint"]
@@ -382,7 +380,6 @@ async def swift_preview_object(
         headers["Range"] = range_hdr
 
     async with client.get(url, headers=headers) as upstream:
-        # StreamResponse so we don't buffer the whole file in UI server
         resp = aiohttp.web.StreamResponse(status=upstream.status)
 
         # Content-Type from Swift

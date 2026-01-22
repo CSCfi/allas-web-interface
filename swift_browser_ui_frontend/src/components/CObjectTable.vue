@@ -301,6 +301,7 @@ export default {
                   const owner = this.owner || "";
                   const previewUrl = getPreviewUrl(projectID, this.container, item.name, owner);
                   window.open(previewUrl, "_blank");
+                  this.$store.commit("togglePreviewOpenedToast", true);
                 },
               },
             },

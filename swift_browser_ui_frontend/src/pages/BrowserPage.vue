@@ -99,6 +99,7 @@
         @cancel-download="cancelDownload"
       />
       <DownloadStartedToast v-if="$store.state.downloadStartedToastVisible" />
+      <PreviewOpenedToast v-if="$store.state.previewOpenedToastVisible" />
       <CopyProgressToast v-if="Object.keys($store.state.copyJobs).length" />
       <router-view class="content-wrapper" />
       <c-toasts

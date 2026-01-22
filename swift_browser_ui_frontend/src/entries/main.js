@@ -17,6 +17,8 @@ import DeleteModal from "@/components/DeleteModal.vue";
 import TokenModal from "@/components/TokenModal.vue";
 import CopyProgressToast from "@/components/CopyProgressToast.vue";
 import ObjectInfoModal from "@/components/ObjectInfoModal.vue";
+import PreviewOpenedToast from "@/components/PreviewOpenedToast.vue";
+
 
 
 
@@ -100,6 +102,7 @@ const app = createApp({
     DownloadStartedToast,
     CopyProgressToast,
     ObjectInfoModal,
+    PreviewOpenedToast,
   },
   data: function () {
     return {

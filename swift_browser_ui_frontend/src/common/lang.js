@@ -14,6 +14,10 @@ let default_translations = {
           },
         ],
       },
+      preview: {
+        openedInNewTab: "Opening file in a new tab. If preview isn’t supported, "
+         + "your browser may download the file instead.",
+      },
       error: {
         prevPage: "Go to previous page",
         login: "Go to login",
@@ -587,6 +591,10 @@ let default_translations = {
             href: "/login/oidc_front",
           },
         ],
+      },
+      preview: {
+        openedInNewTab: "Avaa tiedosto uudessa välilehdessä. Jos esikatselu " +
+         "ei ole tuettu, selain saattaa ladata tiedoston sen sijaan.",
       },
       error: {
         prevPage: "Siirry edelliselle sivulle",

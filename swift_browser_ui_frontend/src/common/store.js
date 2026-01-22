@@ -82,6 +82,7 @@ const store = createStore({
     copyJobs: {},
     openObjectInfoModal: false,
     selectedObjectInfo: null,
+    previewOpenedToastVisible: false,
   },
   mutations: {
     setProjects(state, newProjects) {
@@ -271,6 +272,9 @@ const store = createStore({
     },
     setSelectedObjectInfo(state, payload) {
       state.selectedObjectInfo = payload;
+    },
+    togglePreviewOpenedToast(state, val) {
+      state.previewOpenedToastVisible = val;
     },
   },
   actions: {
