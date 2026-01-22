@@ -15,8 +15,8 @@ let default_translations = {
         ],
       },
       preview: {
-        openedInNewTab: "Opening file in a new tab. If preview isn’t supported, "
-         + "your browser may download the file instead.",
+        openedInNewTab: "Opening file in a new tab. Preview depends on the content type; "
+         + "unsupported types may download instead — press Info for details.",
       },
       error: {
         prevPage: "Go to previous page",
@@ -593,8 +593,9 @@ let default_translations = {
         ],
       },
       preview: {
-        openedInNewTab: "Avaa tiedosto uudessa välilehdessä. Jos esikatselu " +
-         "ei ole tuettu, selain saattaa ladata tiedoston sen sijaan.",
+        openedInNewTab: "Avaa tiedosto uudessa välilehdessä. Esikatselu riippuu sisällön tyypistä; " +
+         "tuettuja tyyppejä lukuun ottamatta selain saattaa"
+          + "ladata tiedoston sen sijaan — paina Tiedot saadaksesi lisätietoja.",
       },
       error: {
         prevPage: "Siirry edelliselle sivulle",
