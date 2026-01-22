@@ -15,8 +15,8 @@ let default_translations = {
         ],
       },
       preview: {
-        openedInNewTab: "Opening file in a new tab. Preview depends on the content type; "
-         + "unsupported types may download instead — press Info for details.",
+        openedInNewTab: "Opening file in a new tab. Preview depends on the content type, "
+         + "unsupported types may download instead.",
       },
       error: {
         prevPage: "Go to previous page",
@@ -27,8 +27,8 @@ let default_translations = {
           "be for example due to missing password and/or " +
           "username.",
         UIdown: "500 – Service is temporarily down. Please try again in" +
-                "a few minutes. Please contact support at servicedesk@csc.fi" +
-                "if the problem persists.",
+                " a few minutes. Please contact support at servicedesk@csc.fi" +
+                " if the problem persists.",
         UIdown_text1:
           "You are seeing this page because " +
           "the service is currently unavailable. Please check back later.",
@@ -593,9 +593,9 @@ let default_translations = {
         ],
       },
       preview: {
-        openedInNewTab: "Avaa tiedosto uudessa välilehdessä. Esikatselu riippuu sisällön tyypistä; " +
-         "tuettuja tyyppejä lukuun ottamatta selain saattaa"
-          + "ladata tiedoston sen sijaan — paina Tiedot saadaksesi lisätietoja.",
+        openedInNewTab: "Tiedosto avautuu uuteen välilehteen. Esikatselu " +
+          "riippuu sisällön tyypistä, ja tukemattomat tyypit saattavat " +
+          "ladata tiedoston sen sijaan.",
       },
       error: {
         prevPage: "Siirry edelliselle sivulle",
@@ -605,9 +605,9 @@ let default_translations = {
           "Virhe sivupyynnössä. Tämä voi johtua esimerkiksi " +
           "puuttuvasta salasanasta ja/tai käyttäjänimestä ",
         UIdown: "500 – Palvelu on tilapäisesti poissa käytöstä." +
-                "Yritä uudelleen muutaman minuutin kuluttua." +
-                "Ota yhteyttä tukeen servicedesk@csc.fi, jos" +
-                "ongelma jatkuu.",
+                " Yritä uudelleen muutaman minuutin kuluttua." +
+                " Ota yhteyttä tukeen servicedesk@csc.fi, jos" +
+                " ongelma jatkuu.",
         UIdown_text1:
           "Näet tämän sivun, koska palvelu " +
           "ei ole tällä hetkellä saatavilla.",
