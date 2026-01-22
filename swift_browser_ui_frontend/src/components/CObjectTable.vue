@@ -200,8 +200,8 @@ export default {
       const url = makeGetObjectsMetaURL(projectID, container, [...objects]);
       if (this.owner) url.searchParams.append("owner", this.owner);
 
-      const meta = await getObjectsMeta(projectID, container, objects, url, undefined,
-        this.owner || "");
+      const meta = await getObjectsMeta(
+        projectID, container, objects, url, undefined,this.owner || "");
       const metaObj = meta?.[0]?.[1] || {};
 
 
