@@ -80,7 +80,9 @@ const store = createStore({
     sharedContainers: [],
     downloadStartedToastVisible: false,
     copyJobs: {},
-
+    openObjectInfoModal: false,
+    selectedObjectInfo: null,
+    previewOpenedToastVisible: false,
   },
   mutations: {
     setProjects(state, newProjects) {
@@ -265,8 +267,15 @@ const store = createStore({
     removeCopyJob(state, jobId) {
       delete state.copyJobs[jobId];
     },
-
-
+    toggleObjectInfoModal(state, payload) {
+      state.openObjectInfoModal = payload;
+    },
+    setSelectedObjectInfo(state, payload) {
+      state.selectedObjectInfo = payload;
+    },
+    togglePreviewOpenedToast(state, val) {
+      state.previewOpenedToastVisible = val;
+    },
   },
   actions: {
     updateContainers: async function (

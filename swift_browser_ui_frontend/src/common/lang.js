@@ -14,6 +14,10 @@ let default_translations = {
           },
         ],
       },
+      preview: {
+        openedInNewTab: "Opening file in a new tab. Preview depends on the content type, "
+         + "unsupported types may download instead.",
+      },
       error: {
         prevPage: "Go to previous page",
         login: "Go to login",
@@ -23,8 +27,8 @@ let default_translations = {
           "be for example due to missing password and/or " +
           "username.",
         UIdown: "500 – Service is temporarily down. Please try again in" +
-                "a few minutes. Please contact support at servicedesk@csc.fi" +
-                "if the problem persists.",
+                " a few minutes. Please contact support at servicedesk@csc.fi" +
+                " if the problem persists.",
         UIdown_text1:
           "You are seeing this page because " +
           "the service is currently unavailable. Please check back later.",
@@ -289,6 +293,15 @@ let default_translations = {
         files: "Files ",
         folder: "Folder",
         folderName: "Folder name",
+        info: "Info",
+        preview: "Preview",
+        fullPath: "Full path",
+        contentType: "Content type",
+        created: "Created",
+        checksum: "Checksum",
+        items: "Items",
+        createdChecksumNote:"*Creation time and checksum are available only"
+         + " for objects uploaded via this UI.",
         upOneLevel: "back to parent folder",
         backToBuckets: "back to all buckets",
         createFolder: "Create folder",
@@ -579,6 +592,11 @@ let default_translations = {
           },
         ],
       },
+      preview: {
+        openedInNewTab: "Tiedosto avautuu uuteen välilehteen. Esikatselu " +
+          "riippuu sisällön tyypistä, ja tukemattomat tyypit saattavat " +
+          "ladata tiedoston sen sijaan.",
+      },
       error: {
         prevPage: "Siirry edelliselle sivulle",
         login: "Siirry kirjautumissivulle",
@@ -587,9 +605,9 @@ let default_translations = {
           "Virhe sivupyynnössä. Tämä voi johtua esimerkiksi " +
           "puuttuvasta salasanasta ja/tai käyttäjänimestä ",
         UIdown: "500 – Palvelu on tilapäisesti poissa käytöstä." +
-                "Yritä uudelleen muutaman minuutin kuluttua." +
-                "Ota yhteyttä tukeen servicedesk@csc.fi, jos" +
-                "ongelma jatkuu.",
+                " Yritä uudelleen muutaman minuutin kuluttua." +
+                " Ota yhteyttä tukeen servicedesk@csc.fi, jos" +
+                " ongelma jatkuu.",
         UIdown_text1:
           "Näet tämän sivun, koska palvelu " +
           "ei ole tällä hetkellä saatavilla.",
@@ -856,6 +874,18 @@ let default_translations = {
         files: "Tiedostot ",
         folder: "Kansio",
         createFolder: "Luo kansio",
+        info: "Tiedot",
+        preview: "Esikatselu",
+        fullPath: "Koko polku",
+        contentType: "Sisältötyyppi",
+        created: "Luotu",
+        checksum: "Tarkistussumma",
+        items: "Kohteet",
+        createdChecksumNote:
+          "*Luontiaika ja tarkistussumma ovat saatavilla " +
+          "vain käyttöliittymän kautta ladatuissa objekteissa.",
+        upOneLevel: "takaisin ylempään kansioon",
+        backToBuckets: "takaisin kaikkiin ämpäreihin",
         overwriteConfirm:
           " on jo olemassa. Haluatko korvata tiedoston? " +
           "(Edellinen tiedosto poistetaan.)",

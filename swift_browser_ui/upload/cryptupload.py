@@ -1,11 +1,13 @@
 """Class for session crypt upload/download websocket."""
 
 import asyncio
+import hashlib
 import logging
 import os
 import random
 import secrets
 import ssl
+import time
 import typing
 
 import aiohttp.client
@@ -48,6 +50,7 @@ class FileUpload:
         total: int,
         owner: str = "",
         owner_name: str = "",
+        content_type: str = "application/octet-stream",
     ):
         """."""
         self.session = session
@@ -62,6 +65,9 @@ class FileUpload:
 
         self.owner = owner
         self.owner_name = owner_name
+        self.content_type = content_type or "application/octet-stream"
+        self.sha256 = hashlib.sha256()
+        self.created_epoch = int(time.time())
 
         # Initialize backend generated values
         self.segment_id = secrets.token_urlsafe(32)
@@ -217,6 +223,7 @@ class FileUpload:
                         pass
             self.done_chunks.add(i)
             chunk = self.chunk_cache.pop(i)
+            self.sha256.update(chunk)
             yield chunk
 
         # Finally yield eof
@@ -290,6 +297,9 @@ class FileUpload:
                 "X-Auth-Token": self.token,
                 "X-Object-Manifest": f"{self.container}{common.SEGMENTS_CONTAINER}/{self.path}/{self.segment_id}/",
                 "Content-Length": "0",
+                "Content-Type": self.content_type,
+                "X-Object-Meta-Created": str(self.created_epoch),
+                "X-Object-Meta-SHA256": self.sha256.hexdigest(),
             },
             ssl=ssl_context,
         ) as resp:
@@ -370,6 +380,7 @@ class UploadSession:
         if "owner_name" in msg:
             owner_name = str(msg["owner_name"])
         total = int(msg["total"])
+        content_type = str(msg.get("content_type", "application/octet-stream"))
 
         if (
             container in self.uploads
@@ -393,8 +404,9 @@ class UploadSession:
             name,
             path,
             total,
-            owner,
-            owner_name,
+            owner=owner,
+            owner_name=owner_name,
+            content_type=content_type,
         )
 
         await self.uploads[container][path].init_upload()

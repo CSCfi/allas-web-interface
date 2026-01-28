@@ -581,3 +581,12 @@ export async function swiftCreateEmptyObject(project, container, objectPath, own
   if (ret.status >= 500) throw new Error("Storage backend error.");
   throw new Error(`Object creation failed (${ret.status}).`);
 }
+
+export function getPreviewUrl(project, container, objectName, owner = "") {
+  const url = new URL(
+    `/preview/${encodeURIComponent(project)}/${encodeURIComponent(container)}/${encodeURIComponent(objectName)}`,
+    document.location.origin
+  );
+  if (owner) url.searchParams.append("owner", owner);
+  return url.toString();
+}

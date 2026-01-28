@@ -216,9 +216,10 @@ class ObjectReplicationProxy:
             length = int(resp_g.headers["Content-Length"])
 
             # Copy over metadata headers
-            for i in resp_g.headers:
-                if "X-Object-Meta-Usertags" in i:
-                    headers[i] = resp_g.headers[i]
+            for k, v in resp_g.headers.items():
+                lk = k.lower()
+                if lk.startswith("x-object-meta-"):
+                    headers[k] = v
 
             if "X-Object-Manifest" not in resp_g.headers:
                 LOGGER.info(f"Copying object {object_name} in full.")
@@ -263,6 +264,9 @@ class ObjectReplicationProxy:
                 LOGGER.debug("Uploading manifest")
                 # Add manifest headers
                 headers["X-Object-Manifest"] = manifest
+                headers["Content-Type"] = resp_g.headers.get(
+                    "Content-Type", "application/octet-stream"
+                )
 
                 if _is_cancelled(app, job_id):
                     raise asyncio.CancelledError()
