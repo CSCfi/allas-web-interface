@@ -131,12 +131,12 @@ export default {
     },
   },
   created() {
+    this.abortController = new AbortController();
     this.setHeaders();
     this.setPagination();
     Promise.all([this.getSharingContainers(), this.getSharedContainers()]);
   },
   beforeMount () {
-    this.abortController = new AbortController();
   },
   beforeUnmount () {
     this.abortController.abort();
@@ -147,14 +147,22 @@ export default {
       this.paginationOptions.currentPage = 1;
     },
     async getSharingContainers () {
-      this.sharingContainers =
-        await getSharingContainers(this.active.id, this.abortController.signal);
-        this.$store.commit('setSharingContainers', this.sharingContainers);
+      try {
+        this.sharingContainers =
+          await getSharingContainers(this.active.id, this.abortController.signal);
+          this.$store.commit('setSharingContainers', this.sharingContainers);
+      } catch (e) {
+        if (e?.name !== "AbortError") throw e;
+      }
     },
     async getSharedContainers () {
-      this.sharedContainers =
-        await getSharedContainers(this.active.id, this.abortController.signal);
-        this.$store.commit('setSharedContainers', this.sharedContainers);
+      try {
+        this.sharedContainers =
+          await getSharedContainers(this.active.id, this.abortController.signal);
+          this.$store.commit('setSharedContainers', this.sharedContainers);
+      } catch (e) {
+        if (e?.name !== "AbortError") throw e;
+      }
     },
     async getPage () {
       let offset = 0;

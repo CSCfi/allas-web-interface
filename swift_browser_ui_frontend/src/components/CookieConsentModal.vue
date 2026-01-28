@@ -3,7 +3,7 @@
     <div class="cookie-modal">
 
       <div class="modal-header">
-        <h2><Strong>COOKIES</Strong></h2>
+        <h2><strong>COOKIES</strong></h2>
         <button class="close-btn" @click="acknowledge">✖ Close</button>
       </div>
 

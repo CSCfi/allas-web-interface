@@ -594,6 +594,14 @@ const store = createStore({
           await getDB().objects.put(newObj);
         }
       }
+      // Update container count if needed
+      if (!isSegmentsContainer) {
+        const realCount = newObjects.filter(o =>
+          !(o.name.endsWith("/") && Number(o.bytes || 0) === 0)
+        ).length;
+
+        await getDB().containers.update(container.id, { count: realCount });
+      }
 
       if (!isSegmentsContainer && updateTags) {
         await dispatch("updateObjectTags", {

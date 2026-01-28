@@ -8,9 +8,7 @@
       >
         <c-row align="center">
           <c-csc-logo alt="CSC_Logo" />
-          <h1 class="app-name">
-            {{ $t("Allas") }}
-          </h1>
+          <h1 class="app-name">Allas</h1>
         </c-row>
       </router-link>
 

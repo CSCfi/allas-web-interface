@@ -7,7 +7,7 @@
       weight="400"
     >
       <c-csc-logo />
-      <span>{{ $t("Allas") }} </span>
+      <span>Allas</span>
     </c-link>
     <c-spacer />
     <LanguageSelector />

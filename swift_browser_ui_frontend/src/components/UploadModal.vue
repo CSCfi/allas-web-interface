@@ -101,7 +101,7 @@
           >
             {{ $t("message.objects.file") }}
             <b>
-              {{ existingFiles[0].name }}
+              {{ existingFiles[0].relativePath || existingFiles[0].name }}
             </b>
             {{ $t("message.objects.overwriteConfirm") }}
           </span>
@@ -328,7 +328,6 @@ export default {
         const files = Array.from(value);
         files.forEach(file => {
           if (this.addFiles) {
-            file.relativePath = file.name;
             this.appendDropFiles(file);
           }
         });
@@ -343,7 +342,7 @@ export default {
     },
     existingFileNames() {
       return this.existingFiles.reduce((array, item) => {
-        array.push(item.name);
+        array.push(item.relativePath || item.name);
         return array;
       }, []).join(", ");
     },
@@ -434,6 +433,11 @@ export default {
     }
   },
   methods: {
+    // Get the current prefix from the route query
+    getCurrentPrefix() {
+      const raw = (this.$route.query.prefix || "").replace(/^\/+/, "");
+      return raw && !raw.endsWith("/") ? `${raw}/` : raw;
+    },
     // Create any empty folders that were added
     async createEmptyFolders() {
       if (this.emptyFolders.length === 0) return;
@@ -481,20 +485,29 @@ export default {
         setTimeout(() => this.dropFileErrors[1].show = false, 6000);
         return;
       }
+
+      // Determine effective path with prefix
+      const prefix = this.getCurrentPrefix();
+      const rp = file.relativePath || file.name;
+      const effectivePath = `${prefix}${rp}`;
+
+
       //Check if file path already exists in dropFiles
       if (
         this.dropFiles.find(
-          ({ relativePath }) => relativePath === file.relativePath,
+          ({ relativePath }) => relativePath === effectivePath,
         ) === undefined
       ) {
         if (this.objects && !overwrite) {
           //Check if file already exists in container objects
-          const existingFile = this.objects.find(obj => obj.name === file.relativePath);
+          const existingFile = this.objects.find(obj => obj.name === effectivePath);
           if (existingFile) {
+            file.relativePath = effectivePath;
             this.existingFiles.push(file);
             return;
           }
         }
+        file.relativePath = effectivePath;
         this.$store.commit("appendDropFiles", file);
       } else {
         this.dropFileErrors[0].show = true;
@@ -876,12 +889,8 @@ export default {
         ? this.currentFolder
         : this.inputFolder;
 
-      const rawPrefix = (this.$route.query.prefix || "").replace(/^\/+/, "");
-      const prefix = rawPrefix && !rawPrefix.endsWith("/") ? `${rawPrefix}/` : rawPrefix;
-
       const filesForUpload = this.$store.state.dropFiles.map(file => {
-        const rp = file.relativePath || file.name;
-        file.relativePath = `${prefix}${rp}`;
+        file.relativePath = file.relativePath || file.name;
         return file;
       });
 
