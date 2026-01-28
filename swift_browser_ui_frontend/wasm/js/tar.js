@@ -45,19 +45,18 @@ function calcChecksum(header512BinaryStr) {
   return checksum.toString(8).padStart(6, "0") + "\x00 ";
 }
 
-// Common header tail (after typeflag).
+// Common header tail (after typeflag). POSIX ustar.
 const headerEnd =
   "\x00".repeat(100) + // linkname[100]
-  "ustar " +           // magic[6]
-  " \x00" +            // version[2]
+  "ustar\x00" +        // magic[6] = "ustar\0"
+  "00" +               // version[2] = "00"
   "\x00".repeat(32) +  // uname[32]
   "\x00".repeat(32) +  // gname[32]
   "0000000\x00" +      // devmajor[8]
   "0000000\x00" +      // devminor[8]
-  "\x00".repeat(12) +  // atime[12]
-  "\x00".repeat(12) +  // ctime[12]
-  "\x00".repeat(126) + // remainder / extensions
-  "\x00".repeat(17);   // pad to 512
+  "\x00".repeat(155) + // prefix[155]
+  "\x00".repeat(12);   // pad[12] to reach 512 bytes total
+
 
 function octal11(n) {
   return n.toString(8).padStart(11, "0") + "\x00";
