@@ -45,17 +45,24 @@ function calcChecksum(header512BinaryStr) {
   return checksum.toString(8).padStart(6, "0") + "\x00 ";
 }
 
-// Common header tail (after typeflag). POSIX ustar.
+function setChecksum(header512) {
+  // checksum field is bytes 148..155 (8 bytes)
+  const checksum = calcChecksum(header512);
+  return header512.slice(0, 148) + checksum + header512.slice(156);
+}
+
+
+// Common header end fields (after typeflag)
 const headerEnd =
-  "\x00".repeat(100) + // linkname[100]
-  "ustar\x00" +        // magic[6] = "ustar\0"
-  "00" +               // version[2] = "00"
-  "\x00".repeat(32) +  // uname[32]
-  "\x00".repeat(32) +  // gname[32]
-  "0000000\x00" +      // devmajor[8]
-  "0000000\x00" +      // devminor[8]
-  "\x00".repeat(155) + // prefix[155]
-  "\x00".repeat(12);   // pad[12] to reach 512 bytes total
+  "\x00".repeat(100) +
+  "ustar\x00" +
+  "00" +
+  "\x00".repeat(32) +
+  "\x00".repeat(32) +
+  "0000000\x00" +
+  "0000000\x00" +
+  "\x00".repeat(155) +
+  "\x00".repeat(12);
 
 
 function octal11(n) {
@@ -93,7 +100,7 @@ function buildLongLinkBlocks(path) {
     headerEnd;
 
   // Fill checksum
-  lHeader = lHeader.replace("        ", calcChecksum(lHeader));
+  lHeader = setChecksum(lHeader);
 
   return lHeader + pathBlock;
 }
@@ -114,7 +121,7 @@ function buildHeader({ name100Binary, mode, uid, gid, sizeField, mtimeField, typ
     typeflag +
     headerEnd;
 
-  header = header.replace("        ", calcChecksum(header));
+  header = setChecksum(header);
   return header;
 }
 
