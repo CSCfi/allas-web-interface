@@ -146,7 +146,7 @@
           @sort="onSort"
           @paginate="getDropTablePage"
         />
-        <p class="info-text is-size-6 share-note">
+        <p class="info-text is-6 share-note">
           {{ $t("message.encrypt.uploadedFiles") }}
           <b>{{ active.name }}</b>{{ !owner ? "." : " (" }}
           <c-link
@@ -520,7 +520,7 @@ export default {
     },
     getDropTablePage() {
       const offset = this.filesPagination.currentPage * this.filesPagination.itemsPerPage
-                    - this.filesPagination.itemsPerPage;
+        - this.filesPagination.itemsPerPage;
       const limit = this.filesPagination.itemsPerPage;
 
       // Normal files (from store)
@@ -641,7 +641,7 @@ export default {
         try {
           segmentObjs = await getObjects(
             this.owner || this.active.id,
-            segmentCont.name
+            segmentCont.name,
           );
         } catch (_) {
           segmentObjs = [];
@@ -852,25 +852,25 @@ export default {
             // Refresh containers list
             await this.$store.dispatch("updateContainers", { projectID });
 
-             const db = getDB();
-             const cont = await db.containers.get({ projectID, name: container });
-             if (cont) {
+            const db = getDB();
+            const cont = await db.containers.get({ projectID, name: container });
+            if (cont) {
               await this.$store.dispatch("updateObjects", {
                 projectID,
                 container: cont,
                 ...(this.owner ? { owner: this.owner } : {}),
               });
               // Update container object count and last_modified
-               const objs  = await db.objects.where({ containerID: cont.id }).toArray();
-               const bytes = objs.reduce((sum, o) => sum + (o?.bytes || 0), 0);
+              const objs  = await db.objects.where({ containerID: cont.id }).toArray();
+              const bytes = objs.reduce((sum, o) => sum + (o?.bytes || 0), 0);
 
-               await db.containers.update(cont.id, {
-                 count: objs.length,
-                 bytes,
-                 last_modified: new Date().toISOString(),
-               });
+              await db.containers.update(cont.id, {
+                count: objs.length,
+                bytes,
+                last_modified: new Date().toISOString(),
+              });
 
-             }
+            }
             this.$store.commit("setNewFolder", container);
           } catch (e) {}
           this.toggleUploadModal();
@@ -926,7 +926,7 @@ export default {
 };
 </script>
 
-<style lang="scss" scoped>
+<style scoped>
 
 .upload-card {
   padding: 3rem;
@@ -970,7 +970,7 @@ c-card-actions {
 }
 
 .dropArea {
-  border: 1px dashed $csc-light-grey;
+  border: 1px dashed var(--csc-medium-grey);
   padding: 2rem 0;
   display: flex;
   align-items: center;

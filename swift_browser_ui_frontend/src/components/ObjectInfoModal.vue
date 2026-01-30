@@ -11,7 +11,7 @@
          href="javascript:void(0)"
          color="dark-grey"
          :path="info.isFolder ? mdiFolder : mdiFileOutline"
-         iconFill="primary"
+         icon-fill="primary"
          class="title-icon-link"
        />
        {{ info.name }}
@@ -60,7 +60,7 @@
               </c-button>
           </p>
           <p class="info-note" v-if="info && !info.isFolder">
-            {{ $t("message.objects.createdChecksumNote")}}
+            {{ $t("message.objects.createdChecksumNote") }}
           </p>
         </div>
 
@@ -135,7 +135,7 @@ export default {
 };
 </script>
 
-<style scoped lang="scss">
+<style scoped>
 .info-card {
   padding: 3rem;
   position: absolute;

@@ -111,7 +111,7 @@ export default {
           this.projectId,
           this.container,
           objectName,
-          this.ownerParam
+          this.ownerParam,
         );
 
         // refresh the object list so the folder appears
@@ -165,7 +165,7 @@ export default {
 };
 </script>
 
-<style scoped lang="scss">
+<style scoped>
 .add-folder {
   padding: 3rem;
   position: absolute;

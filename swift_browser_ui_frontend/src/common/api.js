@@ -176,11 +176,11 @@ export async function getObjects(
 
       if (shared) {
         objects[i].url = "/download/".concat(
-          encodeURI(project), "/", encodeURI(container), "/", encodeURI(objects[i].name)
+          encodeURI(project), "/", encodeURI(container), "/", encodeURI(objects[i].name),
         );
       } else {
         objects[i].url = "/api/".concat(
-          encodeURI(project), "/", encodeURI(container), "/", encodeURI(objects[i].name)
+          encodeURI(project), "/", encodeURI(container), "/", encodeURI(objects[i].name),
         );
       }
     }
@@ -561,7 +561,7 @@ export async function swiftCreateEmptyObject(project, container, objectPath, own
 
   const objectUrl = new URL(
     `/api/${encodeURIComponent(project)}/${encodeURIComponent(container)}/${encodeURIComponent(name)}`,
-    document.location.origin
+    document.location.origin,
   );
 
   // If owner is specified, add it as a query parameter (for shared containers)
@@ -585,7 +585,7 @@ export async function swiftCreateEmptyObject(project, container, objectPath, own
 export function getPreviewUrl(project, container, objectName, owner = "") {
   const url = new URL(
     `/preview/${encodeURIComponent(project)}/${encodeURIComponent(container)}/${encodeURIComponent(objectName)}`,
-    document.location.origin
+    document.location.origin,
   );
   if (owner) url.searchParams.append("owner", owner);
   return url.toString();

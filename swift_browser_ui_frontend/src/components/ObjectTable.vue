@@ -215,8 +215,8 @@ export default {
     },
     atBucketRoot() { return !this.prefix; },
     showGoUp() {
-    return this.$route.name === "ObjectsView" || this.$route.name === "SharedObjects";
-  },
+      return this.$route.name === "ObjectsView" || this.$route.name === "SharedObjects";
+    },
     queryPage () {
       return this.$route.query.page || 1;
     },
@@ -295,14 +295,14 @@ export default {
       if (this.objsLoading) setTimeout(() => this.objsLoading = false, 100);
     },
     prefix(val) {
-    if (val && !val.endsWith("/")) {
-      // normalize the URL in place (doesn't add a new history entry)
-      const query = { ...this.$route.query, prefix: `${val}/` };
-      this.$router.replace({ name: this.$route.name, params: this.$route.params, query });
-      return;
-    }
-    this.breadcrumbClicked = true;
-  },
+      if (val && !val.endsWith("/")) {
+        // normalize the URL in place (doesn't add a new history entry)
+        const query = { ...this.$route.query, prefix: `${val}/` };
+        this.$router.replace({ name: this.$route.name, params: this.$route.params, query });
+        return;
+      }
+      this.breadcrumbClicked = true;
+    },
   },
 
   created: function () {
@@ -730,14 +730,14 @@ export default {
 };
 </script>
 
-<style scoped lang="scss">
+<style scoped>
 
 #search {
   flex: 0.4;
 }
 
 .folder-info {
-  border: 1px solid $csc-primary;
+  border: 1px solid var(--csc-primary);
   margin: 0rem 0rem;
 }
 
@@ -750,7 +750,7 @@ export default {
   color: #FFF;
   font-size: 1rem;
   font-weight: 700;
-  background: $csc-primary;
+  background: var(--csc-dark-blue);
   align-items: center;
   & .mdi {
     font-size: 1.5rem;
@@ -763,7 +763,7 @@ export default {
 }
 
 .folder-details {
-  color: $csc-dark;
+  color: var(--csc-dark);
 
   & li {
     padding: .25rem 0;
@@ -775,7 +775,7 @@ export default {
   flex-wrap: wrap;
   align-items: center;
   color: #FFF;
-  background: $csc-blue;
+  background: var(--csc-blue);
   border-radius: .25rem;
   padding: 0 1rem;
   margin: 1.5rem 0 0;
