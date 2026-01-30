@@ -7,7 +7,7 @@
       weight="400"
     >
       <c-csc-logo />
-      <span>{{ $t("Allas") }} </span>
+      <span>Allas</span>
     </c-link>
     <c-spacer />
     <LanguageSelector />
@@ -24,7 +24,7 @@ export default {
 };
 </script>
 
-<style lang="scss" scoped>
+<style scoped>
 c-toolbar span {
   display: inline-flex;
   align-items: center;

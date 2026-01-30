@@ -268,33 +268,47 @@ async function beginDownloadInSession(
   }
 
   // Add the archive folder structure
-  if (downloads[id].archive) {
-    let folderPaths = Object.keys(downloads[id].files)
-      .map(path => path.split("/"))  // split paths to items
-      .map(path => path.slice(0, -1))  // remove the file names from paths
-      .filter(path => path.length > 0)  // remove empty paths (root level files)
-      .sort((a, b) => a.length - b.length)  // sort by path length as levels
-      .reduce((unique, path) => {  // strip paths down to just the unique ones
-        let check = unique.find(item => item === path.join("/"));
-        if (check === undefined) {
-          unique.push(path.join("/"));
-        }
-        return unique;
-      }, []);
+  const writtenDirs = new Set();
+  const dirKey = (p) => p.replace(/\/+$/, ""); // remove trailing slash
 
-    for (const path of folderPaths) {
-      if (downloads[id].direct) {
-        await fileStream.write(
-          addTarFolder(path),
-        );
-      } else {
-        fileStream.enqueue(addTarFolder(path));
+  const writeDirOnce = async (dirPathNoSlash) => {
+    const key = dirKey(dirPathNoSlash);
+    if (!key || writtenDirs.has(key)) return;
+
+    const entry = addTarFolder(key);
+    if (downloads[id].direct) {
+      await fileStream.write(entry);
+    } else {
+      fileStream.enqueue(entry);
+    }
+    writtenDirs.add(key);
+  };
+
+  if (downloads[id].archive) {
+    // Derived directories from file paths
+    const allDirs = new Set();
+
+    for (const objPath of Object.keys(downloads[id].files)) {
+      // Add all parent directories
+      const isDirMarker = objPath.endsWith("/") && downloads[id].files[objPath].size === 0;
+      const parts = dirKey(objPath).split("/").filter(Boolean);
+
+      // If it's a directory marker, include the full path
+      const upto = isDirMarker ? parts.length : Math.max(parts.length - 1, 0);
+      for (let i = 1; i <= upto; i++) {
+        allDirs.add(parts.slice(0, i).join("/"));
       }
+    }
+
+    // Write directories in order of path length
+    const folderPaths = Array.from(allDirs).sort((a, b) => a.length - b.length);
+    for (const d of folderPaths) {
+      await writeDirOnce(d);
     }
   }
 
   if (downloads[id].direct) {
-    //get total download size and periodically report download progress
+    // Get total download size and periodically report download progress
     for (const file in downloads[id].files) {
       totalToDo += downloads[id].files[file].size;
     }
@@ -318,6 +332,16 @@ async function beginDownloadInSession(
     }
 
     let path = file;
+
+    // write as directory (0755), not a file (0644)
+    if (
+      downloads[id].archive &&
+      path.endsWith("/") &&
+      downloads[id].files[file].size === 0
+    ) {
+      await writeDirOnce(path);
+      continue;
+    }
 
     if (downloads[id].archive) {
       const size = downloads[id].files[file].size;

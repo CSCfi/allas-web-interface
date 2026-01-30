@@ -11,7 +11,7 @@ import CFooter from "@/components/CFooter.vue";
 import MainToolbar from "@/components/MainToolbar.vue";
 import CookieConsentModal from "@/components/CookieConsentModal.vue";
 
-import "@/css/prod.scss";
+import "@/assets/main.css";
 
 applyPolyfills().then(() => {
   defineCustomElements();

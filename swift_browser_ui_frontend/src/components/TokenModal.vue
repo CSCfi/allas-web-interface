@@ -343,9 +343,7 @@ export default {
 };
 </script>
 
-<style lang="scss" scoped>
-
-@import "@/css/prod.scss";
+<style scoped>
 
 .token-card {
   padding: 3rem 2rem;

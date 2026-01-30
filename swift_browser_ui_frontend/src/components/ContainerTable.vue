@@ -131,12 +131,12 @@ export default {
     },
   },
   created() {
+    this.abortController = new AbortController();
     this.setHeaders();
     this.setPagination();
     Promise.all([this.getSharingContainers(), this.getSharedContainers()]);
   },
   beforeMount () {
-    this.abortController = new AbortController();
   },
   beforeUnmount () {
     this.abortController.abort();
@@ -147,14 +147,22 @@ export default {
       this.paginationOptions.currentPage = 1;
     },
     async getSharingContainers () {
-      this.sharingContainers =
-        await getSharingContainers(this.active.id, this.abortController.signal);
-        this.$store.commit('setSharingContainers', this.sharingContainers);
+      try {
+        this.sharingContainers =
+          await getSharingContainers(this.active.id, this.abortController.signal);
+        this.$store.commit("setSharingContainers", this.sharingContainers);
+      } catch (e) {
+        if (e?.name !== "AbortError") throw e;
+      }
     },
     async getSharedContainers () {
-      this.sharedContainers =
-        await getSharedContainers(this.active.id, this.abortController.signal);
-        this.$store.commit('setSharedContainers', this.sharedContainers);
+      try {
+        this.sharedContainers =
+          await getSharedContainers(this.active.id, this.abortController.signal);
+        this.$store.commit("setSharedContainers", this.sharedContainers);
+      } catch (e) {
+        if (e?.name !== "AbortError") throw e;
+      }
     },
     async getPage () {
       let offset = 0;
@@ -472,7 +480,7 @@ export default {
         projectID,
         container,
       ).then(async() => {
-          /*
+        /*
             In case the upload was initially cancelled and
             regular container has no uploaded objects yet (0 item), but
             segment container does have, we need to check and delete
@@ -510,7 +518,7 @@ export default {
         try {
           const sharedDetails = await this.$store.state.client.getShareDetails(
             projectID,
-            container
+            container,
           );
 
           if (sharedDetails?.length) {
@@ -528,7 +536,7 @@ export default {
             itemCount:
               this.paginationOptions.itemCount - 1,
           });
-        })
+      })
         .catch(() => {
           addErrorToastOnMain(
             this.$t("message.container_ops.deleteFail") || "Delete failed",

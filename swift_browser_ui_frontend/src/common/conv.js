@@ -80,7 +80,7 @@ export async function syncContainerACLs(store) {
   // Refresh current sharing information
   let currentsharing = await client.getShare(project);
 
-    // Prune stale entries
+  // Prune stale entries
   for (let container of currentsharing) {
     let containerDetails = await client.getShareDetails(project, container);
     for (let detail of containerDetails) {
@@ -177,7 +177,7 @@ export async function computeSHA256(keyContent) {
 function extractTags(meta) {
   const headers = meta?.[1] || {};
   const lower = Object.fromEntries(
-    Object.entries(headers).map(([k, v]) => [String(k).toLowerCase(), v])
+    Object.entries(headers).map(([k, v]) => [String(k).toLowerCase(), v]),
   );
   const raw =
     lower["usertags"] ||

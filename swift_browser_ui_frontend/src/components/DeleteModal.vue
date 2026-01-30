@@ -222,7 +222,7 @@ export default {
         // delete each bucket fully
         for (const { name: containerName } of containersToDelete) {
           // main container objects
-         await deleteContainerObjectsByMarker(projectForCalls, containerName);
+          await deleteContainerObjectsByMarker(projectForCalls, containerName);
 
           // Delete segments buckets if exists and its objects
           const segContainer = `${containerName}_segments`;
@@ -238,7 +238,7 @@ export default {
           try {
             const sharedDetails = await this.$store.state.client.getShareDetails(
               this.projectID,
-              containerName
+              containerName,
             );
 
             if (sharedDetails?.length) {
@@ -297,7 +297,7 @@ export default {
         try {
           segment_objects = await getObjects(
             this.owner || this.projectID,
-            segment_container.name
+            segment_container.name,
           );
         } catch (e) {
           segment_objects = [];
@@ -392,7 +392,7 @@ export default {
               this.owner || this.projectID,
               this.container,
               markerName,
-              this.owner
+              this.owner,
             );
           }
         }
@@ -507,14 +507,7 @@ export default {
 };
 </script>
 
-<style scoped lang="scss">
-
-@import "@/css/prod.scss";
-
-.mdi-alert-circle {
-  font-size: 2.0em;
-  color: $csc-red;
-}
+<style scoped>
 
 .delete-modal {
   padding: 0px;

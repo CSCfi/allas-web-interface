@@ -19,7 +19,7 @@
         {{ $t("message.container_ops.addContainer") }}
       </h2>
       <c-card-content>
-        <p class="info-text is-size-6">
+        <p class="info-text">
           {{ $t("message.container_ops.norename") }}
         </p>
         <c-text-field
@@ -49,7 +49,7 @@
           @addTag="addingTag"
           @deleteTag="deletingTag"
         />
-        <p class="info-text is-size-6">
+        <p class="info-text is-6">
           {{ $t("message.container_ops.createdFolder") }}
           <b>{{ active.name }}</b>.
         </p>
@@ -246,7 +246,7 @@ export default {
 };
 </script>
 
-<style lang="scss" scoped>
+<style scoped>
 
 .add-folder {
   padding: 3rem;

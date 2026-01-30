@@ -8,9 +8,7 @@
       >
         <c-row align="center">
           <c-csc-logo alt="CSC_Logo" />
-          <h1 class="app-name">
-            {{ $t("Allas") }}
-          </h1>
+          <h1 class="app-name">Allas</h1>
         </c-row>
       </router-link>
 
@@ -222,11 +220,11 @@ export default {
 };
 </script>
 
-<style lang="scss" scoped>
+<style scoped>
 
 .toolbar {
   z-index: 31;
-  color: $csc-grey;
+  color: var(--csc-grey);
   height: 71px;
   display: flex;
   column-gap: 12px;
@@ -236,7 +234,7 @@ export default {
 }
 
 .app-name {
-  color: $csc-grey;
+  color: var(--csc-grey);
   font-size: 1.25rem;
   margin-left: 2rem;
 }

@@ -136,14 +136,14 @@ export default {
       return this.$route.params.owner;
     },
     isSharedContainer() {
-    const container = this.$route.params.container;
-    if (this.$route.params.owner) return true; // browsing someone else’s bucket
-    const sharedToMe = (this.$store.state.sharedContainers || [])
-      .some(c => c.container === container); // check if container is in shared containers
-    const sharedOut = (this.$store.state.sharingContainers || [])
-      .includes(container); // check if container is being shared out
-    return sharedToMe || sharedOut;
-  },
+      const container = this.$route.params.container;
+      if (this.$route.params.owner) return true; // browsing someone else’s bucket
+      const sharedToMe = (this.$store.state.sharedContainers || [])
+        .some(c => c.container === container); // check if container is in shared containers
+      const sharedOut = (this.$store.state.sharingContainers || [])
+        .includes(container); // check if container is being shared out
+      return sharedToMe || sharedOut;
+    },
   },
   watch: {
     prefix() {
@@ -217,7 +217,7 @@ export default {
       }
 
       const etag =
-        (metaObj.etag || "").toString().replaceAll('"', "") || base.etag;
+        (metaObj.etag || "").toString().replaceAll("\"", "") || base.etag;
 
       const checksum = (metaObj?.Sha256 ?? metaObj?.sha256 ?? base.checksum);
 
@@ -308,7 +308,7 @@ export default {
           }),
         },
         size: {
-          value: getHumanReadableSize(Number(item.bytes) || 0, this.locale)
+          value: getHumanReadableSize(Number(item.bytes) || 0, this.locale),
         },
         last_modified: {
           value: this.showTimestamp? parseDateTime(
@@ -468,11 +468,11 @@ export default {
 
       const p = this.$route.query.prefix || "";
       if (p && !this.$store.state.openDeleteModal &&
-          !this.objs.some(o => o.name === p || o.name.startsWith(p))) {
+        !this.objs.some(o => o.name === p || o.name.startsWith(p))) {
         let up = p.replace(/[^/]+\/?$/, "");
         if (up && !up.endsWith("/")) up += "/";
         this.$router.replace({
-          query: { ...this.$route.query, prefix: up || undefined }
+          query: { ...this.$route.query, prefix: up || undefined },
         });
       }
 
@@ -583,8 +583,8 @@ export default {
       const MAX_DOWNLOAD_SIZE = 5 * 1024 * 1024 * 1024; // 5GiB in bytes
 
       if (object?.subfolder) {
-         // Check if folder size exceeds the limit
-         if (object.bytes > MAX_DOWNLOAD_SIZE) {
+        // Check if folder size exceeds the limit
+        if (object.bytes > MAX_DOWNLOAD_SIZE) {
           addErrorToastOnMain(this.$t("message.download.errorSizeExceeded"));
           return;
         }
@@ -668,10 +668,10 @@ export default {
 };
 </script>
 
-<style lang="scss" scoped>
+<style scoped>
 
- .object-table-wrapper{
-    position: relative;
-  }
+.object-table-wrapper{
+  position: relative;
+}
 
 </style>
