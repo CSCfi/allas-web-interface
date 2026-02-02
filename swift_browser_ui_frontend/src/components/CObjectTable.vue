@@ -299,8 +299,16 @@ export default {
                 onClick: () => {
                   const projectID = this.owner || this.active?.id;
                   const owner = this.owner || "";
-                  const previewUrl = getPreviewUrl(projectID, this.container, item.name, owner);
-                  window.open(previewUrl, "_blank");
+
+                  // Determine if we need to use the proxy URL
+                  const isSharedRoute = !!this.$route.params.owner;
+                  const needsProxy = isSharedRoute || this.isSharedContainer;
+
+                  const url = needsProxy
+                    ? this.$store.state.socket.buildProxyUrl(this.container, item.name, owner)
+                    : getPreviewUrl(projectID, this.container, item.name, owner);
+
+                  window.open(url, "_blank");
                   this.$store.commit("togglePreviewOpenedToast", true);
                 },
               },
