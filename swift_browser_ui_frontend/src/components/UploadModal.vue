@@ -405,19 +405,29 @@ export default {
       }
     },
     abortReason() {
-      if (this.abortReason !== undefined) {
-        if (this.abortReason
-          ?.match("Could not create or access the container.")) {
-          this.uploadError = this.currentFolder ?
-            this.$t("message.upload.accessFail")
-            : this.$t("message.error.createFail")
-              .concat(" ", this.$t("message.error.inUseOtherPrj"));
+      if (!this.abortReason) return;
+
+        // Only set uploadError once
+        if (this.uploadError) {
+          this.$store.commit("setUploadAbortReason", undefined);
+          return;
         }
-        else if (this.abortReason?.match("cancel")) {
+        const r = (this.abortReason || "").toLowerCase();
+
+        if (r.includes("could not create or access the container")) {
+          // Container creation/access error
+          if (r.includes("already in use") || r.includes("conflict") || r.includes("409")) {
+            this.uploadError = this.$t("message.error.inUseOtherPrj");
+          } else {
+            this.uploadError = this.currentFolder
+              ? this.$t("message.upload.accessFail")
+              : this.$t("message.error.createFail");
+          }
+        } else if (r.includes("cancel")) {
           this.uploadError = this.$t("message.upload.cancelled");
         }
+
         this.$store.commit("setUploadAbortReason", undefined);
-      }
     },
     uploadError() {
       if (this.uploadError) addErrorToastOnMain(this.uploadError);
@@ -838,7 +848,13 @@ export default {
             await swiftCreateContainer(projectID, container, []);
           }
         } catch (e) {
-          this.uploadError = this.$t("message.error.createFail") || "Bucket creation failed.";
+          if (e?.code === "NAME_IN_USE") {
+            this.uploadError = this.$t("message.error.inUseOtherPrj");
+          } else if (e?.code === "INVALID_NAME") {
+            this.uploadError = this.$t("message.container_ops.invalidName") || this.$t("message.error.createFail");
+          } else {
+            this.uploadError = this.$t("message.error.createFail") || "Bucket creation failed.";
+          }
           return;
         }
 

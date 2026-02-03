@@ -165,7 +165,7 @@ export default {
       let projectID = this.$route.params.project;
       const folderName = toRaw(this.folderName);
       const tags = toRaw(this.tags);
-      swiftCreateContainer(projectID, folderName, tags.join(";"))
+      swiftCreateContainer(projectID, folderName, tags)
         .then(async () => {
           const containerTimestamp = await getTimestampForContainer(
             projectID, folderName, this.controller.signal);
@@ -204,9 +204,10 @@ export default {
         })
         .catch(err => {
           let errorMessage = this.$t("message.error.createFail");
-          if (err.message.match("Container name already in use")) {
+
+          if (err?.code === "NAME_IN_USE") {
             errorMessage = this.$t("message.error.inUseOtherPrj");
-          } else if (err.message.match("Invalid container or tag name")) {
+          } else if (err?.code === "INVALID_NAME") {
             errorMessage = this.$t("message.error.invalidName");
           }
           document.querySelector("#createModal-toasts").addToast(

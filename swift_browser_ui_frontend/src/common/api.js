@@ -354,9 +354,14 @@ export async function swiftCreateContainer(project, container, tags = []) {
   ret = await PUT(url);
   if ([200, 201, 202, 204].includes(ret.status)) return;
 
-  if (ret.status === 409) throw new Error("Container name already in use.");
-  if (ret.status === 400 || ret.status === 405) throw new Error("Invalid container or tag name.");
-  throw new Error(`Container creation unsuccessful (${ret.status}).`);
+  const err = new Error();
+  err.status = ret.status;
+
+  if (ret.status === 409) err.code = "NAME_IN_USE";
+  else if (ret.status === 400 || ret.status === 405) err.code = "INVALID_NAME";
+  else err.code = "CREATE_FAILED";
+
+  throw err;
 }
 
 export async function swiftDeleteContainer(
