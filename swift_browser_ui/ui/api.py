@@ -384,9 +384,13 @@ async def swift_preview_object(
 
         # Content-Type from Swift
         ctype = upstream.headers.get("Content-Type", "application/octet-stream")
-        if ";" in ctype:
-            ctype = ctype.split(";", 1)[0].strip()
-        resp.content_type = ctype
+
+        # Ensure text/* types have charset
+        if ctype.startswith("text/") and "charset=" not in ctype.lower():
+            ctype = f"{ctype}; charset=utf-8"
+
+        # Set Content-Type
+        resp.headers["Content-Type"] = ctype
 
         # Force inline preview
         filename = object_name.split("/")[-1]
