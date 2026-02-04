@@ -165,7 +165,7 @@ export default {
       let projectID = this.$route.params.project;
       const folderName = toRaw(this.folderName);
       const tags = toRaw(this.tags);
-      swiftCreateContainer(projectID, folderName, tags)
+      swiftCreateContainer(projectID, folderName, tags.join(";"))
         .then(async () => {
           const containerTimestamp = await getTimestampForContainer(
             projectID, folderName, this.controller.signal);
