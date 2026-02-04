@@ -173,62 +173,65 @@ export default {
       checkIfItemIsLastOnPage(this.paginationOptions);
   },
   methods: {
-    async buildInfoForItem(item) {
-      const isFolder = !!item?.subfolder;
+      async buildInfoForItem(item) {
+        const isFolder = !!item?.subfolder;
 
-      const base = {
-        name: this.renderFolders ? getFolderName(item.name, this.$route) : item.name,
-        fullPath: `${this.container}/${item.name}`,
-        sizeHuman: getHumanReadableSize(Number(item.bytes) || 0, this.locale),
-        itemCount: isFolder ? item.itemCount ?? "-" : undefined,
-        lastModified: item.last_modified
-          ? parseDateTime(this.locale, item.last_modified, this.$t, false)
-          : "-",
-        contentType: item.content_type || item.type || (isFolder ? "application/x-directory" : "-"),
-        created: "-",
-        etag: isFolder ? undefined : (item.etag || "-"),
-        checksum: "-",
-        isFolder,
-      };
+        const base = {
+          name: this.renderFolders ? getFolderName(item.name, this.$route) : item.name,
+          fullPath: `${this.container}/${item.name}`,
+          sizeHuman: getHumanReadableSize(Number(item.bytes) || 0, this.locale),
+          itemCount: isFolder ? item.itemCount ?? "-" : undefined,
+          lastModified: item.last_modified
+            ? parseDateTime(this.locale, item.last_modified, this.$t, false)
+            : "-",
+          contentType: item.content_type || item.type || (isFolder ? "application/x-directory" : "-"),
+          created: "-",
+          etag: isFolder ? undefined : (item.etag || "-"),
+          checksum: "-",
+          isFolder,
+        };
 
-      if (isFolder) return base;
+        if (isFolder) return base;
 
-      const projectID = this.owner || this.active?.id;
-      const container = this.container;
-      const objects = [item.name];
+        const projectID = this.active?.id;
+        if (!projectID) throw new Error("No active project selected");
+        const owner = this.owner || "";
+        const container = this.container;
+        const objects = [item.name];
 
-      const url = makeGetObjectsMetaURL(projectID, container, [...objects]);
-      if (this.owner) url.searchParams.append("owner", this.owner);
+        const url = makeGetObjectsMetaURL(projectID, container, [...objects]);
+        if (owner) url.searchParams.append("owner", owner);
 
-      const meta = await getObjectsMeta(
-        projectID, container, objects, url, undefined,this.owner || "");
-      const metaObj = meta?.[0]?.[1] || {};
+        const meta = await getObjectsMeta(
+          projectID, container, objects, url, undefined, owner
+        );
+        const metaObj = meta?.[0]?.[1] || {};
 
 
-      let created = "-";
+        let created = "-";
 
-      const createdRaw = metaObj?.Created ?? metaObj?.created ?? "";
-      const createdSec = Number.parseInt(createdRaw, 10);
-      if (Number.isFinite(createdSec) && createdSec > 0) {
-        const iso = DateTime.fromSeconds(createdSec).toUTC().toISO();
-        if (iso) {
-          created = parseDateTime(this.locale, iso, this.$t, false);
+        const createdRaw = metaObj?.Created ?? metaObj?.created ?? "";
+        const createdSec = Number.parseInt(createdRaw, 10);
+        if (Number.isFinite(createdSec) && createdSec > 0) {
+          const iso = DateTime.fromSeconds(createdSec).toUTC().toISO();
+          if (iso) {
+            created = parseDateTime(this.locale, iso, this.$t, false);
+          }
         }
-      }
 
-      const etag =
-        (metaObj.etag || "").toString().replaceAll("\"", "") || base.etag;
+        const etag =
+          (metaObj.etag || "").toString().replaceAll("\"", "") || base.etag;
 
-      const checksum = (metaObj?.Sha256 ?? metaObj?.sha256 ?? base.checksum);
+        const checksum = (metaObj?.Sha256 ?? metaObj?.sha256 ?? base.checksum);
 
 
-      return {
-        ...base,
-        created,
-        etag,
-        checksum,
-      };
-    },
+        return {
+          ...base,
+          created,
+          etag,
+          checksum,
+        };
+      },
     async onOpenInfoModal(item, keypress) {
       try {
         const info = await this.buildInfoForItem(item);
@@ -297,8 +300,12 @@ export default {
                   flexShrink: "0",
                 },
                 onClick: () => {
-                  const projectID = this.owner || this.active?.id;
+                   const projectID = this.active?.id;
                   const owner = this.owner || "";
+                  if (!projectID) {
+                    addErrorToastOnMain("No active project selected.");
+                    return;
+                  }
 
                   // Determine if we need to use the proxy URL
                   const isSharedRoute = !!this.$route.params.owner;
