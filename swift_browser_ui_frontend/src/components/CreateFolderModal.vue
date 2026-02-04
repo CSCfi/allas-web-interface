@@ -19,7 +19,7 @@
         {{ $t("message.container_ops.addContainer") }}
       </h2>
       <c-card-content>
-        <p class="info-text is-size-6">
+        <p class="info-text">
           {{ $t("message.container_ops.norename") }}
         </p>
         <c-text-field
@@ -49,7 +49,7 @@
           @addTag="addingTag"
           @deleteTag="deletingTag"
         />
-        <p class="info-text is-size-6">
+        <p class="info-text is-6">
           {{ $t("message.container_ops.createdFolder") }}
           <b>{{ active.name }}</b>.
         </p>
@@ -204,9 +204,10 @@ export default {
         })
         .catch(err => {
           let errorMessage = this.$t("message.error.createFail");
-          if (err.message.match("Container name already in use")) {
+
+          if (err?.code === "NAME_IN_USE") {
             errorMessage = this.$t("message.error.inUseOtherPrj");
-          } else if (err.message.match("Invalid container or tag name")) {
+          } else if (err?.code === "INVALID_NAME") {
             errorMessage = this.$t("message.error.invalidName");
           }
           document.querySelector("#createModal-toasts").addToast(
@@ -246,7 +247,7 @@ export default {
 };
 </script>
 
-<style lang="scss" scoped>
+<style scoped>
 
 .add-folder {
   padding: 3rem;

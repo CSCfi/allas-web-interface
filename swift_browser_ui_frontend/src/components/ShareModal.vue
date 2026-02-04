@@ -602,7 +602,7 @@ export default {
 };
 </script>
 
-<style lang="scss" scoped>
+<style scoped>
 
 .share-card {
   padding: 2rem;
@@ -660,12 +660,12 @@ c-card-actions > h2 {
 .toggle-instructions {
   justify-content: flex-end;
   align-items: center;
-  color: $csc-primary;
+  color: var(--csc-primary);
 }
 
 .guide-content {
   margin-top: 1rem;
-  background-color: $csc-primary-lighter;
+  background-color: var(--csc-primary-lighter);
   justify-content: space-between;
   padding: 1rem;
 }
@@ -678,7 +678,7 @@ c-select {
   color: var(--csc-dark);
   width: 100%;
   & > * {
-    font-size: $body-size;
+    font-size: var(--body-font-size);
   }
 }
 
@@ -699,7 +699,7 @@ c-flex, .shared-notification {
 c-alert[type="success"] {
   align-items: center;
   margin-bottom: 1.5rem;
-  box-shadow: 2px 4px 4px 0px var(--csc-light-grey);
+  box-shadow: 2px 4px 4px 0px var(--csc-medium-grey);
   & > .shared-notification {
     color: var(--csc-dark);
   };
@@ -712,7 +712,7 @@ c-toasts {
 c-alert[type="success"] {
   align-items: center;
   margin-bottom: 1.5rem;
-  box-shadow: 2px 4px 4px 0px var(--csc-light-grey);
+  box-shadow: 2px 4px 4px 0px var(--csc-medium-grey);
   & > .shared-notification {
     color: var(--csc-dark);
   };

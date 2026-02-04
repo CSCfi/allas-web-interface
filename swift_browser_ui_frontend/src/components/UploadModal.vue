@@ -101,7 +101,7 @@
           >
             {{ $t("message.objects.file") }}
             <b>
-              {{ existingFiles[0].name }}
+              {{ existingFiles[0].relativePath || existingFiles[0].name }}
             </b>
             {{ $t("message.objects.overwriteConfirm") }}
           </span>
@@ -146,7 +146,7 @@
           @sort="onSort"
           @paginate="getDropTablePage"
         />
-        <p class="info-text is-size-6 share-note">
+        <p class="info-text is-6 share-note">
           {{ $t("message.encrypt.uploadedFiles") }}
           <b>{{ active.name }}</b>{{ !owner ? "." : " (" }}
           <c-link
@@ -328,7 +328,6 @@ export default {
         const files = Array.from(value);
         files.forEach(file => {
           if (this.addFiles) {
-            file.relativePath = file.name;
             this.appendDropFiles(file);
           }
         });
@@ -343,7 +342,7 @@ export default {
     },
     existingFileNames() {
       return this.existingFiles.reduce((array, item) => {
-        array.push(item.name);
+        array.push(item.relativePath || item.name);
         return array;
       }, []).join(", ");
     },
@@ -406,19 +405,29 @@ export default {
       }
     },
     abortReason() {
-      if (this.abortReason !== undefined) {
-        if (this.abortReason
-          ?.match("Could not create or access the container.")) {
-          this.uploadError = this.currentFolder ?
-            this.$t("message.upload.accessFail")
-            : this.$t("message.error.createFail")
-              .concat(" ", this.$t("message.error.inUseOtherPrj"));
+      if (!this.abortReason) return;
+
+        // Only set uploadError once
+        if (this.uploadError) {
+          this.$store.commit("setUploadAbortReason", undefined);
+          return;
         }
-        else if (this.abortReason?.match("cancel")) {
+        const r = (this.abortReason || "").toLowerCase();
+
+        if (r.includes("could not create or access the container")) {
+          // Container creation/access error
+          if (r.includes("already in use") || r.includes("conflict") || r.includes("409")) {
+            this.uploadError = this.$t("message.error.inUseOtherPrj");
+          } else {
+            this.uploadError = this.currentFolder
+              ? this.$t("message.upload.accessFail")
+              : this.$t("message.error.createFail");
+          }
+        } else if (r.includes("cancel")) {
           this.uploadError = this.$t("message.upload.cancelled");
         }
+
         this.$store.commit("setUploadAbortReason", undefined);
-      }
     },
     uploadError() {
       if (this.uploadError) addErrorToastOnMain(this.uploadError);
@@ -434,6 +443,11 @@ export default {
     }
   },
   methods: {
+    // Get the current prefix from the route query
+    getCurrentPrefix() {
+      const raw = (this.$route.query.prefix || "").replace(/^\/+/, "");
+      return raw && !raw.endsWith("/") ? `${raw}/` : raw;
+    },
     // Create any empty folders that were added
     async createEmptyFolders() {
       if (this.emptyFolders.length === 0) return;
@@ -481,20 +495,29 @@ export default {
         setTimeout(() => this.dropFileErrors[1].show = false, 6000);
         return;
       }
+
+      // Determine effective path with prefix
+      const prefix = this.getCurrentPrefix();
+      const rp = file.relativePath || file.name;
+      const effectivePath = `${prefix}${rp}`;
+
+
       //Check if file path already exists in dropFiles
       if (
         this.dropFiles.find(
-          ({ relativePath }) => relativePath === file.relativePath,
+          ({ relativePath }) => relativePath === effectivePath,
         ) === undefined
       ) {
         if (this.objects && !overwrite) {
           //Check if file already exists in container objects
-          const existingFile = this.objects.find(obj => obj.name === file.relativePath);
+          const existingFile = this.objects.find(obj => obj.name === effectivePath);
           if (existingFile) {
+            file.relativePath = effectivePath;
             this.existingFiles.push(file);
             return;
           }
         }
+        file.relativePath = effectivePath;
         this.$store.commit("appendDropFiles", file);
       } else {
         this.dropFileErrors[0].show = true;
@@ -507,7 +530,7 @@ export default {
     },
     getDropTablePage() {
       const offset = this.filesPagination.currentPage * this.filesPagination.itemsPerPage
-                    - this.filesPagination.itemsPerPage;
+        - this.filesPagination.itemsPerPage;
       const limit = this.filesPagination.itemsPerPage;
 
       // Normal files (from store)
@@ -628,7 +651,7 @@ export default {
         try {
           segmentObjs = await getObjects(
             this.owner || this.active.id,
-            segmentCont.name
+            segmentCont.name,
           );
         } catch (_) {
           segmentObjs = [];
@@ -825,7 +848,13 @@ export default {
             await swiftCreateContainer(projectID, container, []);
           }
         } catch (e) {
-          this.uploadError = this.$t("message.error.createFail") || "Bucket creation failed.";
+          if (e?.code === "NAME_IN_USE") {
+            this.uploadError = this.$t("message.error.inUseOtherPrj");
+          } else if (e?.code === "INVALID_NAME") {
+            this.uploadError = this.$t("message.container_ops.invalidName") || this.$t("message.error.createFail");
+          } else {
+            this.uploadError = this.$t("message.error.createFail") || "Bucket creation failed.";
+          }
           return;
         }
 
@@ -839,25 +868,25 @@ export default {
             // Refresh containers list
             await this.$store.dispatch("updateContainers", { projectID });
 
-             const db = getDB();
-             const cont = await db.containers.get({ projectID, name: container });
-             if (cont) {
+            const db = getDB();
+            const cont = await db.containers.get({ projectID, name: container });
+            if (cont) {
               await this.$store.dispatch("updateObjects", {
                 projectID,
                 container: cont,
                 ...(this.owner ? { owner: this.owner } : {}),
               });
               // Update container object count and last_modified
-               const objs  = await db.objects.where({ containerID: cont.id }).toArray();
-               const bytes = objs.reduce((sum, o) => sum + (o?.bytes || 0), 0);
+              const objs  = await db.objects.where({ containerID: cont.id }).toArray();
+              const bytes = objs.reduce((sum, o) => sum + (o?.bytes || 0), 0);
 
-               await db.containers.update(cont.id, {
-                 count: objs.length,
-                 bytes,
-                 last_modified: new Date().toISOString(),
-               });
+              await db.containers.update(cont.id, {
+                count: objs.length,
+                bytes,
+                last_modified: new Date().toISOString(),
+              });
 
-             }
+            }
             this.$store.commit("setNewFolder", container);
           } catch (e) {}
           this.toggleUploadModal();
@@ -876,12 +905,8 @@ export default {
         ? this.currentFolder
         : this.inputFolder;
 
-      const rawPrefix = (this.$route.query.prefix || "").replace(/^\/+/, "");
-      const prefix = rawPrefix && !rawPrefix.endsWith("/") ? `${rawPrefix}/` : rawPrefix;
-
       const filesForUpload = this.$store.state.dropFiles.map(file => {
-        const rp = file.relativePath || file.name;
-        file.relativePath = `${prefix}${rp}`;
+        file.relativePath = file.relativePath || file.name;
         return file;
       });
 
@@ -917,7 +942,7 @@ export default {
 };
 </script>
 
-<style lang="scss" scoped>
+<style scoped>
 
 .upload-card {
   padding: 3rem;
@@ -961,7 +986,7 @@ c-card-actions {
 }
 
 .dropArea {
-  border: 1px dashed $csc-light-grey;
+  border: 1px dashed var(--csc-medium-grey);
   padding: 2rem 0;
   display: flex;
   align-items: center;

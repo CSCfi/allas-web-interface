@@ -3,7 +3,7 @@
     <div class="cookie-modal">
 
       <div class="modal-header">
-        <h2><Strong>COOKIES</Strong></h2>
+        <h2><strong>COOKIES</strong></h2>
         <button class="close-btn" @click="acknowledge">✖ Close</button>
       </div>
 
@@ -73,27 +73,33 @@
                 <a href="https://support.microsoft.com/en-us/microsoft-edge/
                 delete-cookies-in-microsoft-edge-63947406-40ac-c3b8-57b9-/
                 2a946a29ae09"
-                target="_blank">Microsoft Edge</a>
+                target="_blank"
+>Microsoft Edge</a>
               </li>
               <li>
                 <a href="https://support.mozilla.org/en-US/kb/clear-cookies-and
-                -site-data-firefox" target="_blank">Mozilla Firefox</a>
+                -site-data-firefox" target="_blank"
+>Mozilla Firefox</a>
               </li>
               <li>
                 <a href="https://support.google.com/chrome/answer/95647"
-                target="_blank">Google Chrome</a>
+                target="_blank"
+>Google Chrome</a>
               </li>
               <li>
                 <a href="https://help.opera.com/en/latest/web-preferences/#cookies"
-                target="_blank">Opera</a>
+                target="_blank"
+>Opera</a>
               </li>
               <li>
                 <a href="https://support.apple.com/guide/safari/manage-cookies
-                -and-website-data-sfri11471/mac" target="_blank">Safari</a>
+                -and-website-data-sfri11471/mac" target="_blank"
+>Safari</a>
               </li>
               <li>
                 <a href="https://support.google.com/chrome/answer/95647?co=GENIE
-                .Platform%3DAndroid" target="_blank">Chrome (Android)</a>
+                .Platform%3DAndroid" target="_blank"
+>Chrome (Android)</a>
               </li>
             </ul>
             </details>

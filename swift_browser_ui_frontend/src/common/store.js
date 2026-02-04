@@ -569,7 +569,7 @@ const store = createStore({
       for (let i = 0; i < newObjects.length; i++) {
         const newObj = newObjects[i];
         const oldObj = existingObjects.find(
-          obj => obj.name === newObj.name && obj.containerID === newObj.containerID
+          obj => obj.name === newObj.name && obj.containerID === newObj.containerID,
         );
 
         // Consider objects equal if all properties are equal except 'id'
@@ -593,6 +593,14 @@ const store = createStore({
         } else {
           await getDB().objects.put(newObj);
         }
+      }
+      // Update container count if needed
+      if (!isSegmentsContainer) {
+        const realCount = newObjects.filter(o =>
+          !(o.name.endsWith("/") && Number(o.bytes || 0) === 0),
+        ).length;
+
+        await getDB().containers.update(container.id, { count: realCount });
       }
 
       if (!isSegmentsContainer && updateTags) {

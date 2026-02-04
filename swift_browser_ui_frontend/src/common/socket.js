@@ -194,7 +194,7 @@ export default class UploadSocket {
     return upinfo;
   }
 
-    async resolveDownloadObjects(container, objects, owner) {
+  async resolveDownloadObjects(container, objects, owner) {
     // Find the container in IndexedDB
     const dbContainer = await getDB().containers.get({
       projectID: this.active.id,
@@ -423,9 +423,9 @@ export default class UploadSocket {
           id: sessionId,
           container: container,
           files: dbObjects.map(obj => ({
-              path: obj.name,
-              url: this.buildProxyUrl(container, obj.name, owner),
-              size: obj.bytes,
+            path: obj.name,
+            url: this.buildProxyUrl(container, obj.name, owner),
+            size: obj.bytes,
           })),
           handle: fileHandle,
           owner: owner,

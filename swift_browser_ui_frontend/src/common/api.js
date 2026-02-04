@@ -176,11 +176,11 @@ export async function getObjects(
 
       if (shared) {
         objects[i].url = "/download/".concat(
-          encodeURI(project), "/", encodeURI(container), "/", encodeURI(objects[i].name)
+          encodeURI(project), "/", encodeURI(container), "/", encodeURI(objects[i].name),
         );
       } else {
         objects[i].url = "/api/".concat(
-          encodeURI(project), "/", encodeURI(container), "/", encodeURI(objects[i].name)
+          encodeURI(project), "/", encodeURI(container), "/", encodeURI(objects[i].name),
         );
       }
     }
@@ -341,23 +341,63 @@ export async function getSharedContainerAddress(project) {
 }
 
 export async function swiftCreateContainer(project, container, tags = []) {
-  const url = new URL(
-    `/api/${encodeURI(project)}/${encodeURI(container)}`,
-    document.location.origin,
-  );
+  const url = new URL(`/api/${encodeURI(project)}/${encodeURI(container)}`, document.location.origin);
 
-  // Try creating the container with tags first
+  const classifyAndThrow = async (ret) => {
+    let text = "";
+    try { text = await ret.text(); } catch (_) {}
+    const msg = (text || "").toLowerCase();
+
+    const err = new Error(text || `Container creation failed (${ret.status})`);
+    err.status = ret.status;
+
+    if (ret.status === 409 || msg.includes("already in use") || msg.includes("conflict") || msg.includes("409")) {
+      err.code = "NAME_IN_USE";
+    } else if (ret.status === 400 && msg.includes("invalid")) {
+      err.code = "INVALID_NAME";
+    } else {
+      err.code = "CREATE_FAILED";
+    }
+
+    throw err;
+  };
+
+  // try to create with tags first
   let ret = await PUT(url, JSON.stringify({ tags }));
   if ([200, 201, 202, 204].includes(ret.status)) return;
 
-  // If that fails, try without tags (older Swift versions)
-  ret = await PUT(url);
-  if ([200, 201, 202, 204].includes(ret.status)) return;
+  // invalid name or already in use
+  {
+    let peek = "";
+    try { peek = await ret.clone().text(); } catch (_) {}
+    const msg = peek.toLowerCase();
 
-  if (ret.status === 409) throw new Error("Container name already in use.");
-  if (ret.status === 400 || ret.status === 405) throw new Error("Invalid container or tag name.");
-  throw new Error(`Container creation unsuccessful (${ret.status}).`);
+    if (ret.status === 409 || msg.includes("already in use") || msg.includes("conflict") || msg.includes("409")) {
+      const err = new Error(peek || "Container name already in use");
+      err.status = ret.status;
+      err.code = "NAME_IN_USE";
+      throw err;
+    }
+    if (ret.status === 400 && msg.includes("invalid")) {
+      const err = new Error(peek || "Invalid container name");
+      err.status = ret.status;
+      err.code = "INVALID_NAME";
+      throw err;
+    }
+  }
+
+  // retry without tags
+  const retry = ret.status === 415 || ret.status === 405 || ret.status === 400;
+  if (retry) {
+    ret = await PUT(url);
+    if ([200, 201, 202, 204].includes(ret.status)) return;
+    return classifyAndThrow(ret);
+  }
+
+  return classifyAndThrow(ret);
 }
+
+
 
 export async function swiftDeleteContainer(
   project,
@@ -561,7 +601,7 @@ export async function swiftCreateEmptyObject(project, container, objectPath, own
 
   const objectUrl = new URL(
     `/api/${encodeURIComponent(project)}/${encodeURIComponent(container)}/${encodeURIComponent(name)}`,
-    document.location.origin
+    document.location.origin,
   );
 
   // If owner is specified, add it as a query parameter (for shared containers)
@@ -585,7 +625,7 @@ export async function swiftCreateEmptyObject(project, container, objectPath, own
 export function getPreviewUrl(project, container, objectName, owner = "") {
   const url = new URL(
     `/preview/${encodeURIComponent(project)}/${encodeURIComponent(container)}/${encodeURIComponent(objectName)}`,
-    document.location.origin
+    document.location.origin,
   );
   if (owner) url.searchParams.append("owner", owner);
   return url.toString();

@@ -246,10 +246,10 @@ export default {
 };
 </script>
 
-<style scoped lang="scss">
+<style scoped>
 
 #secondary-navbar {
-  border-bottom: 6px solid $csc-primary-light;
+  border-bottom: 6px solid var(--csc-primary-light);
 }
 
 .container-fluid {
@@ -294,16 +294,15 @@ c-select {
 
 .tooltip c-icon {
   margin-left: 0.5rem;
-  color: $csc-primary;
+  color: var(--csc-primary);
 }
 
 .tooltip-content {
   visibility: hidden;
   text-align: left;
   width: 20rem;
-  background-color: $white;
-  color: $text;
-  border: 1px solid $csc-primary;
+  background-color: white;
+  border: 1px solid var(--csc-primary);
   border-radius: 0.375rem;
   padding: 1rem;
   font-size: 14px;
@@ -329,7 +328,7 @@ c-select {
   width: 0;
   height: 0;
   border: 0.7rem solid transparent;
-  border-bottom-color: $csc-primary;
+  border-bottom-color: var(--csc-primary);
 }
 .tooltip-content::after {
   content: " ";
@@ -340,7 +339,7 @@ c-select {
   height: 0;
   margin-left: -0.75rem;
   border: 0.65rem solid transparent;
-  border-bottom-color: $white;
+  border-bottom-color: white;
 }
 
 .column {
