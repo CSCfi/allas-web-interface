@@ -193,15 +193,18 @@ export default {
 
       if (isFolder) return base;
 
-      const projectID = this.owner || this.active?.id;
+      const projectID = this.active?.id;
+      if (!projectID) throw new Error("No active project selected");
+      const owner = this.owner || "";
       const container = this.container;
       const objects = [item.name];
 
       const url = makeGetObjectsMetaURL(projectID, container, [...objects]);
-      if (this.owner) url.searchParams.append("owner", this.owner);
+      if (owner) url.searchParams.append("owner", owner);
 
       const meta = await getObjectsMeta(
-        projectID, container, objects, url, undefined,this.owner || "");
+        projectID, container, objects, url, undefined, owner
+      );
       const metaObj = meta?.[0]?.[1] || {};
 
 
@@ -297,8 +300,12 @@ export default {
                   flexShrink: "0",
                 },
                 onClick: () => {
-                  const projectID = this.owner || this.active?.id;
+                  const projectID = this.active?.id;
                   const owner = this.owner || "";
+                  if (!projectID) {
+                    addErrorToastOnMain("No active project selected.");
+                    return;
+                  }
 
                   // Determine if we need to use the proxy URL
                   const isSharedRoute = !!this.$route.params.owner;
