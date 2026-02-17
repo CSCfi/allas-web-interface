@@ -14,6 +14,19 @@ let default_translations = {
           },
         ],
       },
+      public: {
+        public: "Make public",
+        title: "Public access",
+        bucketLabel: "Bucket",
+        toggleLabel: "Public read access",
+        subtitle: "Control anonymous read access to this bucket.",
+        toggleHelp: "When enabled, anyone with the link can browse and download objects.",
+        linkLabel: "Public link",
+        linkHelp: "Share this link carefully. Disable public access to revoke it.",
+        open: "Open",
+        copy: "Copy",
+
+      },
       preview: {
         openedInNewTab: "Opening file in a new tab. Preview depends on the content type, "
          + "unsupported types may download instead.",
@@ -592,6 +605,18 @@ let default_translations = {
             href: "/login/oidc_front",
           },
         ],
+      },
+      public: {
+        public: "Tee julkinen",
+        title: "Julkinen pääsy",
+        bucketLabel: "ämpäri",
+        toggleLabel: "Julkinen lukuoikeus",
+        subtitle: "Säädä anonyymin lukuoikeuden taso tälle ämpärille.",
+        toggleHelp: "Kun käytössä, kuka tahansa linkin saava voi selata ja ladata ämpärin sisältöä.",
+        linkLabel: "Julkinen linkki",
+        linkHelp: "Jaa tämä linkki huolellisesti. Poista julkinen pääsy peruuttaaksesi linkki.",
+        open: "Avaa",
+        copy: "Kopioi",
       },
       preview: {
         openedInNewTab: "Tiedosto avautuu uuteen välilehteen. Esikatselu " +

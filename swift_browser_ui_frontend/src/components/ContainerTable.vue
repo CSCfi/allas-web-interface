@@ -34,6 +34,7 @@ import {
   mdiShareVariantOutline,
   mdiDotsHorizontal,
   mdiPail,
+  mdiEarth,
 } from "@mdi/js";
 import {
   toggleEditTagsModal,
@@ -56,6 +57,7 @@ import {
   swiftDeleteContainer,
   swiftDeleteObjects,
   removeAccessControlMeta,
+  setContainerPublic,
 } from "@/common/api";
 
 export default {
@@ -143,6 +145,25 @@ export default {
   },
   expose: ["toFirstPage"],
   methods: {
+    onOpenPublicModal(item, keypress) {
+      this.$store.commit("togglePublicModal", true);
+      this.$store.commit("setPublicModalContainer", {
+        name: item.name,
+        is_public: !!item.is_public,
+      });
+
+      if (keypress) {
+        setPrevActiveElement();
+        const modal = document.getElementById("public-modal");
+        disableFocusOutsideModal(modal);
+      }
+
+      setTimeout(() => {
+        const el = document.querySelector("#public-toggle input") ||
+          document.querySelector("#public-copy button");
+        el?.focus?.();
+      }, 300);
+    },
     toFirstPage() {
       this.paginationOptions.currentPage = 1;
     },
@@ -318,6 +339,24 @@ export default {
                       onKeyUp: (event) => {
                         if(event.keyCode === 13)
                           this.onOpenShareModal(item.name, true);
+                      },
+                      disabled: item.owner,
+                    },
+                  },
+                },
+                {
+                  value: this.$t("message.public.public"),
+                  component: {
+                    tag: "c-button",
+                    params: {
+                      testid: "public-container",
+                      text: true,
+                      size: "small",
+                      title: this.$t("message.public.public"),
+                      path: mdiEarth,
+                      onClick: () => this.onOpenPublicModal(item),
+                      onKeyUp: (event) => {
+                        if (event.keyCode === 13) this.onOpenPublicModal(item, true);
                       },
                       disabled: item.owner,
                     },

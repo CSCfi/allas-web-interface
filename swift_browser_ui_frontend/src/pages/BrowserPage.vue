@@ -63,6 +63,15 @@
         <ShareModal />
       </c-modal>
       <c-modal
+        id="public-modal"
+        v-model="openPublicModal"
+        v-csc-control
+        disable-backdrop-blur
+        width="64vw"
+      >
+        <PublicModal />
+      </c-modal>
+      <c-modal
         id="copy-folder-modal"
         v-model="openCopyFolderModal"
         v-csc-control

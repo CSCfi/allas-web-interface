@@ -128,7 +128,7 @@ async def _check_last_modified(
     # If last_modified is not part of container basic info,
     # head request is made to check container metadata
     # and add last modified data from there.
-    if "last_modified" not in container.keys():
+    if "last_modified" not in container.keys() or "is_public" not in container:
         try:
             name = container["name"]
             async with client.head(
@@ -137,19 +137,24 @@ async def _check_last_modified(
                     "X-Auth-Token": session["projects"][project]["token"],
                 },
             ) as ret:
-                date_str = ret.headers["Last-Modified"]
-                # Convert the date string to the ISO 8601 format
-                date_obj = datetime.strptime(date_str, "%a, %d %b %Y %H:%M:%S %Z")
-                iso_8601_str = date_obj.strftime("%Y-%m-%dT%H:%M:%S.%f")
-                container["last_modified"] = iso_8601_str
+                read_acl = ret.headers.get("X-Container-Read", "")
+                container["is_public"] = _is_public_read(read_acl)
+
+                if "last_modified" not in container:
+                    date_str = ret.headers["Last-Modified"]
+                    # Convert the date string to the ISO 8601 format
+                    date_obj = datetime.strptime(date_str, "%a, %d %b %Y %H:%M:%S %Z")
+                    iso_8601_str = date_obj.strftime("%Y-%m-%dT%H:%M:%S.%f")
+                    container["last_modified"] = iso_8601_str
         # we expect either the header Last Modified to be missing or
         # the value is not what we expect for str to date conversion
         except (KeyError, ValueError) as e:
             # If anything goes wrong, set last_modified key anyway with null value
             request.app["Log"].exception(
-                f"something happened when retrieving last modified {e}"
+                f"something happened when retrieving last modified/public state {e}"
             )
-            container["last_modified"] = None
+            container.setdefault("last_modified", None)
+            container.setdefault("is_public", False)
     return container
 
 
@@ -639,6 +644,150 @@ async def get_shared_container_address(
     return aiohttp.web.json_response(session["projects"][project]["endpoint"])
 
 
+PUBLIC_READ_TOKENS = [".r:*", ".rlistings"]
+
+
+def _split_acl(acl: str) -> list[str]:
+    """Split ACL string into list of entries."""
+    if not acl:
+        return []
+    return [a.strip() for a in acl.split(",") if a.strip()]
+
+
+def _join_acl(parts: list[str]) -> str:
+    """Join ACL entries into a string, removing duplicates while preserving order."""
+    seen = set()
+    out = []
+    for p in parts:
+        if p not in seen:
+            out.append(p)
+            seen.add(p)
+    return ",".join(out)
+
+
+def _enable_public_read(read_acl: str) -> str:
+    """Enable public read access in the ACL string."""
+    parts = _split_acl(read_acl)
+    for tok in PUBLIC_READ_TOKENS:
+        if tok not in parts:
+            parts.append(tok)  # appended to end
+    return _join_acl(parts)
+
+
+def _disable_public_read(read_acl: str) -> str:
+    """Disable public read access in the ACL string."""
+    parts = [p for p in _split_acl(read_acl) if p not in PUBLIC_READ_TOKENS]
+    return _join_acl(parts)
+
+
+def _is_public_read(read_acl: str) -> bool:
+    """Check if ACL string has public read access enabled."""
+    parts = set(_split_acl(read_acl))
+    return all(tok in parts for tok in PUBLIC_READ_TOKENS)
+
+
+async def set_container_public(request: aiohttp.web.Request) -> aiohttp.web.Response:
+    """Set the public read access for a container."""
+    session = await aiohttp_session.get_session(request)
+    client = request.app["api_client"]
+
+    project = request.match_info["project"]
+    container = request.match_info["container"]
+
+    enabled_str = request.query.get("enabled", "").lower()
+    if enabled_str not in {"true", "false"}:
+        raise aiohttp.web.HTTPBadRequest(reason="Missing or invalid ?enabled=true|false")
+    enabled = enabled_str == "true"
+
+    async def _apply(name: str, *, allow_missing: bool) -> None:
+        await _ensure_owner_access_to_container(
+            request, name, allow_missing=allow_missing
+        )
+
+        headers = {"X-Auth-Token": session["projects"][project]["token"]}
+
+        async with client.head(
+            f"{session['projects'][project]['endpoint']}/{name}",
+            headers=headers,
+        ) as ret:
+            if ret.status == 404:
+                if allow_missing:
+                    return
+                raise aiohttp.web.HTTPNotFound(reason=f"Container not found: {name}")
+            if ret.status not in {200, 204}:
+                raise aiohttp.web.HTTPForbidden(
+                    reason=f"Failed to read container ACL: {name}"
+                )
+            read_acl = ret.headers.get("X-Container-Read", "")
+
+        new_read = (
+            _enable_public_read(read_acl) if enabled else _disable_public_read(read_acl)
+        )
+        headers["X-Container-Read"] = new_read
+
+        async with client.post(
+            f"{session['projects'][project]['endpoint']}/{name}",
+            headers=headers,
+        ) as ret:
+            if ret.status != 204:
+                raise aiohttp.web.HTTPForbidden(reason="Failed to update container ACL")
+
+    await _apply(container, allow_missing=False)
+    await _apply(f"{container}_segments", allow_missing=True)
+
+    return aiohttp.web.Response(status=204)
+
+
+async def list_public_containers(request: aiohttp.web.Request) -> aiohttp.web.Response:
+    """List all containers with public read access."""
+    session = await aiohttp_session.get_session(request)
+    client = request.app["api_client"]
+    project = request.match_info["project"]
+
+    containers = []
+    while True:
+        params = {"limit": 10000, "format": "json"}
+        if containers:
+            params["marker"] = containers[-1]["name"]
+        async with client.get(
+            f"{session['projects'][project]['endpoint']}",
+            params=params,
+            headers={"X-Auth-Token": session["projects"][project]["token"]},
+        ) as ret:
+            if ret.status == 204:
+                break
+            page = await ret.json()
+            containers += page
+            if not page:
+                break
+
+    async def _check(name: str) -> tuple[str, bool]:
+        async with client.head(
+            f"{session['projects'][project]['endpoint']}/{name}",
+            headers={"X-Auth-Token": session["projects"][project]["token"]},
+        ) as ret:
+            read_acl = ret.headers.get("X-Container-Read", "")
+            return (name, _is_public_read(read_acl))
+
+    results = await asyncio.gather(*[_check(c["name"]) for c in containers])
+    public = [
+        name for (name, is_pub) in results if is_pub and not name.endswith("_segments")
+    ]
+    return aiohttp.web.json_response({"public": public})
+
+
+async def get_public_base_address(request: aiohttp.web.Request) -> aiohttp.web.Response:
+    """Get the base address for public access to containers."""
+    session = await aiohttp_session.get_session(request)
+    project = request.match_info["project"]
+
+    endpoint = session["projects"][project]["endpoint"]
+    u = urlparse(endpoint)
+    host = f"{u.scheme}://{u.netloc}"
+    base_path = u.path.rstrip("/")
+    return aiohttp.web.json_response({"base": f"{host}{base_path}"})
+
+
 async def _swift_get_container_acl_wrapper(
     request: aiohttp.web.Request,
     container: str,
@@ -739,13 +888,15 @@ async def get_access_control_metadata(
 
 async def _ensure_owner_access_to_container(
     request: aiohttp.web.Request,
+    container: str,
+    *,
+    allow_missing: bool = False,
 ):
     """Ensure that owner project will retain access to all files."""
     session = await aiohttp_session.get_session(request)
     client = request.app["api_client"]
 
     project = request.match_info["project"]
-    container = request.match_info["container"]
 
     request.app["Log"].info(
         f"Ensuring project {project} retains access to container"
@@ -762,21 +913,32 @@ async def _ensure_owner_access_to_container(
         f"{session['projects'][project]['endpoint']}/{container}",
         headers=headers,
     ) as ret:
-        if "X-Container-Read" in ret.headers:
-            read_acl = ret.headers["X-Container-Read"]
-        if "X-Container-Write" in ret.headers:
-            write_acl = ret.headers["X-Container-Write"]
+        if ret.status == 404:
+            if allow_missing:
+                return
+            raise aiohttp.web.HTTPNotFound(reason=f"Container not found: {container}")
 
-    if project not in read_acl:
-        read_acl += f",{project}:*"
+        if ret.status not in {200, 204}:
+            raise aiohttp.web.HTTPForbidden(reason="Failed to read container ACL")
+
+        read_acl = ret.headers.get("X-Container-Read", "")
+        write_acl = ret.headers.get("X-Container-Write", "")
+
+    read_parts = _split_acl(read_acl)
+    write_parts = _split_acl(write_acl)
+
+    owner_token = f"{project}:*"
+
+    if owner_token not in read_parts:
+        read_parts.append(owner_token)
         changed = True
-    if project not in write_acl:
-        write_acl += f",{project}:*"
+    if owner_token not in write_parts:
+        write_parts.append(owner_token)
         changed = True
 
     if changed:
-        headers["X-Container-Read"] = read_acl
-        headers["X-Container-Write"] = write_acl
+        headers["X-Container-Read"] = _join_acl(read_parts)
+        headers["X-Container-Write"] = _join_acl(write_parts)
 
         async with client.post(
             f"{session['projects'][project]['endpoint']}/{container}",
@@ -790,176 +952,212 @@ async def _ensure_owner_access_to_container(
                 )
 
 
-async def remove_project_container_acl(
-    request: aiohttp.web.Request,
-) -> aiohttp.web.Response:
-    """Remove access from a project in container acl."""
-    await _ensure_owner_access_to_container(request)
-    session = await aiohttp_session.get_session(request)
-    request.app["Log"].info(
-        "API call to remove container ACL from "
-        f"{request.remote}, sess: {session} :: {time.ctime()}"
-    )
-    client = request.app["api_client"]
-
-    project = request.match_info["project"]
-    container = request.match_info["container"]
-    receiver = request.match_info["receiver"]
-    headers: typing.Dict[str, typing.Any] = {
-        "X-Auth-Token": session["projects"][project]["token"],
-    }
+async def _head_container_acls(session, client, project, container, headers):
+    """Return the read and write ACL strings for a container."""
     async with client.head(
         f"{session['projects'][project]['endpoint']}/{container}",
         headers=headers,
     ) as ret:
-        if "X-Container-Read" in ret.headers:
-            headers["X-Container-Read"] = (
-                ret.headers["X-Container-Read"]
-                .replace(f"{receiver}:*", "")
-                .replace(",,", ",")
-                .rstrip(",")
-            )
-        if "X-Container-Write" in ret.headers:
-            headers["X-Container-Write"] = (
-                ret.headers["X-Container-Write"]
-                .replace(f"{receiver}:*", "")
-                .replace(",,", ",")
-                .rstrip(",")
-            )
+        if ret.status == 404:
+            return None, None  # container does not exist
+        if ret.status not in {200, 204}:
+            raise aiohttp.web.HTTPForbidden(reason="Failed to read container ACL")
+        return (
+            ret.headers.get("X-Container-Read", ""),
+            ret.headers.get("X-Container-Write", ""),
+        )
+
+
+async def _post_container_acls(
+    session, client, project, container, headers, read_acl, write_acl
+):
+    """Update the container ACLs with the provided read and write ACL strings."""
+    headers["X-Container-Read"] = read_acl
+    headers["X-Container-Write"] = write_acl
     async with client.post(
         f"{session['projects'][project]['endpoint']}/{container}",
         headers=headers,
     ) as ret:
-        if ret.status == 204:
-            return aiohttp.web.Response(status=200)
-        else:
-            raise aiohttp.web.HTTPNotFound()
+        return ret.status
+
+
+async def remove_project_container_acl(
+    request: aiohttp.web.Request,
+) -> aiohttp.web.Response:
+    """Remove access from a project in container acl."""
+    container = request.match_info["container"]
+    segments = f"{container}_segments"
+
+    await _ensure_owner_access_to_container(request, container, allow_missing=False)
+    await _ensure_owner_access_to_container(request, segments, allow_missing=True)
+
+    session = await aiohttp_session.get_session(request)
+    client = request.app["api_client"]
+    project = request.match_info["project"]
+    receiver = request.match_info["receiver"]
+
+    async def apply(name: str, *, allow_missing: bool):
+        headers = {"X-Auth-Token": session["projects"][project]["token"]}
+
+        read_acl, write_acl = await _head_container_acls(
+            session, client, project, name, headers
+        )
+
+        if read_acl is None:
+            if allow_missing:
+                return 204
+            raise aiohttp.web.HTTPNotFound(reason=f"Container not found: {name}")
+
+        read_acl = read_acl.replace(f"{receiver}:*", "").replace(",,", ",").rstrip(",")
+        write_acl = write_acl.replace(f"{receiver}:*", "").replace(",,", ",").rstrip(",")
+
+        status = await _post_container_acls(
+            session, client, project, name, headers, read_acl, write_acl
+        )
+        return status
+
+    st1 = await apply(container, allow_missing=False)
+    st2 = await apply(segments, allow_missing=True)
+
+    if st1 == 204 and st2 == 204:
+        return aiohttp.web.Response(status=200)
+    raise aiohttp.web.HTTPNotFound()
 
 
 async def remove_container_acl(request: aiohttp.web.Request) -> aiohttp.web.Response:
     """Remove all allowed projects from container acl."""
     session = await aiohttp_session.get_session(request)
-    request.app["Log"].info(
-        "API call to remove projects fom container ACL from "
-        f"{request.remote}, sess: {session} :: {time.ctime()}"
-    )
     client = request.app["api_client"]
     project = request.match_info["project"]
     container = request.match_info["container"]
+    segments = f"{container}_segments"
 
-    async with client.post(
-        f"{session['projects'][project]['endpoint']}/{container}",
-        headers={
-            "X-Auth-Token": session["projects"][project]["token"],
-            "X-Container-Read": "",
-            "X-Container-Write": "",
-        },
-    ) as ret:
-        if ret.status == 204:
-            await _ensure_owner_access_to_container(request)
-            return aiohttp.web.Response(status=200)
-        else:
-            raise aiohttp.web.HTTPNotFound()
+    async def clear(name: str, *, allow_missing: bool):
+        async with client.post(
+            f"{session['projects'][project]['endpoint']}/{name}",
+            headers={
+                "X-Auth-Token": session["projects"][project]["token"],
+                "X-Container-Read": "",
+                "X-Container-Write": "",
+            },
+        ) as ret:
+            if ret.status == 404:
+                if allow_missing:
+                    return
+                raise aiohttp.web.HTTPNotFound(reason=f"Container not found: {name}")
+            if ret.status != 204:
+                raise aiohttp.web.HTTPNotFound()
+        await _ensure_owner_access_to_container(
+            request, name, allow_missing=allow_missing
+        )
+
+    await clear(container, allow_missing=False)
+    await clear(segments, allow_missing=True)
+
+    return aiohttp.web.Response(status=200)
 
 
 async def modify_container_write_acl(
     request: aiohttp.web.Request,
 ) -> aiohttp.web.Response:
     """Modify write access for a project from container acl."""
-    await _ensure_owner_access_to_container(request)
+    container = request.match_info["container"]
+    segments = f"{container}_segments"
+
+    await _ensure_owner_access_to_container(request, container, allow_missing=False)
+    await _ensure_owner_access_to_container(request, segments, allow_missing=True)
+
     session = await aiohttp_session.get_session(request)
-    request.app["Log"].info(
-        "API call to modify projects fom container ACL from "
-        f"{request.remote}, sess: {session} :: {time.ctime()}"
-    )
     client = request.app["api_client"]
     project = request.match_info["project"]
-    container = request.match_info["container"]
     receivers = request.query["projects"].split(",")
     rights = request.query["rights"].split(",")
 
-    headers = {"X-Auth-Token": session["projects"][project]["token"]}
-    read_acl = ""
-    write_acl = ""
+    async def apply(name: str, *, allow_missing: bool):
+        headers = {"X-Auth-Token": session["projects"][project]["token"]}
 
-    async with client.head(
-        f"{session['projects'][project]['endpoint']}/{container}",
-        headers=headers,
-    ) as ret:
-        if "X-Container-Read" in ret.headers:
-            read_acl = ret.headers["X-Container-Read"]
-        if "X-Container-Write" in ret.headers:
-            write_acl = ret.headers["X-Container-Write"]
-    if "w" in rights:
-        for receiver in receivers:
-            write_acl += f",{receiver}:*"
-    else:
-        for receiver in receivers:
-            write_acl = write_acl.replace(f"{receiver}:*", "")
+        read_acl, write_acl = await _head_container_acls(
+            session, client, project, name, headers
+        )
 
-    read_acl = read_acl.replace(",,", ",").strip(",")
-    write_acl = write_acl.replace(",,", ",").strip(",")
+        if read_acl is None:
+            if allow_missing:
+                return 204
+            raise aiohttp.web.HTTPNotFound(reason=f"Container not found: {name}")
 
-    headers["X-Container-Read"] = read_acl
-    headers["X-Container-Write"] = write_acl
-
-    async with client.post(
-        f"{session['projects'][project]['endpoint']}/{container}", headers=headers
-    ) as ret:
-        if ret.status == 204:
-            return aiohttp.web.Response(status=200)
+        if "w" in rights:
+            for receiver in receivers:
+                write_acl += f",{receiver}:*"
         else:
-            raise aiohttp.web.HTTPNotFound()
+            for receiver in receivers:
+                write_acl = write_acl.replace(f"{receiver}:*", "")
+
+        read_acl = read_acl.replace(",,", ",").strip(",")
+        write_acl = write_acl.replace(",,", ",").strip(",")
+
+        status = await _post_container_acls(
+            session, client, project, name, headers, read_acl, write_acl
+        )
+        return status
+
+    st1 = await apply(container, allow_missing=False)
+    st2 = await apply(segments, allow_missing=True)
+
+    if st1 == 204 and st2 == 204:
+        return aiohttp.web.Response(status=200)
+    raise aiohttp.web.HTTPNotFound()
 
 
 async def add_project_container_acl(
     request: aiohttp.web.Request,
 ) -> aiohttp.web.Response:
     """Add access for a project in container acl."""
-    await _ensure_owner_access_to_container(request)
+    container = request.match_info["container"]
+    segments = f"{container}_segments"
+
     session = await aiohttp_session.get_session(request)
-    request.app["Log"].info(
-        "API call to add access for project in container from "
-        f"{request.remote}, sess: {session} :: {time.ctime()}"
-    )
     client = request.app["api_client"]
     project = request.match_info["project"]
-    container = request.match_info["container"]
     receivers = request.query["projects"].split(",")
 
-    headers = {
-        "X-Auth-Token": session["projects"][project]["token"],
-    }
+    await _ensure_owner_access_to_container(request, container, allow_missing=False)
+    await _ensure_owner_access_to_container(request, segments, allow_missing=True)
 
-    read_acl = ""
-    write_acl = ""
-    async with client.head(
-        f"{session['projects'][project]['endpoint']}/{container}",
-        headers=headers,
-    ) as ret:
-        if "X-Container-Read" in ret.headers:
-            read_acl = ret.headers["X-Container-Read"]
-        if "X-Container-Write" in ret.headers:
-            write_acl = ret.headers["X-Container-Write"]
-    if "r" in request.query["rights"]:
-        for receiver in receivers:
-            read_acl += f",{receiver}:*"
-        read_acl = read_acl.replace(",,", ",").lstrip(",")
-    if "w" in request.query["rights"]:
-        for receiver in receivers:
-            write_acl += f",{receiver}:*"
-        write_acl = write_acl.replace(",,", ",").lstrip(",")
+    rights = request.query["rights"]
 
-    headers["X-Container-Read"] = read_acl
-    headers["X-Container-Write"] = write_acl
-    async with client.post(
-        f"{session['projects'][project]['endpoint']}/{container}",
-        headers=headers,
-    ) as ret:
-        if ret.status == 204:
-            return aiohttp.web.Response(status=201)
-        else:
-            raise aiohttp.web.HTTPNotFound
+    async def apply(name: str, *, allow_missing: bool):
+        headers = {"X-Auth-Token": session["projects"][project]["token"]}
+
+        read_acl, write_acl = await _head_container_acls(
+            session, client, project, name, headers
+        )
+
+        if read_acl is None:
+            if allow_missing:
+                return 204
+            raise aiohttp.web.HTTPNotFound(reason=f"Container not found: {name}")
+
+        if "r" in rights:
+            for receiver in receivers:
+                read_acl += f",{receiver}:*"
+            read_acl = read_acl.replace(",,", ",").lstrip(",")
+
+        if "w" in rights:
+            for receiver in receivers:
+                write_acl += f",{receiver}:*"
+            write_acl = write_acl.replace(",,", ",").lstrip(",")
+
+        status = await _post_container_acls(
+            session, client, project, name, headers, read_acl, write_acl
+        )
+        return status
+
+    st1 = await apply(container, allow_missing=False)
+    st2 = await apply(segments, allow_missing=True)
+
+    if st1 == 204 and st2 == 204:
+        return aiohttp.web.Response(status=201)
+    raise aiohttp.web.HTTPNotFound()
 
 
 async def swift_download_shared_object(

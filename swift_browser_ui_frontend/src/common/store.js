@@ -7,6 +7,7 @@ import {
   getObjects,
   getCopyStatus,
   cancelCopy,
+  getPublicBaseAddress,
 } from "@/common/api";
 import {
   getTagsForContainer,
@@ -83,6 +84,9 @@ const store = createStore({
     openObjectInfoModal: false,
     selectedObjectInfo: null,
     previewOpenedToastVisible: false,
+    openPublicModal: false,
+    publicModalContainer: null,
+    publicBase: "",
   },
   mutations: {
     setProjects(state, newProjects) {
@@ -275,6 +279,15 @@ const store = createStore({
     },
     togglePreviewOpenedToast(state, val) {
       state.previewOpenedToastVisible = val;
+    },
+    togglePublicModal(state, payload) {
+      state.openPublicModal = payload;
+    },
+    setPublicModalContainer(state, payload) {
+      state.publicModalContainer = payload;
+    },
+    setPublicBase(state, payload) {
+      state.publicBase = payload || "";
     },
   },
   actions: {
@@ -737,6 +750,12 @@ const store = createStore({
       dispatch("stopCopyJobPolling", { jobId });
       commit("removeCopyJob", jobId);
     },
+    async ensurePublicBase({ state, commit }, { projectID, signal }) {
+      if (state.publicBase) return state.publicBase;
+      const { base } = await getPublicBaseAddress(projectID, signal);
+      commit("setPublicBase", base);
+      return base;
+   },
   },
 });
 

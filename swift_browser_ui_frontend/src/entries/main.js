@@ -18,6 +18,8 @@ import TokenModal from "@/components/TokenModal.vue";
 import CopyProgressToast from "@/components/CopyProgressToast.vue";
 import ObjectInfoModal from "@/components/ObjectInfoModal.vue";
 import PreviewOpenedToast from "@/components/PreviewOpenedToast.vue";
+import PublicModal from "@/components/PublicModal.vue";
+
 
 
 
@@ -103,6 +105,7 @@ const app = createApp({
     CopyProgressToast,
     ObjectInfoModal,
     PreviewOpenedToast,
+    PublicModal,
   },
   data: function () {
     return {
@@ -203,6 +206,14 @@ const app = createApp({
     openObjectInfoModal: {
       get() { return this.$store.state.openObjectInfoModal; },
       set() {},
+    },
+    openPublicModal: {
+      get() {
+        return this.$store.state.openPublicModal;
+      },
+      set(v) {
+        this.$store.commit("togglePublicModal", v);
+      },
     },
   },
   watch: {
