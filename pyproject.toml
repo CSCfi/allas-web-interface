@@ -51,7 +51,7 @@ test = [
     "pytest-cov==6.1.1",
     "pytest-xdist==3.6.1",
     "pytest==8.3.5",
-    "tox==4.25.0",
+    "tox==4.44.0",
     "setuptools==71.1.0",
 ]
 ui_test = [
