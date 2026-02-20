@@ -15,16 +15,10 @@ let default_translations = {
         ],
       },
       public: {
-        public: "Make public",
-        title: "Public access",
-        bucketLabel: "Bucket",
-        toggleLabel: "Public read access",
-        subtitle: "Control anonymous read access to this bucket.",
-        toggleHelp: "When enabled, anyone with the link can browse and download objects.",
-        linkLabel: "Public link",
-        linkHelp: "Share this link carefully. Disable public access to revoke it.",
-        open: "Open",
-        copy: "Copy",
+        public: "Public Access",
+        updateFail: "Failed to update public access",
+        clickToOpen: "Link",
+        disabled: "   Disabled",
 
       },
       preview: {
@@ -607,16 +601,10 @@ let default_translations = {
         ],
       },
       public: {
-        public: "Tee julkinen",
-        title: "Julkinen pääsy",
-        bucketLabel: "ämpäri",
-        toggleLabel: "Julkinen lukuoikeus",
-        subtitle: "Säädä anonyymin lukuoikeuden taso tälle ämpärille.",
-        toggleHelp: "Kun käytössä, kuka tahansa linkin saava voi selata ja ladata ämpärin sisältöä.",
-        linkLabel: "Julkinen linkki",
-        linkHelp: "Jaa tämä linkki huolellisesti. Poista julkinen pääsy peruuttaaksesi linkki.",
-        open: "Avaa",
-        copy: "Kopioi",
+        public: "Julkinen pääsy",
+        updateFail: "Julkisen pääsyn päivittäminen epäonnistui",
+        clickToOpen: "Linkki",
+        disabled: "Pois käytöstä",
       },
       preview: {
         openedInNewTab: "Tiedosto avautuu uuteen välilehteen. Esikatselu " +

@@ -34,7 +34,7 @@ import {
   mdiShareVariantOutline,
   mdiDotsHorizontal,
   mdiPail,
-  mdiEarth,
+  mdiContentCopy,
 } from "@mdi/js";
 import {
   toggleEditTagsModal,
@@ -93,6 +93,7 @@ export default {
       sortBy: "name",
       sortDirection: "asc",
       abortController: null,
+      publicBusy: {},
     };
   },
   computed: {
@@ -136,6 +137,12 @@ export default {
     this.abortController = new AbortController();
     this.setHeaders();
     this.setPagination();
+
+    this.$store.dispatch("ensurePublicBase", {
+      projectID: this.active.id,
+      signal: this.abortController.signal,
+    }).catch(() => {});
+
     Promise.all([this.getSharingContainers(), this.getSharedContainers()]);
   },
   beforeMount () {
@@ -145,25 +152,6 @@ export default {
   },
   expose: ["toFirstPage"],
   methods: {
-    onOpenPublicModal(item, keypress) {
-      this.$store.commit("togglePublicModal", true);
-      this.$store.commit("setPublicModalContainer", {
-        name: item.name,
-        is_public: !!item.is_public,
-      });
-
-      if (keypress) {
-        setPrevActiveElement();
-        const modal = document.getElementById("public-modal");
-        disableFocusOutsideModal(modal);
-      }
-
-      setTimeout(() => {
-        const el = document.querySelector("#public-toggle input") ||
-          document.querySelector("#public-copy button");
-        el?.focus?.();
-      }, 300);
-    },
     toFirstPage() {
       this.paginationOptions.currentPage = 1;
     },
@@ -185,6 +173,44 @@ export default {
         if (e?.name !== "AbortError") throw e;
       }
     },
+    async togglePublic(containerName, nextEnabled) {
+      if (!containerName) return;
+      if (this.publicBusy[containerName]) return;
+
+      this.publicBusy = { ...this.publicBusy, [containerName]: true };
+
+      const idx = this.conts.findIndex(c => c.name === containerName);
+      const prev = idx >= 0 ? !!this.conts[idx].is_public : false;
+      if (idx >= 0) this.conts[idx].is_public = nextEnabled;
+
+      try {
+        await this.$store.dispatch("ensurePublicBase", {
+          projectID: this.active.id,
+          signal: this.abortController.signal,
+        });
+
+        await setContainerPublic(this.active.id, containerName, nextEnabled);
+
+        this.$store.dispatch("updateContainers", { projectID: this.active.id });
+      } catch (e) {
+        if (idx >= 0) this.conts[idx].is_public = prev;
+
+        addErrorToastOnMain(
+          this.$t("message.public.updateFail"),
+        );
+      } finally {
+        const { [containerName]: _, ...rest } = this.publicBusy;
+        this.publicBusy = rest;
+      }
+    },
+
+    openPublic(containerName) {
+      const base = this.$store.state.publicBase;
+      if (!base || !containerName) return;
+      const url = `${base}/${encodeURIComponent(containerName)}/`;
+      window.open(url, "_blank", "noopener,noreferrer");
+    },
+
     async getPage () {
       let offset = 0;
       let limit = this.conts?.length;
@@ -290,6 +316,75 @@ export default {
             sharing: {
               value: getSharedStatus(item.name),
             },
+            public: {
+              value: null,
+              children: [
+                {
+                  key: `pub_toggle_${item.name}_${item.is_public ? "on" : "off"}`,
+                  value: null,
+                  component: {
+                    tag: "input",
+                    params: {
+                      type: "checkbox",
+                      class: "public-switch-input",
+                      checked: !!item.is_public,
+                      disabled: !!item.owner || !!this.publicBusy[item.name],
+                      onChange: (ev) => {
+                        const host = ev?.currentTarget || ev?.target;
+                        const next = !!host?.checked;
+                        this.togglePublic(item.name, next);
+                      },
+                      onInput: (ev) => {
+                        const host = ev?.currentTarget || ev?.target;
+                        const next = !!host?.checked;
+                        this.togglePublic(item.name, next);
+                      },
+                    },
+                  },
+                },
+                {
+                  key: `pub_slider_${item.name}`,
+                  value: null,
+                  component: {
+                    tag: "span",
+                    params: {
+                      class: "public-switch-slider",
+                      onClick: () => {
+                        if (item.owner || this.publicBusy[item.name]) return;
+                        this.togglePublic(item.name, !item.is_public);
+                      },
+                    },
+                  },
+                },
+
+                // show "disabled" text when not public
+                ...(!item.is_public ? [{
+                  key: `pub_disabled_${item.name}`,
+                  value: this.$t("message.public.disabled") || "Disabled",
+                  component: {
+                    tag: "span",
+                    params: {
+                      class: "public-status",
+                    },
+                  },
+                }] : []),
+
+                // show link only when public
+                ...(item.is_public ? [{
+                  key: `pub_link_${item.name}`,
+                  value: this.$t("message.public.clickToOpen"),
+                  component: {
+                    tag: "c-link",
+                    params: {
+                      class: "public-link",
+                      href: "javascript:void(0)",
+                      color: "primary",
+                      onClick: () => this.openPublic(item.name),
+                    },
+                  },
+                }] : []),
+              ],
+            },
             last_activity: {
               value: this.showTimestamp? parseDateTime(
                 this.locale, item.last_modified, this.$t, false) :
@@ -345,20 +440,22 @@ export default {
                   },
                 },
                 {
-                  value: this.$t("message.public.public"),
+                  value: this.$t("message.copy"),
                   component: {
                     tag: "c-button",
                     params: {
-                      testid: "public-container",
+                      testid: "copy-container",
                       text: true,
                       size: "small",
-                      title: this.$t("message.public.public"),
-                      path: mdiEarth,
-                      onClick: () => this.onOpenPublicModal(item),
+                      title: this.$t("message.copy"),
+                      path: mdiContentCopy,
+                      onClick: () => this.openCopyFolderModal(item.name, item.owner),
                       onKeyUp: (event) => {
-                        if (event.keyCode === 13) this.onOpenPublicModal(item, true);
+                        if (event.keyCode === 13) {
+                          this.openCopyFolderModal(item.name, item.owner, true);
+                        }
                       },
-                      disabled: item.owner,
+                      disabled: !item.bytes,
                     },
                   },
                 },
@@ -368,22 +465,6 @@ export default {
                     tag: "c-menu",
                     params: {
                       items: [
-                        {
-                          name: this.$t("message.copy"),
-                          action: () => {
-                            this.openCopyFolderModal(item.name, item.owner);
-                            const menuItems = document
-                              .querySelector("c-menu-items");
-                            menuItems.addEventListener("keydown", (e) =>{
-                              if (e.keyCode === 13) {
-                                this.openCopyFolderModal(
-                                  item.name, item.owner, true,
-                                );
-                              }
-                            });
-                          },
-                          disabled: !item.bytes,
-                        },
                         {
                           name: this.$t("message.editTags"),
                           action: () => {
@@ -455,6 +536,11 @@ export default {
         this.conts.forEach((cont, idx) => (cont.sharing = combined[idx]));
       }
 
+      if (this.sortBy === "public") {
+        this.conts.forEach(c => { c.public = c.is_public ? 1 : 0; });
+      }
+
+
       // Use toRaw to mutate the original array, not the proxy
       sortObjects(toRaw(this.conts), this.sortBy, this.sortDirection);
       this.getPage();
@@ -487,6 +573,9 @@ export default {
           value: this.$t("message.table.shared_status"),
           sortable: true,
         },
+        { key: "public",
+          value: this.$t("message.public.public"),
+          sortable: true },
         {
           key: "last_activity",
           value: this.$t("message.table.activity"),

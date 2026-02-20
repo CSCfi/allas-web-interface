@@ -84,8 +84,6 @@ const store = createStore({
     openObjectInfoModal: false,
     selectedObjectInfo: null,
     previewOpenedToastVisible: false,
-    openPublicModal: false,
-    publicModalContainer: null,
     publicBase: "",
   },
   mutations: {
@@ -279,12 +277,6 @@ const store = createStore({
     },
     togglePreviewOpenedToast(state, val) {
       state.previewOpenedToastVisible = val;
-    },
-    togglePublicModal(state, payload) {
-      state.openPublicModal = payload;
-    },
-    setPublicModalContainer(state, payload) {
-      state.publicModalContainer = payload;
     },
     setPublicBase(state, payload) {
       state.publicBase = payload || "";
