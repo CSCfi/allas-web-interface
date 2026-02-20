@@ -22,7 +22,6 @@ import PreviewOpenedToast from "@/components/PreviewOpenedToast.vue";
 
 
 
-
 // CSC UI things
 import { applyPolyfills, defineCustomElements } from "allas-ui/dist/loader";
 import { vControl } from "@/common/csc-ui-vue-directive";
