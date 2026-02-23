@@ -234,6 +234,7 @@ export default {
         return "";
       };
 
+
       // Filter out segment folders for rendering
       // Map the 'accessRights' to the container if it's a shared container
       const mappedContainers = await Promise.all(
@@ -342,21 +343,6 @@ export default {
                     },
                   },
                 },
-                {
-                  key: `pub_slider_${item.name}`,
-                  value: null,
-                  component: {
-                    tag: "span",
-                    params: {
-                      class: "public-switch-slider",
-                      onClick: () => {
-                        if (item.owner || this.publicBusy[item.name]) return;
-                        this.togglePublic(item.name, !item.is_public);
-                      },
-                    },
-                  },
-                },
-
                 // show "disabled" text when not public
                 ...(!item.is_public ? [{
                   key: `pub_disabled_${item.name}`,

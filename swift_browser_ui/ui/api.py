@@ -106,6 +106,15 @@ async def swift_list_containers(
         )
 
 
+async def _probe_public_container(client, endpoint: str, container: str) -> bool:
+    u = urlparse(endpoint)
+    host = f"{u.scheme}://{u.netloc}"
+    base_path = u.path.rstrip("/")
+    url = f"{host}{base_path}/{quote(container, safe='')}"
+    async with client.get(url, params={"format": "json", "limit": 1}, headers={}) as r:
+        return r.status in {200, 204}
+
+
 async def _check_last_modified(
     request: aiohttp.web.Request, container: typing.Dict[str, typing.Any]
 ) -> typing.Dict[str, typing.Any]:
@@ -138,7 +147,15 @@ async def _check_last_modified(
                 },
             ) as ret:
                 read_acl = ret.headers.get("X-Container-Read", "")
-                container["is_public"] = _is_public_read(read_acl)
+                is_pub = _is_public_read(read_acl)
+
+                if "owner" in request.query and not read_acl:
+                    try:
+                        is_pub = await _probe_public_container(client, endpoint, name)
+                    except Exception:
+                        is_pub = False
+
+                container["is_public"] = is_pub
 
                 if "last_modified" not in container:
                     date_str = ret.headers["Last-Modified"]
@@ -512,12 +529,19 @@ async def swift_get_metadata_container(
     ) as ret:
 
         headers = ret.headers
-    return aiohttp.web.json_response(
-        [
-            container,
-            {k.replace("X-Container-Meta-", ""): v for k, v in headers.items()},
-        ]
-    )
+        read_acl = headers.get("X-Container-Read", "")
+        meta = {k.replace("X-Container-Meta-", ""): v for k, v in headers.items()}
+        meta["X-Container-Read"] = read_acl
+        is_pub = _is_public_read(read_acl)
+
+        if owner and not read_acl:
+            try:
+                is_pub = await _probe_public_container(client, endpoint, container)
+            except Exception:
+                is_pub = False
+
+        meta["is_public"] = is_pub
+    return aiohttp.web.json_response([container, meta])
 
 
 async def _swift_update_object_meta_wrapper(

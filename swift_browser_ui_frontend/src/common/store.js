@@ -323,7 +323,7 @@ const store = createStore({
       if (sharedContainers.length > 0) {
         for (let i in sharedContainers) {
           let cont = sharedContainers[i];
-          const { bytes, count } = await getMetadataForSharedContainer(
+          const { bytes, count, is_public } = await getMetadataForSharedContainer(
             projectID,
             cont.container,
             signal,
@@ -334,7 +334,11 @@ const store = createStore({
           cont.projectID = projectID;
           cont.bytes = bytes;
           cont.count = count;
+          cont.is_public = !!is_public;
           cont.name = cont.container;
+
+          // remove after debugging
+          console.log("ASSIGN shared", cont.container, "owner:", cont.owner, "is_public:", cont.is_public);
 
           const idb_last_modified = getContainerLastmodified(
             existingContainers, cont);
