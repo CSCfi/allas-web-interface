@@ -337,9 +337,6 @@ const store = createStore({
           cont.is_public = !!is_public;
           cont.name = cont.container;
 
-          // remove after debugging
-          console.log("ASSIGN shared", cont.container, "owner:", cont.owner, "is_public:", cont.is_public);
-
           const idb_last_modified = getContainerLastmodified(
             existingContainers, cont);
           cont.last_modified = !cont.container.endsWith("_segments") &&
