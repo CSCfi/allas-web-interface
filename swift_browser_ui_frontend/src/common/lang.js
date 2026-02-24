@@ -17,7 +17,7 @@ let default_translations = {
       public: {
         public: "Public Access",
         updateFail: "Failed to update public access",
-        clickToOpen: "Link",
+        link: "Link",
         disabled: "   Disabled",
 
       },
@@ -603,7 +603,7 @@ let default_translations = {
       public: {
         public: "Julkinen pääsy",
         updateFail: "Julkisen pääsyn päivittäminen epäonnistui",
-        clickToOpen: "Linkki",
+        link: "Linkki",
         disabled: "Pois käytöstä",
       },
       preview: {

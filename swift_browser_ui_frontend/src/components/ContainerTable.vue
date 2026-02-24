@@ -204,13 +204,6 @@ export default {
       }
     },
 
-    openPublic(containerName) {
-      const base = this.$store.state.publicBase;
-      if (!base || !containerName) return;
-      const url = `${base}/${encodeURIComponent(containerName)}/`;
-      window.open(url, "_blank", "noopener,noreferrer");
-    },
-
     async getPage () {
       let offset = 0;
       let limit = this.conts?.length;
@@ -249,6 +242,16 @@ export default {
             return sharedDetails && accessRights
               ? {...cont, accessRights} : {...cont};
           }));
+
+      let publicBase = "";
+      try {
+        publicBase = await this.$store.dispatch("ensurePublicBase", {
+          projectID: this.active.id,
+          signal: this.abortController.signal,
+        });
+      } catch (e) {
+        publicBase = "";
+      }
 
       this.containers = mappedContainers
         .slice(offset, offset + limit).reduce((
@@ -346,7 +349,7 @@ export default {
                 // show "disabled" text when not public
                 ...(!item.is_public ? [{
                   key: `pub_disabled_${item.name}`,
-                  value: this.$t("message.public.disabled") || "Disabled",
+                  value: this.$t("message.public.disabled"),
                   component: {
                     tag: "span",
                     params: {
@@ -356,16 +359,17 @@ export default {
                 }] : []),
 
                 // show link only when public
-                ...(item.is_public ? [{
+                ...(item.is_public && publicBase ? [{
                   key: `pub_link_${item.name}`,
-                  value: this.$t("message.public.clickToOpen"),
+                  value: this.$t("message.public.link"),
                   component: {
                     tag: "c-link",
                     params: {
                       class: "public-link",
-                      href: "javascript:void(0)",
+                      href: `${publicBase}/${encodeURIComponent(item.name)}/`,
+                      target: "_blank",
+                      rel: "noopener noreferrer",
                       color: "primary",
-                      onClick: () => this.openPublic(item.name),
                     },
                   },
                 }] : []),
