@@ -23,6 +23,11 @@
             {{ $t("message.table.edit_sharing") }}
           </c-link>
         </li>
+        <li>
+          <b>{{ $t("message.public.public") }}: </b>
+          {{ isPublic ? $t("message.public.yes")
+          : $t("message.public.no") }}
+        </li>
         <li v-show="owner">
           <b>{{ $t("message.table.source_project_id") }}: </b>
           {{ ownerProject }}
@@ -150,13 +155,14 @@
 import {
   truncate,
   parseDateTime,
+  DEV,
+  getMetadataForSharedContainer,
 } from "@/common/conv";
 import {
   getSharedContainers,
   getAccessDetails,
   toggleDeleteModal,
   updateObjectsAndObjectTags,
-  addErrorToastOnMain,
 } from "@/common/globalFunctions";
 import {
   setPrevActiveElement,
@@ -171,8 +177,6 @@ import CObjectTable from "@/components/CObjectTable.vue";
 import { debounce, escapeRegExp } from "lodash";
 import BreadcrumbNav from "@/components/BreadcrumbNav.vue";
 import { toRaw } from "vue";
-import { DEV } from "@/common/conv";
-import { swiftCreateEmptyObject } from "@/common/api";
 
 export default {
   name: "ObjectTable",
@@ -207,6 +211,7 @@ export default {
       breadcrumbClicked: false,
       objsLoading: false,
       filtering: false,
+      isPublic: false,
     };
   },
   computed: {
@@ -330,6 +335,24 @@ export default {
       await this.getSharedContainers();
       await this.getFolderSharedStatus();
       await this.updateObjects();
+    },
+    async refreshPublicStatus() {
+      if (this.owner) {
+        try {
+          const meta = await getMetadataForSharedContainer(
+            this.project,
+            this.containerName,
+            this.abortController.signal,
+            this.owner,
+          );
+          this.isPublic = !!meta?.is_public;
+        } catch (e) {
+          this.isPublic = false;
+        }
+        return;
+      }
+
+      this.isPublic = !!this.currentContainer?.is_public;
     },
     openSubFolderModal(keypress) {
       toggleCreateFolderModal();
@@ -476,6 +499,14 @@ export default {
       }
 
       this.currentContainer = await this.getCurrentContainer();
+      if (!this.owner && !this.currentContainer) {
+        await this.$store.dispatch("updateContainers", {
+          projectID: this.active.id,
+          signal: this.abortController.signal,
+        });
+        this.currentContainer = await this.getCurrentContainer();
+      }
+      await this.refreshPublicStatus();
 
       if (this.currentContainer === undefined) {
         //container not in DB when clicking "view destination"
@@ -485,10 +516,12 @@ export default {
           signal: this.abortController.signal,
         });
         this.currentContainer = await this.getCurrentContainer();
+        await this.refreshPublicStatus();
         if (this.currentContainer === undefined) {
           if (DEV) console.log("Error with uploaded container");
           return;
         }
+
         await this.updateAfterUpload();
       }
       else {

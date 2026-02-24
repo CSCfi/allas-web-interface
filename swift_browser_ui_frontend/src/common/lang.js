@@ -18,7 +18,9 @@ let default_translations = {
         public: "Public Access",
         updateFail: "Failed to update public access",
         link: "Link",
-        disabled: "   Disabled",
+        disabled: "Disabled",
+        yes: "Public",
+        no: "Private",
 
       },
       preview: {

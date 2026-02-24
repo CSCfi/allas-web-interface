@@ -34,7 +34,7 @@ import {
   mdiShareVariantOutline,
   mdiDotsHorizontal,
   mdiPail,
-  mdiContentCopy,
+  mdiPailPlus,
 } from "@mdi/js";
 import {
   toggleEditTagsModal,
@@ -438,7 +438,7 @@ export default {
                       text: true,
                       size: "small",
                       title: this.$t("message.copy"),
-                      path: mdiContentCopy,
+                      path: mdiPailPlus,
                       onClick: () => this.openCopyFolderModal(item.name, item.owner),
                       onKeyUp: (event) => {
                         if (event.keyCode === 13) {
