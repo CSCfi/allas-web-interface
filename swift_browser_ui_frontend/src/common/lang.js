@@ -19,8 +19,8 @@ let default_translations = {
         updateFail: "Failed to update public access",
         link: "Link",
         disabled: "Disabled",
-        yes: "Public",
-        no: "Private",
+        yes: "Public. Anyone with the link can access objects.",
+        no: "Private. Access restricted to this project and shared projects.",
 
       },
       preview: {
@@ -110,7 +110,7 @@ let default_translations = {
         objects: "Objects",
         size: "Size",
         modified: "Last modified",
-        activity: "Last activity",
+        activity: "Last Activity",
         paginated: "Paginated",
         pageNb: "per page",
         tags: "Tags",
@@ -125,7 +125,7 @@ let default_translations = {
         nextPage: "Next page",
         prevPage: "Previous page",
         page: "Page",
-        shared_status: "Shared status",
+        shared_status: "Shared Status",
         sharing: "You have shared",
         shared: "Shared with you",
         edit_sharing: " Edit sharing",
@@ -607,6 +607,8 @@ let default_translations = {
         updateFail: "Julkisen pääsyn päivittäminen epäonnistui",
         link: "Linkki",
         disabled: "Pois käytöstä",
+        yes: "Julkinen. Kuka tahansa linkin saava voi käyttää kohteita.",
+        no: "Yksityinen. Pääsy rajoitettu tähän projektiin ja jaettuihin projekteihin.",
       },
       preview: {
         openedInNewTab: "Tiedosto avautuu uuteen välilehteen. Esikatselu " +

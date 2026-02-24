@@ -25,8 +25,18 @@
         </li>
         <li>
           <b>{{ $t("message.public.public") }}: </b>
-          {{ isPublic ? $t("message.public.yes")
-          : $t("message.public.no") }}
+          {{ isPublic ? $t("message.public.yes") : $t("message.public.no") }}
+
+          <c-link
+            v-if="isPublic && publicBase"
+            class="public-link"
+            :href="`${publicBase}/${encodeURIComponent(containerName)}/`"
+            target="_blank"
+            rel="noopener noreferrer"
+            underline
+          >
+            {{ $t("message.public.link") }}
+          </c-link>
         </li>
         <li v-show="owner">
           <b>{{ $t("message.table.source_project_id") }}: </b>
@@ -212,6 +222,7 @@ export default {
       objsLoading: false,
       filtering: false,
       isPublic: false,
+      publicBase: "",
     };
   },
   computed: {
@@ -322,6 +333,16 @@ export default {
   },
   mounted () {
     this.objsLoading = true;
+
+    this.$store.dispatch("ensurePublicBase", {
+      projectID: this.active.id,
+      signal: this.abortController.signal,
+    }).then((base) => {
+      this.publicBase = base || "";
+    }).catch(() => {
+      this.publicBase = "";
+    });
+
     this.getData();
   },
   beforeUnmount () {
