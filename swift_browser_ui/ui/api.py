@@ -1032,8 +1032,11 @@ async def remove_project_container_acl(
                 return 204
             raise aiohttp.web.HTTPNotFound(reason=f"Container not found: {name}")
 
-        read_acl = read_acl.replace(f"{receiver}:*", "").replace(",,", ",").rstrip(",")
-        write_acl = write_acl.replace(f"{receiver}:*", "").replace(",,", ",").rstrip(",")
+        read_parts = [p for p in _split_acl(read_acl) if p != f"{receiver}:*"]
+        write_parts = [p for p in _split_acl(write_acl) if p != f"{receiver}:*"]
+
+        read_acl = _join_acl(read_parts)
+        write_acl = _join_acl(write_parts)
 
         status = await _post_container_acls(
             session, client, project, name, headers, read_acl, write_acl
@@ -1057,11 +1060,31 @@ async def remove_container_acl(request: aiohttp.web.Request) -> aiohttp.web.Resp
     segments = f"{container}_segments"
 
     async def clear(name: str, *, allow_missing: bool):
+        headers = {
+            "X-Auth-Token": session["projects"][project]["token"],
+        }
+        async with client.head(
+            f"{session['projects'][project]['endpoint']}/{name}",
+            headers=headers,
+        ) as ret:
+            if ret.status == 404:
+                if allow_missing:
+                    return
+                raise aiohttp.web.HTTPNotFound(reason=f"Container not found: {name}")
+            if ret.status not in {200, 204}:
+                raise aiohttp.web.HTTPForbidden(reason="Failed to read container ACL")
+
+            read_acl = ret.headers.get("X-Container-Read", "")
+
+        public_only_read = _join_acl(
+            [p for p in _split_acl(read_acl) if p in PUBLIC_READ_TOKENS]
+        )
+
         async with client.post(
             f"{session['projects'][project]['endpoint']}/{name}",
             headers={
                 "X-Auth-Token": session["projects"][project]["token"],
-                "X-Container-Read": "",
+                "X-Container-Read": public_only_read,
                 "X-Container-Write": "",
             },
         ) as ret:
@@ -1084,7 +1107,7 @@ async def remove_container_acl(request: aiohttp.web.Request) -> aiohttp.web.Resp
 async def modify_container_write_acl(
     request: aiohttp.web.Request,
 ) -> aiohttp.web.Response:
-    """Modify write access for a project from container acl."""
+    """Modify write access for projects in container acl."""
     container = request.match_info["container"]
     segments = f"{container}_segments"
 
@@ -1095,7 +1118,7 @@ async def modify_container_write_acl(
     client = request.app["api_client"]
     project = request.match_info["project"]
     receivers = request.query["projects"].split(",")
-    rights = request.query["rights"].split(",")
+    rights = request.query["rights"]
 
     async def apply(name: str, *, allow_missing: bool):
         headers = {"X-Auth-Token": session["projects"][project]["token"]}
@@ -1109,15 +1132,20 @@ async def modify_container_write_acl(
                 return 204
             raise aiohttp.web.HTTPNotFound(reason=f"Container not found: {name}")
 
-        if "w" in rights:
-            for receiver in receivers:
-                write_acl += f",{receiver}:*"
-        else:
-            for receiver in receivers:
-                write_acl = write_acl.replace(f"{receiver}:*", "")
+        write_parts = _split_acl(write_acl)
 
-        read_acl = read_acl.replace(",,", ",").strip(",")
-        write_acl = write_acl.replace(",,", ",").strip(",")
+        # remove old write entries
+        for r in receivers:
+            token = f"{r}:*"
+            if token in write_parts:
+                write_parts.remove(token)
+
+        # add write rights if requested
+        if "w" in rights:
+            for r in receivers:
+                write_parts.append(f"{r}:*")
+
+        write_acl = _join_acl(write_parts)
 
         status = await _post_container_acls(
             session, client, project, name, headers, read_acl, write_acl
@@ -1161,15 +1189,19 @@ async def add_project_container_acl(
                 return 204
             raise aiohttp.web.HTTPNotFound(reason=f"Container not found: {name}")
 
+        read_parts = _split_acl(read_acl)
+        write_parts = _split_acl(write_acl)
+
         if "r" in rights:
             for receiver in receivers:
-                read_acl += f",{receiver}:*"
-            read_acl = read_acl.replace(",,", ",").lstrip(",")
+                read_parts.append(f"{receiver}:*")
 
         if "w" in rights:
             for receiver in receivers:
-                write_acl += f",{receiver}:*"
-            write_acl = write_acl.replace(",,", ",").lstrip(",")
+                write_parts.append(f"{receiver}:*")
+
+        read_acl = _join_acl(read_parts)
+        write_acl = _join_acl(write_parts)
 
         status = await _post_container_acls(
             session, client, project, name, headers, read_acl, write_acl
