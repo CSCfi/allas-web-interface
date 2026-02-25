@@ -82,6 +82,7 @@ export default {
   },
   data() {
     return {
+      contsLocal: [],
       containers: [],
       sharingContainers: [],
       sharedContainers: [],
@@ -108,15 +109,19 @@ export default {
     },
   },
   watch: {
+    conts: {
+      immediate: true,
+      handler(newVal) {
+        this.contsLocal = (newVal || []).map(c => ({ ...c }));
+        Promise.all([this.getSharingContainers(), this.getSharedContainers()])
+          .then(() => this.getPage());
+      }
+    },
     disablePagination() {
       this.getPage();
     },
     hideTags() {
       this.getPage();
-    },
-    conts() {
-      Promise.all([this.getSharingContainers(), this.getSharedContainers()])
-        .then(() => this.getPage());
     },
     showTimestamp() {
       this.getPage();
@@ -142,8 +147,6 @@ export default {
       projectID: this.active.id,
       signal: this.abortController.signal,
     }).catch(() => {});
-
-    Promise.all([this.getSharingContainers(), this.getSharedContainers()]);
   },
   beforeMount () {
   },
@@ -179,9 +182,9 @@ export default {
 
       this.publicBusy = { ...this.publicBusy, [containerName]: true };
 
-      const idx = this.conts.findIndex(c => c.name === containerName);
-      const prev = idx >= 0 ? !!this.conts[idx].is_public : false;
-      if (idx >= 0) this.conts[idx].is_public = nextEnabled;
+      const idx = this.contsLocal.findIndex(c => c.name === containerName);
+      const prev = idx >= 0 ? !!this.contsLocal[idx].is_public : false;
+      if (idx >= 0) this.contsLocal[idx].is_public = nextEnabled;
 
       try {
         await this.$store.dispatch("ensurePublicBase", {
@@ -193,7 +196,7 @@ export default {
 
         this.$store.dispatch("updateContainers", { projectID: this.active.id });
       } catch (e) {
-        if (idx >= 0) this.conts[idx].is_public = prev;
+        if (idx >= 0) this.contsLocal[idx].is_public = prev;
 
         addErrorToastOnMain(
           this.$t("message.public.updateFail"),
@@ -206,9 +209,9 @@ export default {
 
     async getPage () {
       let offset = 0;
-      let limit = this.conts?.length;
+      let limit = this.contsLocal?.length;
 
-      if (!this.disablePagination || this.conts?.length > 500) {
+      if (!this.disablePagination || this.contsLocal?.length > 500) {
         offset =
           this.paginationOptions.currentPage
           * this.paginationOptions.itemsPerPage
@@ -231,7 +234,7 @@ export default {
       // Filter out segment folders for rendering
       // Map the 'accessRights' to the container if it's a shared container
       const mappedContainers = await Promise.all(
-        this.conts.filter(cont => !cont.name.endsWith("_segments"))
+        this.contsLocal.filter(cont => !cont.name.endsWith("_segments"))
           .map(async(cont) => {
             const sharedDetails = cont.owner ? await getAccessDetails(
               this.$route.params.project,
@@ -514,25 +517,25 @@ export default {
       this.sortDirection = event.detail.direction;
 
       if (this.sortBy === "sharing") {
-        let allSharing = this.conts.map(x =>
+        let allSharing = this.contsLocal.map(x =>
           this.sharingContainers.includes(x.name)
             ? this.$t("message.table.sharing") : "");
-        let allShared = this.conts.map(x =>
+        let allShared = this.contsLocal.map(x =>
           this.sharedContainers.some(cont => cont.container === x.name)
             ? this.$t("message.table.shared") : "");
 
         let combined = allSharing.map((value, idx) =>
           value !== "" ? value : allShared[idx]);
-        this.conts.forEach((cont, idx) => (cont.sharing = combined[idx]));
+        this.contsLocal.forEach((cont, idx) => (cont.sharing = combined[idx]));
       }
 
       if (this.sortBy === "public") {
-        this.conts.forEach(c => { c.public = c.is_public ? 1 : 0; });
+        this.contsLocal.forEach(c => { c.public = c.is_public ? 1 : 0; });
       }
 
 
       // Use toRaw to mutate the original array, not the proxy
-      sortObjects(toRaw(this.conts), this.sortBy, this.sortDirection);
+      sortObjects(toRaw(this.contsLocal), this.sortBy, this.sortDirection);
       this.getPage();
     },
     setHeaders() {
@@ -670,7 +673,7 @@ export default {
       const MAX_DOWNLOAD_SIZE = 5 * 1024 * 1024 * 1024; // 5GiB in bytes
 
       // Find the container details to check its size
-      const containerData = this.conts.find(cont => cont.name === container);
+      const containerData = this.contsLocal.find(cont => cont.name === container);
 
       if (containerData && containerData.bytes > MAX_DOWNLOAD_SIZE) {
         addErrorToastOnMain(this.$t("message.download.errorSizeExceeded"));
