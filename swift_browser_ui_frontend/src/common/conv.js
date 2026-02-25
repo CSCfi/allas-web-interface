@@ -235,9 +235,14 @@ export async function getMetadataForSharedContainer(
   owner,
 ) {
   let meta = await getContainerMeta(project, containerName, signal, owner);
+
   const bytes = extractBytes(meta);
   const count = extractObjectCount(meta);
-  return { bytes: Number(bytes), count: Number(count) };
+
+  const headers = meta?.[1] || {};
+  const is_public = !!headers.is_public;
+
+  return { bytes: Number(bytes), count: Number(count), is_public };
 }
 
 export async function getTagsForObjects(

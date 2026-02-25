@@ -34,6 +34,7 @@ import {
   mdiShareVariantOutline,
   mdiDotsHorizontal,
   mdiPail,
+  mdiPailPlus,
 } from "@mdi/js";
 import {
   toggleEditTagsModal,
@@ -56,6 +57,7 @@ import {
   swiftDeleteContainer,
   swiftDeleteObjects,
   removeAccessControlMeta,
+  setContainerPublic,
 } from "@/common/api";
 
 export default {
@@ -80,6 +82,7 @@ export default {
   },
   data() {
     return {
+      contsLocal: [],
       containers: [],
       sharingContainers: [],
       sharedContainers: [],
@@ -91,6 +94,7 @@ export default {
       sortBy: "name",
       sortDirection: "asc",
       abortController: null,
+      publicBusy: {},
     };
   },
   computed: {
@@ -105,15 +109,19 @@ export default {
     },
   },
   watch: {
+    conts: {
+      immediate: true,
+      handler(newVal) {
+        this.contsLocal = (newVal || []).map(c => ({ ...c }));
+        Promise.all([this.getSharingContainers(), this.getSharedContainers()])
+          .then(() => this.getPage());
+      }
+    },
     disablePagination() {
       this.getPage();
     },
     hideTags() {
       this.getPage();
-    },
-    conts() {
-      Promise.all([this.getSharingContainers(), this.getSharedContainers()])
-        .then(() => this.getPage());
     },
     showTimestamp() {
       this.getPage();
@@ -134,7 +142,11 @@ export default {
     this.abortController = new AbortController();
     this.setHeaders();
     this.setPagination();
-    Promise.all([this.getSharingContainers(), this.getSharedContainers()]);
+
+    this.$store.dispatch("ensurePublicBase", {
+      projectID: this.active.id,
+      signal: this.abortController.signal,
+    }).catch(() => {});
   },
   beforeMount () {
   },
@@ -164,11 +176,42 @@ export default {
         if (e?.name !== "AbortError") throw e;
       }
     },
+    async togglePublic(containerName, nextEnabled) {
+      if (!containerName) return;
+      if (this.publicBusy[containerName]) return;
+
+      this.publicBusy = { ...this.publicBusy, [containerName]: true };
+
+      const idx = this.contsLocal.findIndex(c => c.name === containerName);
+      const prev = idx >= 0 ? !!this.contsLocal[idx].is_public : false;
+      if (idx >= 0) this.contsLocal[idx].is_public = nextEnabled;
+
+      try {
+        await this.$store.dispatch("ensurePublicBase", {
+          projectID: this.active.id,
+          signal: this.abortController.signal,
+        });
+
+        await setContainerPublic(this.active.id, containerName, nextEnabled);
+
+        this.$store.dispatch("updateContainers", { projectID: this.active.id });
+      } catch (e) {
+        if (idx >= 0) this.contsLocal[idx].is_public = prev;
+
+        addErrorToastOnMain(
+          this.$t("message.public.updateFail"),
+        );
+      } finally {
+        const { [containerName]: _, ...rest } = this.publicBusy;
+        this.publicBusy = rest;
+      }
+    },
+
     async getPage () {
       let offset = 0;
-      let limit = this.conts?.length;
+      let limit = this.contsLocal?.length;
 
-      if (!this.disablePagination || this.conts?.length > 500) {
+      if (!this.disablePagination || this.contsLocal?.length > 500) {
         offset =
           this.paginationOptions.currentPage
           * this.paginationOptions.itemsPerPage
@@ -187,10 +230,11 @@ export default {
         return "";
       };
 
+
       // Filter out segment folders for rendering
       // Map the 'accessRights' to the container if it's a shared container
       const mappedContainers = await Promise.all(
-        this.conts.filter(cont => !cont.name.endsWith("_segments"))
+        this.contsLocal.filter(cont => !cont.name.endsWith("_segments"))
           .map(async(cont) => {
             const sharedDetails = cont.owner ? await getAccessDetails(
               this.$route.params.project,
@@ -201,6 +245,16 @@ export default {
             return sharedDetails && accessRights
               ? {...cont, accessRights} : {...cont};
           }));
+
+      let publicBase = "";
+      try {
+        publicBase = await this.$store.dispatch("ensurePublicBase", {
+          projectID: this.active.id,
+          signal: this.abortController.signal,
+        });
+      } catch (e) {
+        publicBase = "";
+      }
 
       this.containers = mappedContainers
         .slice(offset, offset + limit).reduce((
@@ -269,6 +323,61 @@ export default {
             sharing: {
               value: getSharedStatus(item.name),
             },
+            public: {
+              value: null,
+              children: [
+                {
+                  key: `pub_toggle_${item.name}_${item.is_public ? "on" : "off"}`,
+                  value: null,
+                  component: {
+                    tag: "input",
+                    params: {
+                      type: "checkbox",
+                      class: "public-switch-input",
+                      checked: !!item.is_public,
+                      disabled: !!item.owner || !!this.publicBusy[item.name],
+                      onChange: (ev) => {
+                        const host = ev?.currentTarget || ev?.target;
+                        const next = !!host?.checked;
+                        this.togglePublic(item.name, next);
+                      },
+                      onInput: (ev) => {
+                        const host = ev?.currentTarget || ev?.target;
+                        const next = !!host?.checked;
+                        this.togglePublic(item.name, next);
+                      },
+                    },
+                  },
+                },
+                // show "disabled" text when not public
+                ...(!item.is_public ? [{
+                  key: `pub_disabled_${item.name}`,
+                  value: this.$t("message.public.disabled"),
+                  component: {
+                    tag: "span",
+                    params: {
+                      class: "public-status",
+                    },
+                  },
+                }] : []),
+
+                // show link only when public
+                ...(item.is_public && publicBase ? [{
+                  key: `pub_link_${item.name}`,
+                  value: this.$t("message.public.link"),
+                  component: {
+                    tag: "c-link",
+                    params: {
+                      class: "public-link",
+                      href: `${publicBase}/${encodeURIComponent(item.name)}/`,
+                      target: "_blank",
+                      rel: "noopener noreferrer",
+                      color: "primary",
+                    },
+                  },
+                }] : []),
+              ],
+            },
             last_activity: {
               value: this.showTimestamp? parseDateTime(
                 this.locale, item.last_modified, this.$t, false) :
@@ -324,27 +433,31 @@ export default {
                   },
                 },
                 {
+                  value: this.$t("message.copy"),
+                  component: {
+                    tag: "c-button",
+                    params: {
+                      testid: "copy-container",
+                      text: true,
+                      size: "small",
+                      title: this.$t("message.copy"),
+                      path: mdiPailPlus,
+                      onClick: () => this.openCopyFolderModal(item.name, item.owner),
+                      onKeyUp: (event) => {
+                        if (event.keyCode === 13) {
+                          this.openCopyFolderModal(item.name, item.owner, true);
+                        }
+                      },
+                      disabled: !item.bytes,
+                    },
+                  },
+                },
+                {
                   value: null,
                   component: {
                     tag: "c-menu",
                     params: {
                       items: [
-                        {
-                          name: this.$t("message.copy"),
-                          action: () => {
-                            this.openCopyFolderModal(item.name, item.owner);
-                            const menuItems = document
-                              .querySelector("c-menu-items");
-                            menuItems.addEventListener("keydown", (e) =>{
-                              if (e.keyCode === 13) {
-                                this.openCopyFolderModal(
-                                  item.name, item.owner, true,
-                                );
-                              }
-                            });
-                          },
-                          disabled: !item.bytes,
-                        },
                         {
                           name: this.$t("message.editTags"),
                           action: () => {
@@ -404,20 +517,25 @@ export default {
       this.sortDirection = event.detail.direction;
 
       if (this.sortBy === "sharing") {
-        let allSharing = this.conts.map(x =>
+        let allSharing = this.contsLocal.map(x =>
           this.sharingContainers.includes(x.name)
             ? this.$t("message.table.sharing") : "");
-        let allShared = this.conts.map(x =>
+        let allShared = this.contsLocal.map(x =>
           this.sharedContainers.some(cont => cont.container === x.name)
             ? this.$t("message.table.shared") : "");
 
         let combined = allSharing.map((value, idx) =>
           value !== "" ? value : allShared[idx]);
-        this.conts.forEach((cont, idx) => (cont.sharing = combined[idx]));
+        this.contsLocal.forEach((cont, idx) => (cont.sharing = combined[idx]));
       }
 
+      if (this.sortBy === "public") {
+        this.contsLocal.forEach(c => { c.public = c.is_public ? 1 : 0; });
+      }
+
+
       // Use toRaw to mutate the original array, not the proxy
-      sortObjects(toRaw(this.conts), this.sortBy, this.sortDirection);
+      sortObjects(toRaw(this.contsLocal), this.sortBy, this.sortDirection);
       this.getPage();
     },
     setHeaders() {
@@ -448,6 +566,9 @@ export default {
           value: this.$t("message.table.shared_status"),
           sortable: true,
         },
+        { key: "public",
+          value: this.$t("message.public.public"),
+          sortable: true },
         {
           key: "last_activity",
           value: this.$t("message.table.activity"),
@@ -552,7 +673,7 @@ export default {
       const MAX_DOWNLOAD_SIZE = 5 * 1024 * 1024 * 1024; // 5GiB in bytes
 
       // Find the container details to check its size
-      const containerData = this.conts.find(cont => cont.name === container);
+      const containerData = this.contsLocal.find(cont => cont.name === container);
 
       if (containerData && containerData.bytes > MAX_DOWNLOAD_SIZE) {
         addErrorToastOnMain(this.$t("message.download.errorSizeExceeded"));

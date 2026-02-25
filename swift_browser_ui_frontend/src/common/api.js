@@ -630,3 +630,38 @@ export function getPreviewUrl(project, container, objectName, owner = "") {
   if (owner) url.searchParams.append("owner", owner);
   return url.toString();
 }
+
+export async function getPublicBaseAddress(project, signal) {
+  const url = new URL(
+    `/api/public/${encodeURI(project)}/address`,
+    document.location.origin,
+  );
+  const ret = await GET(url, signal);
+  if (ret.status !== 200) throw new Error("Failed to fetch public base address");
+  return ret.json();
+}
+
+export async function setContainerPublic(project, container, enabled, signal) {
+  const url = new URL(
+    `/api/public/${encodeURIComponent(project)}/${encodeURIComponent(container)}`,
+    document.location.origin,
+  );
+  url.searchParams.set("enabled", enabled ? "true" : "false");
+
+  const ret = await PUT(url, undefined);
+  if (ret.status !== 204) {
+    const msg = await ret.text().catch(() => "");
+    throw new Error(msg || `Failed to update public access (${ret.status})`);
+  }
+  return true;
+}
+
+export async function listPublicContainers(project, signal) {
+  const url = new URL(
+    `/api/public/${encodeURI(project)}`,
+    document.location.origin,
+  );
+  const ret = await GET(url, signal);
+  if (ret.status !== 200) throw new Error("Failed to list public containers");
+  return ret.json();
+}

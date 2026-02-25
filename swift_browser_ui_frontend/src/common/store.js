@@ -7,6 +7,7 @@ import {
   getObjects,
   getCopyStatus,
   cancelCopy,
+  getPublicBaseAddress,
 } from "@/common/api";
 import {
   getTagsForContainer,
@@ -83,6 +84,7 @@ const store = createStore({
     openObjectInfoModal: false,
     selectedObjectInfo: null,
     previewOpenedToastVisible: false,
+    publicBase: "",
   },
   mutations: {
     setProjects(state, newProjects) {
@@ -276,6 +278,9 @@ const store = createStore({
     togglePreviewOpenedToast(state, val) {
       state.previewOpenedToastVisible = val;
     },
+    setPublicBase(state, payload) {
+      state.publicBase = payload || "";
+    },
   },
   actions: {
     updateContainers: async function (
@@ -318,7 +323,7 @@ const store = createStore({
       if (sharedContainers.length > 0) {
         for (let i in sharedContainers) {
           let cont = sharedContainers[i];
-          const { bytes, count } = await getMetadataForSharedContainer(
+          const { bytes, count, is_public } = await getMetadataForSharedContainer(
             projectID,
             cont.container,
             signal,
@@ -329,6 +334,7 @@ const store = createStore({
           cont.projectID = projectID;
           cont.bytes = bytes;
           cont.count = count;
+          cont.is_public = !!is_public;
           cont.name = cont.container;
 
           const idb_last_modified = getContainerLastmodified(
@@ -737,6 +743,12 @@ const store = createStore({
       dispatch("stopCopyJobPolling", { jobId });
       commit("removeCopyJob", jobId);
     },
+    async ensurePublicBase({ state, commit }, { projectID, signal }) {
+      if (state.publicBase) return state.publicBase;
+      const { base } = await getPublicBaseAddress(projectID, signal);
+      commit("setPublicBase", base);
+      return base;
+   },
   },
 });
 
