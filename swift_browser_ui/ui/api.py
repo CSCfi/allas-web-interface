@@ -1032,6 +1032,9 @@ async def remove_project_container_acl(
                 return 204
             raise aiohttp.web.HTTPNotFound(reason=f"Container not found: {name}")
 
+        read_acl = read_acl or ""
+        write_acl = write_acl or ""
+
         read_parts = [p for p in _split_acl(read_acl) if p != f"{receiver}:*"]
         write_parts = [p for p in _split_acl(write_acl) if p != f"{receiver}:*"]
 
@@ -1132,6 +1135,9 @@ async def modify_container_write_acl(
                 return 204
             raise aiohttp.web.HTTPNotFound(reason=f"Container not found: {name}")
 
+        read_acl = read_acl or ""
+        write_acl = write_acl or ""
+
         write_parts = _split_acl(write_acl)
 
         # remove old write entries
@@ -1188,6 +1194,9 @@ async def add_project_container_acl(
             if allow_missing:
                 return 204
             raise aiohttp.web.HTTPNotFound(reason=f"Container not found: {name}")
+
+        read_acl = read_acl or ""
+        write_acl = write_acl or ""
 
         read_parts = _split_acl(read_acl)
         write_parts = _split_acl(write_acl)
