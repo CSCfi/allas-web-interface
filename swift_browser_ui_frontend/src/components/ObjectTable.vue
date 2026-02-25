@@ -333,16 +333,6 @@ export default {
   },
   mounted () {
     this.objsLoading = true;
-
-    this.$store.dispatch("ensurePublicBase", {
-      projectID: this.active.id,
-      signal: this.abortController.signal,
-    }).then((base) => {
-      this.publicBase = base || "";
-    }).catch(() => {
-      this.publicBase = "";
-    });
-
     this.getData();
   },
   beforeUnmount () {
@@ -353,9 +343,24 @@ export default {
   },
   methods: {
     getData: async function () {
+      await this.loadPublicBase();
       await this.getSharedContainers();
       await this.getFolderSharedStatus();
       await this.updateObjects();
+    },
+    async loadPublicBase() {
+    const projectID = this.project;
+      if (!projectID) return;
+
+      try {
+        const base = await this.$store.dispatch("ensurePublicBase", {
+          projectID,
+          signal: this.abortController.signal,
+        });
+        this.publicBase = base || "";
+      } catch (_) {
+        this.publicBase = "";
+      }
     },
     async refreshPublicStatus() {
       if (this.owner) {
