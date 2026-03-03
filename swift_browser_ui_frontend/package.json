@@ -4,14 +4,14 @@
   "private": true,
   "scripts": {
     "serve": "./build_wasm.sh && vite serve --mode development",
-    "build": "./build_wasm.sh && vite build --mode production",
+    "build": "./build_wasm.sh && vite build --mode production && cp -f public/favicon.ico dist/favicon.ico",
     "test": "vue-cli-service test:unit --config=jest.config.js",
     "lint": "pnpm exec eslint --fix src",
-    "build-devel": "./build_wasm.sh && vite build --mode development",
+    "build-devel": "./build_wasm.sh && vite build --mode development && cp -f public/favicon.ico dist/favicon.ico",
     "serve-prod": "./build_wasm.sh && vite serve --mode production",
     "build-wasm": "./build_wasm.sh",
-    "docker-build": "vite build --mode production",
-    "docker-build-devel": "vite build --mode development"
+    "docker-build": "vite build --mode production && cp -f public/favicon.ico dist/favicon.ico",
+    "docker-build-devel": "vite build --mode development && cp -f public/favicon.ico dist/favicon.ico"
   },
   "dependencies": {
     "@intlify/unplugin-vue-i18n": "^11.0.3",
