@@ -3,7 +3,7 @@
     class="container-box"
     role="region"
   >
-    <FolderTabs />
+    <!-- <FolderTabs /> -->
     <div
       v-for="component of folderComponents"
       :key="component.name"
@@ -26,7 +26,7 @@ import { markRaw } from "vue";
 
 export default {
   name: "FoldersView",
-  components: { FolderTabs },
+  // components: { FolderTabs },
 
   // values in the 'data' property are reactive by default
   // but components shouldn't be reactive, so we use `markRaw`

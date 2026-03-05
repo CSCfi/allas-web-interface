@@ -164,7 +164,7 @@ let bucket_overrides = {
       },
       search: {
         container: "Bucket",
-        folder: "Subbucket",
+        folder: "Folder",
         buildingIndex:
         "This project has a large number of objects. Please " +
         "wait a moment and try again.",
