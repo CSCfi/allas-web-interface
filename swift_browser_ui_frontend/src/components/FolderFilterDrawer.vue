@@ -8,7 +8,7 @@
         @click="openPanel"
         @keyup.enter="openPanel"
       >
-        <i class="mdi mdi-filter-variant" style="margin-right:.5rem;" />
+        <i class="mdi mdi-tune" style="margin-right:.5rem;" />
         Filter
       </c-button>
 
@@ -81,41 +81,67 @@
             </div>
 
             <div class="section">
+                <div class="section-title">Display</div>
+
+                <div class="check">
+                    <label>
+                    <input type="checkbox" v-model="draft.exactTime" />
+                    Show timestamp
+                    </label>
+                </div>
+
+                <div class="check">
+                    <label>
+                    <input type="checkbox" v-model="draft.hideTags" />
+                    Hide tags
+                    </label>
+                </div>
+
+                <div class="check">
+                    <label>
+                    <input type="checkbox" v-model="draft.showAll" />
+                    Disable pagination
+                    </label>
+                </div>
+            </div>
+
+            <div class="section">
                 <div class="section-title">Size & items</div>
 
                 <div class="field-row">
-                <div class="field">
-                    <label class="field-label">At least</label>
+                    <label class="field-label" for="min-objects">Minimum objects</label>
+                    <div class="field-controls">
                     <input
-                    class="field-input"
-                    type="number"
-                    min="0"
-                    step="1"
-                    placeholder="0"
-                    v-model.number="draft.minItems"
+                        id="min-objects"
+                        class="field-input"
+                        type="number"
+                        min="0"
+                        step="1"
+                        placeholder="0"
+                        v-model.number="draft.minItems"
                     />
                     <span class="field-suffix">objects</span>
-                </div>
+                    </div>
                 </div>
 
                 <div class="field-row">
-                <div class="field">
-                    <label class="field-label">At least</label>
+                    <label class="field-label" for="min-size">Minimum size</label>
+                    <div class="field-controls">
                     <input
-                    class="field-input"
-                    type="number"
-                    min="0"
-                    step="0.1"
-                    placeholder="0"
-                    v-model.number="draft.minSize"
+                        id="min-size"
+                        class="field-input"
+                        type="number"
+                        min="0"
+                        step="0.1"
+                        placeholder="0"
+                        v-model.number="draft.minSize"
                     />
-
                     <select class="field-select" v-model="draft.minSizeUnit">
-                    <option value="MiB">MiB</option>
-                    <option value="GiB">GiB</option>
-                    <option value="TiB">TiB</option>
+                        <option value="MiB">MiB</option>
+                        <option value="GiB">GiB</option>
+                        <option value="TiB">TiB</option>
                     </select>
-                </div>
+                    </div>
                 </div>
 
                 <div class="hint">Leave blank or 0 to disable these filters.</div>
@@ -135,6 +161,7 @@
                 No tags found in this project.
                 </div>
             </div>
+
           </div>
           <div class="panel-footer">
             <c-button outlined size="small" @click="closePanel">Close</c-button>
@@ -164,6 +191,9 @@ export default {
         minItems: null,
         minSize: null,
         minSizeUnit: "GiB",
+        exactTime: false,
+        hideTags: false,
+        showAll: false,
       },
     };
   },
@@ -196,6 +226,10 @@ export default {
       const minSize = q.minSize !== undefined ? Number(q.minSize) : null;
       const minSizeUnit = q.minSizeUnit ? String(q.minSizeUnit) : null;
 
+      const exactTime = q.exactTime === "1";
+      const hideTags = q.hideTags === "1";
+      const showAll = q.showAll === "1";
+
       return {
         shared,
         tags,
@@ -204,6 +238,9 @@ export default {
         minSizeMiB: Number.isFinite(minSizeMiB) ? minSizeMiB : null,
         minSize: Number.isFinite(minSize) ? minSize : null,
         minSizeUnit: ["MiB","GiB","TiB"].includes(minSizeUnit) ? minSizeUnit : null,
+        exactTime,
+        hideTags,
+        showAll,
     };
     },
 
@@ -245,6 +282,32 @@ export default {
             label,
             });
         }
+        if (this.applied.exactTime) {
+            chips.push({
+                key: "display:exactTime",
+                type: "display",
+                value: "exactTime",
+                label: "Timestamp",
+            });
+        }
+
+        if (this.applied.hideTags) {
+            chips.push({
+                key: "display:hideTags",
+                type: "display",
+                value: "hideTags",
+                label: "Hide tags",
+            });
+        }
+
+        if (this.applied.showAll) {
+            chips.push({
+                key: "display:showAll",
+                type: "display",
+                value: "showAll",
+                label: "Disable pagination",
+            });
+        }
 
         return chips;
     },
@@ -279,6 +342,9 @@ export default {
         this.draft.shared = [...this.applied.shared];
         this.draft.tags = [...this.applied.tags];
         this.draft.public = !!this.applied.public;
+        this.draft.exactTime = !!this.applied.exactTime;
+        this.draft.hideTags = !!this.applied.hideTags;
+        this.draft.showAll = !!this.applied.showAll;
 
         this.draft.minItems = this.applied.minItems ?? null;
 
@@ -326,6 +392,11 @@ export default {
             public: isPublic ? "1" : null,
             minItems: minItems != null ? String(minItems) : null,
             minSizeMiB: minSizeMiB != null ? String(minSizeMiB) : null,
+            minSize: minSizeNum != null ? String(minSizeNum) : null,
+            minSizeUnit: minSizeNum != null ? unit : null,
+            exactTime: this.draft.exactTime ? "1" : null,
+            hideTags: this.draft.hideTags ? "1" : null,
+            showAll: this.draft.showAll ? "1" : null,
         };
 
         this.$emit("apply", patch);
@@ -339,6 +410,9 @@ export default {
         this.draft.minItems = null;
         this.draft.minSize = null;
         this.draft.minSizeUnit = "GiB";
+        this.draft.exactTime = false;
+        this.draft.hideTags = false;
+        this.draft.showAll = false;
     },
 
     removeChip(chip) {
@@ -350,6 +424,9 @@ export default {
             minSizeMiB: this.applied.minSizeMiB,
             minSize: this.applied.minSize,
             minSizeUnit: this.applied.minSizeUnit,
+            exactTime: !!this.applied.exactTime,
+            hideTags: !!this.applied.hideTags,
+            showAll: !!this.applied.showAll,
         };
 
         if (chip.type === "shared") {
@@ -374,6 +451,12 @@ export default {
             next.minSizeUnit = null;
         }
 
+        if (chip.type === "display") {
+            if (chip.value === "exactTime") next.exactTime = false;
+            if (chip.value === "hideTags") next.hideTags = false;
+            if (chip.value === "showAll") next.showAll = false;
+        }
+
         const patch = {
             shared: next.shared.length ? next.shared.join(",") : null,
             tags: next.tags.length ? next.tags.join(",") : null,
@@ -382,6 +465,9 @@ export default {
             minSizeMiB: next.minSizeMiB != null ? String(next.minSizeMiB) : null,
             minSize: next.minSizeMiB != null && next.minSize != null ? String(next.minSize) : null,
             minSizeUnit: next.minSizeMiB != null && next.minSizeUnit ? String(next.minSizeUnit) : null,
+            exactTime: next.exactTime ? "1" : null,
+            hideTags: next.hideTags ? "1" : null,
+            showAll: next.showAll ? "1" : null,
         };
 
         this.$emit("apply", patch);
@@ -559,9 +645,12 @@ export default {
 }
 
 .field-row {
-  display: flex;
-  gap: 0.75rem;
-  margin: 0.5rem 0;
+  display: grid;
+  grid-template-columns: 130px 1fr;
+  align-items: center;
+  column-gap: 1rem;
+  row-gap: 0.5rem;
+  margin: 0.65rem 0;
 }
 
 .field {
@@ -571,26 +660,37 @@ export default {
   flex-wrap: wrap;
 }
 
+
 .field-label {
-  font-size: 12px;
+  font-size: 14px;
   color: #374151;
-  min-width: 48px;
+  margin: 0;
+}
+
+.field-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
 }
 
 .field-input {
-  width: 120px;
+  width: 140px;
   padding: 0.35rem 0.5rem;
   border: 1px solid #e5e7eb;
   border-radius: 6px;
   font-size: 14px;
+  box-sizing: border-box;
 }
 
 .field-select {
+  min-width: 72px;
   padding: 0.35rem 0.5rem;
   border: 1px solid #e5e7eb;
   border-radius: 6px;
   font-size: 14px;
   background: #fff;
+  box-sizing: border-box;
 }
 
 .field-suffix {

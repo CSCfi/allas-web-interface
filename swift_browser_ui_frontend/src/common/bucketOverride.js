@@ -53,7 +53,7 @@ let bucket_overrides = {
         back_to_shared_folders: "Back to buckets shared with you",
       },
       tableOptions: {
-        render: "Display as buckets",
+        render: "Display as Folders and Objects",
         text: "Display as object paths",
       },
       share: {

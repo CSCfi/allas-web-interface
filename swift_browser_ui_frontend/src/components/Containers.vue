@@ -30,17 +30,6 @@
             <c-icon :path="mdiPlus" />
             {{ $t("message.createFolder") }}
           </c-button>
-
-          <c-menu
-            :key="optionsKey"
-            :items.prop="tableOptions"
-            data-testid="table-options-selector"
-          >
-            <span class="menu-active display-options-menu">
-              <i class="mdi mdi-tune" />
-              {{ $t("message.tableOptions.displayOptions") }}
-            </span>
-          </c-menu>
         </div>
       </div>
     </div>
@@ -96,7 +85,6 @@ export default {
       direction: "asc",
       currentPage: 1,
       showTags: true,
-      optionsKey: 1,
       abortController: null,
       containers: [],
       renderingContainers: [],
@@ -136,7 +124,6 @@ export default {
         this.hideTags = saved.hideTags;
         this.hidePagination = saved.hidePagination;
         this.showTimestamp = saved.showTimestamp;
-        this.updateTableOptions();
       }
     },
 
@@ -177,7 +164,6 @@ export default {
     },
 
     locale() {
-      this.updateTableOptions();
     },
 
     async containersToUpdateObjs() {
@@ -188,9 +174,6 @@ export default {
         this.abortController.signal,
       );
     },
-  },
-  created() {
-    this.updateTableOptions();
   },
   beforeMount() {
     this.abortController = new AbortController();
@@ -236,6 +219,9 @@ export default {
 
       const minItems = q.minItems !== undefined ? Number(q.minItems) : null;
       const minSizeMiB = q.minSizeMiB !== undefined ? Number(q.minSizeMiB) : null;
+      const exactTime = q.exactTime === "1";
+      const hideTags = q.hideTags === "1";
+      const showAll = q.showAll === "1";
 
       const matchMinItems = (cont) => {
         if (!Number.isFinite(minItems) || minItems <= 0) return true;
@@ -259,6 +245,10 @@ export default {
       );
 
       if (wantAll && !wantFrom && !wantTo) {
+        this.showTimestamp = exactTime;
+        this.hideTags = hideTags;
+        this.hidePagination = showAll;
+
         this.renderingContainers = all;
         return;
       }
@@ -282,6 +272,9 @@ export default {
       });
 
       this.renderingContainers = filtered;
+      this.showTimestamp = exactTime;
+      this.hideTags = hideTags;
+      this.hidePagination = showAll;
     },
 
     onFilterApply(queryPatch) {
@@ -297,75 +290,22 @@ export default {
     },
 
     onFilterClear() {
-      const { shared, tags, public: _public, minItems, minSizeMiB, ...rest } = this.$route.query;
+      const {
+        shared,
+        tags,
+        public: _public,
+        minItems,
+        minSizeMiB,
+        minSize,
+        minSizeUnit,
+        exactTime,
+        hideTags,
+        showAll,
+        ...rest
+      } = this.$route.query;
+
       this.$router.push({ query: { ...rest, page: 1 } });
     },
-
-    updateTableOptions: function () {
-      const displayOptions = {
-        showTimestamp: this.showTimestamp,
-        hideTags: this.hideTags,
-        hidePagination: this.hidePagination,
-      };
-      this.tableOptions = [
-        {
-          name: this.showTimestamp
-            ? this.$t("message.tableOptions.fromNow")
-            : this.$t("message.tableOptions.timestamp"),
-          action: async () => {
-            this.showTimestamp = !this.showTimestamp;
-
-            const newProject = {
-              ...this.currentProject,
-              displayOptions: {
-                ...displayOptions,
-                showTimestamp: this.showTimestamp,
-              },
-            };
-            await getDB().projects.put(newProject);
-            this.updateTableOptions();
-          },
-        },
-        {
-          name: this.hideTags
-            ? this.$t("message.tableOptions.showTags")
-            : this.$t("message.tableOptions.hideTags"),
-          action: async () => {
-            this.hideTags = !this.hideTags;
-
-            const newProject = {
-              ...this.currentProject,
-              displayOptions: {
-                ...displayOptions,
-                hideTags: this.hideTags,
-              },
-            };
-            await getDB().projects.put(newProject);
-            this.updateTableOptions();
-          },
-        },
-        {
-          name: this.hidePagination
-            ? this.$t("message.tableOptions.showPagination")
-            : this.$t("message.tableOptions.hidePagination"),
-          action: async () => {
-            this.hidePagination = !this.hidePagination;
-
-            const newProject = {
-              ...this.currentProject,
-              displayOptions: {
-                ...displayOptions,
-                hidePagination: this.hidePagination,
-              },
-            };
-            await getDB().projects.put(newProject);
-            this.updateTableOptions();
-          },
-        },
-      ];
-      this.optionsKey++;
-    },
-
     fetchContainers: async function (withLoader = false) {
       if (this.active.id === undefined || this.abortController.signal?.aborted) return;
       if (withLoader) this.contsLoading = true;
