@@ -1,5 +1,8 @@
 <template>
-  <div class="contents">
+  <c-flex
+    class="container-box contents"
+    role="region"
+  >
     <div id="optionsbar">
       <div class="options-row options-row--search">
         <div class="row-left">
@@ -47,7 +50,7 @@
     </div>
 
     <c-toasts id="container-toasts" data-testid="container-toasts" />
-  </div>
+  </c-flex>
 </template>
 
 <script>

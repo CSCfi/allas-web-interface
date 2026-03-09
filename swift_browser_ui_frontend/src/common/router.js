@@ -1,5 +1,5 @@
 import { createRouter, createWebHistory } from "vue-router";
-import FoldersView from "@/views/Folders.vue";
+import ContainersView from "@/components/Containers.vue";
 import ObjectsView from "@/views/Objects.vue";
 import SharedObjects from "@/views/SharedObjects.vue";
 import {getProjects, getContainers} from "@/common/api.js";
@@ -55,7 +55,7 @@ export default createRouter({
     {
       path: "/browse",
       name: "Browse",
-      component: FoldersView,
+      component: ContainersView,
     },
     {
       path: "/browse/:user/:project/:container/shared/:owner",
@@ -66,17 +66,17 @@ export default createRouter({
       path: "/browse/:user/:project",
       beforeEnter: checkProject,
       name: "AllFolders",
-      component: FoldersView,
+      component: ContainersView,
     },
     {
       path: "/browse/:user/:project/shared/to",
       name: "SharedTo",
-      component: FoldersView,
+      component: ContainersView,
     },
     {
       path: "/browse/:user/:project/shared/from",
       name: "SharedFrom",
-      component: FoldersView,
+      component: ContainersView,
     },
     {
       path: "/browse/:user/:project/:container",
