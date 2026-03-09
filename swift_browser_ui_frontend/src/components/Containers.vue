@@ -390,4 +390,12 @@ export default {
 .search-wrap :deep(.search) {
   width: 100%;
 }
+
+#cont-table-wrapper {
+  position: relative;
+}
+
+#cont-table-wrapper :deep(c-loader) {
+  pointer-events: none;
+}
 </style>
