@@ -3,7 +3,6 @@
     class="container-box"
     role="region"
   >
-    <!-- <FolderTabs /> -->
     <div
       v-for="component of folderComponents"
       :key="component.name"
@@ -17,7 +16,6 @@
 </template>
 
 <script>
-import FolderTabs from "@/components/FolderTabs.vue";
 import AllFoldersTable from "@/components/AllFoldersTable.vue";
 import SharedOutTable from "@/components/SharedOutTable.vue";
 import SharedTable from "@/components/SharedTable.vue";
@@ -26,7 +24,6 @@ import { markRaw } from "vue";
 
 export default {
   name: "FoldersView",
-  // components: { FolderTabs },
 
   // values in the 'data' property are reactive by default
   // but components shouldn't be reactive, so we use `markRaw`
