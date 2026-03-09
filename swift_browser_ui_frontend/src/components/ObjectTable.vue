@@ -417,10 +417,22 @@ export default {
 
       // at bucket root, go back to all buckets view
       const user = this.$route.params.user || this.$store.state.uname;
+      let restoredQuery = { page: 1 };
+
+      try {
+        if (this.$route.query.returnQuery) {
+          restoredQuery = JSON.parse(
+            decodeURIComponent(this.$route.query.returnQuery),
+          );
+        }
+      } catch (e) {
+        restoredQuery = { page: 1 };
+      }
+
       this.$router.push({
         name: "AllFolders",
         params: { project: this.$route.params.project, user },
-        query: { page: 1 },
+        query: restoredQuery,
       });
     },
     breadcrumbClickHandler(value) {

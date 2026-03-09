@@ -53,7 +53,7 @@ let bucket_overrides = {
         back_to_shared_folders: "Back to buckets shared with you",
       },
       tableOptions: {
-        render: "Display as buckets",
+        render: "Display as Folders and Objects",
         text: "Display as object paths",
       },
       share: {
@@ -164,7 +164,7 @@ let bucket_overrides = {
       },
       search: {
         container: "Bucket",
-        folder: "Subbucket",
+        folder: "Folder",
         buildingIndex:
         "This project has a large number of objects. Please " +
         "wait a moment and try again.",
