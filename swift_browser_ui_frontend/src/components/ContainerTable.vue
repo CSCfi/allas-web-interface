@@ -276,6 +276,8 @@ export default {
                     flexShrink: "0",
                   },
                   onClick: () => {
+                    const listQuery = { ...this.$route.query };
+
                     if(item.owner) {
                       this.$router.push({
                         name: "SharedObjects",
@@ -283,12 +285,20 @@ export default {
                           container: item.name,
                           owner: item.owner,
                         },
+                        query: {
+                          returnTo: "buckets",
+                          returnQuery: encodeURIComponent(JSON.stringify(listQuery)),
+                        },
                       });
                     } else {
                       this.$router.push({
                         name: "ObjectsView",
                         params: {
                           container: item.name,
+                        },
+                        query: {
+                          returnTo: "buckets",
+                          returnQuery: encodeURIComponent(JSON.stringify(listQuery)),
                         },
                       });
                     }
