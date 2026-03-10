@@ -88,7 +88,7 @@ export default {
       sharedContainers: [],
       direction: "asc",
       footerOptions: {
-        itemsPerPageOptions: [5, 10, 25, 50, 100],
+        itemsPerPageOptions: [10, 25, 50, 100, 200, 300],
       },
       paginationOptions: {},
       sortBy: "name",
@@ -208,10 +208,15 @@ export default {
     },
 
     async getPage () {
-      let offset = 0;
-      let limit = this.contsLocal?.length;
+      const MAX_WITHOUT_PAGINATION = 300;
 
-      if (!this.disablePagination || this.contsLocal?.length > 500) {
+      let offset = 0;
+      let limit = this.contsLocal?.length || 0;
+
+      if (this.disablePagination) {
+        offset = 0;
+        limit = Math.min(limit, MAX_WITHOUT_PAGINATION);
+      } else {
         offset =
           this.paginationOptions.currentPage
           * this.paginationOptions.itemsPerPage
