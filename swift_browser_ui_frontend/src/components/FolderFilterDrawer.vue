@@ -100,7 +100,7 @@
                 <div class="check">
                     <label>
                     <input type="checkbox" v-model="draft.showAll" />
-                    Disable pagination
+                    Show all buckets (max 300)
                     </label>
                 </div>
             </div>
@@ -305,7 +305,7 @@ export default {
                 key: "display:showAll",
                 type: "display",
                 value: "showAll",
-                label: "Disable pagination",
+                label: "Show all buckets (max 300)",
             });
         }
 
