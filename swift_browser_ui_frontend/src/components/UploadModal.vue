@@ -816,7 +816,7 @@ export default {
 
       if (!this.currentFolder) {
         this.inputFolder = this.inputFolder.trim();
-        this.errorMsg = validateFolderName(this.inputFolder, this.$t);
+        this.errorMsg = validateFolderName(this.inputFolder, this.$t, this.containers);
       }
       if (this.errorMsg) {
         return;
