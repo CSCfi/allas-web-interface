@@ -130,7 +130,7 @@ export default {
     },
     isLoaderVisible() {
       return this.$store.state.isLoaderVisible
-        && this.$store.state.uploadFolder.name === this.container;
+        && this.$store.state.uploadBucket.name === this.container;
     },
     owner() {
       return this.$route.params.owner;
@@ -174,7 +174,7 @@ export default {
   },
   methods: {
     async buildInfoForItem(item) {
-      const isFolder = !!item?.subfolder;
+      const isFolder = !!item?.folder;
 
       const base = {
         name: this.renderFolders ? getFolderName(item.name, this.$route) : item.name,
@@ -271,7 +271,7 @@ export default {
       return {
         name: {
           value: name,
-          ...(item?.subfolder ? {
+          ...(item?.folder ? {
             component: {
               tag: "c-link",
               params: {
@@ -365,7 +365,7 @@ export default {
                   path: mdiTrayArrowDown,
                   onClick: ({ event }) => {
                     const isSharedRoute = !!this.$route.params.owner;
-                    const isFolder = !!item?.subfolder;
+                    const isFolder = !!item?.folder;
                     const hasNonAscii = /[^\x20-\x7E]/.test(item.name);
                     const hasSpaceOrTab = /[ \t]/.test(item.name);
                     const hasNonAsciiBucket = /[^\x20-\x7E]/.test(this.container);
@@ -429,7 +429,7 @@ export default {
                       this.onOpenEditTagsModal(item.name, true);
                     }
                   },
-                  disabled: item?.subfolder ||
+                  disabled: item?.folder ||
                     (this.owner != undefined && this.accessRights.length <= 1),
                 },
               },
@@ -498,37 +498,37 @@ export default {
         if (isFile(item.name, this.$route) || !this.renderFolders) {
           items.push(item);
         } else {
-          let subName = getFolderName(item.name, this.$route);
-          //check if subfolder already added
+          let name = getFolderName(item.name, this.$route);
+          //check if folder already added
           if (items.find(el => getFolderName(el.name, this.$route)
-            === subName)) {
+            === name)) {
             return items;
           } else {
-            //filter objs that would belong to subfolder
-            let subfolderObjs = filteredObjs.filter(obj => {
+            //filter objs that would belong to folder
+            let folderObjs = filteredObjs.filter(obj => {
               if (getFolderName(obj.name, this.$route) ===
-                subName) {
+                name) {
                 return obj;
               }
             });
             //sort by latest last_modified
-            subfolderObjs.sort((a, b) => sortItems(
+            folderObjs.sort((a, b) => sortItems(
               a, b, "last_modified", "desc"));
-            const subSize = subfolderObjs.reduce((sum, obj) => {
+            const folderSize = folderObjs.reduce((sum, obj) => {
               return sum += obj.bytes;
             }, 0);
-            const fullSubName = getPrefix(this.$route) + subName + "/";
-            //add new subfolder
-            const subfolder = {
+            const fullName = getPrefix(this.$route) + name + "/";
+            //add new folder
+            const folder = {
               container: item.container,
-              name: fullSubName,
-              bytes: subSize,
-              last_modified: subfolderObjs[0].last_modified,
+              name: fullName,
+              bytes: folderSize,
+              last_modified: folderObjs[0].last_modified,
               tags: [],
-              subfolder: true,
-              itemCount: subfolderObjs.length,
+              folder: true,
+              itemCount: folderObjs.length,
             };
-            items.push(subfolder);
+            items.push(folder);
           }
         }
         pagedLength = items.length;
@@ -547,16 +547,16 @@ export default {
     setPageByFileName: function(file){
       if(file != undefined){
         let objectList = this.objs;
-        // check if file is in subfolder
+        // check if file is in folder
         if(file.includes("/")){
-          let subfolderItems = [];
+          let folderItems = [];
           objectList.forEach(element => {
             if(element.name.substr(0, element.name.lastIndexOf("/") + 1)
               === file.substr(0, file.lastIndexOf("/") + 1)){
-              subfolderItems.push(element);
+              folderItems.push(element);
             }
           });
-          objectList = subfolderItems;
+          objectList = folderItems;
         }
         let index = objectList.findIndex(item => item.name == file);
         if(index <= 0){
@@ -597,13 +597,13 @@ export default {
 
       const MAX_DOWNLOAD_SIZE = 5 * 1024 * 1024 * 1024; // 5GiB in bytes
 
-      if (object?.subfolder) {
-        // Check if folder size exceeds the limit
+      if (object?.folder) {
+        // Check if bucket/folder size exceeds the limit
         if (object.bytes > MAX_DOWNLOAD_SIZE) {
           addErrorToastOnMain(this.$t("message.download.errorSizeExceeded"));
           return;
         }
-        const subfolderFiles = this
+        const folderFiles = this
           .objs
           .filter((obj) => {
             return obj.name.startsWith(object.name);
@@ -612,11 +612,11 @@ export default {
 
         this.$store.state.socket.addDownload(
           this.$route.params.container,
-          subfolderFiles,
+          folderFiles,
           this.$route.params.owner ? this.$route.params.owner : "",
           test,
         ).then(() => {
-          if (DEV) console.log(`Started downloading subfolder ${object.name}`);
+          if (DEV) console.log(`Started downloading folder ${object.name}`);
         }).catch(() => {
           addErrorToastOnMain(this.$t("message.download.error"));
         });

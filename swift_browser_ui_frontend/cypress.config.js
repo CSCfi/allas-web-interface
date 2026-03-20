@@ -62,9 +62,9 @@ module.exports = defineConfig({
           });
           return null;
         },
-        deleteFolder(folder) {
-          if (existsSync(folder)) {
-            rmdir(folder, { recursive: true }, (err) => {
+        deleteBucket(Bucket) {
+          if (existsSync(Bucket)) {
+            rmdir(Bucket, { recursive: true }, (err) => {
               if (err) console.error(err);
             });
           }

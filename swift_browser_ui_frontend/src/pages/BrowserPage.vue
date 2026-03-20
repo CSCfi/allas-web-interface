@@ -28,13 +28,13 @@
         <ConfirmRouteModal />
       </c-modal>
       <c-modal
-        v-model="openCreateFolderModal"
+        v-model="openCreateBucketModal"
         v-csc-control
         disable-backdrop-blur
         width="64vw"
       >
-        <SubFolderModal v-if="$route.params.container" />
-        <CreateFolderModal v-else />
+        <FolderModal v-if="$route.params.container" />
+        <CreateBucketModal v-else />
       </c-modal>
       <c-modal
         v-model="openUploadModal"
@@ -63,13 +63,13 @@
         <ShareModal />
       </c-modal>
       <c-modal
-        id="copy-folder-modal"
-        v-model="openCopyFolderModal"
+        id="copy-bucket-modal"
+        v-model="openCopyBucketModal"
         v-csc-control
         disable-backdrop-blur
         width="64vw"
       >
-        <CopyFolderModal />
+        <CopyBucketModal />
       </c-modal>
       <c-modal
         id="delete-objs-modal"

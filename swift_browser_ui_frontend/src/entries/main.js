@@ -7,12 +7,12 @@ import router from "@/common/router";
 import BrowserMainNavbar from "@/components/BrowserMainNavbar.vue";
 import BrowserSecondaryNavbar from "@/components/BrowserSecondaryNavbar.vue";
 import ConfirmRouteModal from "@/components/ConfirmRouteModal.vue";
-import CreateFolderModal from "@/components/CreateFolderModal.vue";
-import SubFolderModal from "@/components/SubFolderModal.vue";
+import CreateBucketModal from "@/components/CreateBucketModal.vue";
+import FolderModal from "@/components/FolderModal.vue";
 import UploadModal from "@/components/UploadModal.vue";
 import EditTagsModal from "@/components/EditTagsModal.vue";
 import ShareModal from "@/components/ShareModal.vue";
-import CopyFolderModal from "@/components/CopyFolderModal.vue";
+import CopyBucketModal from "@/components/CopyBucketModal.vue";
 import DeleteModal from "@/components/DeleteModal.vue";
 import TokenModal from "@/components/TokenModal.vue";
 import CopyProgressToast from "@/components/CopyProgressToast.vue";
@@ -90,13 +90,13 @@ const app = createApp({
     BrowserMainNavbar,
     BrowserSecondaryNavbar,
     ConfirmRouteModal,
-    CreateFolderModal,
-    SubFolderModal,
+    CreateBucketModal,
+    FolderModal,
     UploadModal,
     ProgressNotification,
     EditTagsModal,
     ShareModal,
-    CopyFolderModal,
+    CopyBucketModal,
     DeleteModal,
     TokenModal,
     DownloadStartedToast,
@@ -142,9 +142,9 @@ const app = createApp({
         return newState;
       },
     },
-    openCreateFolderModal: {
+    openCreateBucketModal: {
       get() {
-        return this.$store.state.openCreateFolderModal;
+        return this.$store.state.openCreateBucketModal;
       },
       set(newState) {
         return newState;
@@ -166,9 +166,9 @@ const app = createApp({
         return newState;
       },
     },
-    openCopyFolderModal: {
+    openCopyBucketModal: {
       get() {
-        return this.$store.state.openCopyFolderModal;
+        return this.$store.state.openCopyBucketModal;
       },
       set(newState) {
         return newState;
@@ -206,10 +206,10 @@ const app = createApp({
     },
   },
   watch: {
-    openCreateFolderModal: function () {
-      if (this.openCreateFolderModal) {
+    openCreateBucketModal: function () {
+      if (this.openCreateBucketModal) {
         // Set the modal to scroll to top whenever it's opened
-        const el = document.getElementById("createFolder-modal-content");
+        const el = document.getElementById("createBucket-modal-content");
         el.scrollTo(0, 0);
       }
     },
@@ -273,7 +273,7 @@ const app = createApp({
 
       if (document.location.pathname == "/browse") {
         this.$router.replace({
-          name: "AllFolders",
+          name: "AllBuckets",
           params: {
             project: active.id,
             user: user,

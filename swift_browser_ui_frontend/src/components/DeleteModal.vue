@@ -99,7 +99,7 @@ export default {
       if (this.progress === undefined) return undefined;
       return Math.min(100, Math.round(this.progress * 100));
     },
-    subfolders() {
+    folders() {
       return this.$route.query.prefix ?
         this.$route.query.prefix.split("/") : [];
     },
@@ -343,7 +343,7 @@ export default {
         }
       }
 
-      // Check if any subfolder is selected for deletion
+      // Check if any folder is selected for deletion
       to_remove = unique(to_remove);
       segments_to_remove = unique(segments_to_remove);
 
@@ -413,7 +413,7 @@ export default {
     },
     getDeleteMessage: async function(to_remove) {
       // Only files can be deleted
-      // Show warnings when deleting subfolders
+      // Show warnings when deleting folders
       if (to_remove.length > 0) {
         let msg;
         to_remove.length === 1?
@@ -421,34 +421,34 @@ export default {
           : msg = to_remove.length +
             this.$t("message.objects.deleteManySuccess");
 
-        if (this.subfolders.length && this.renderedFolders) {
-          //get all files uppermost subfolder contains
+        if (this.folders.length && this.renderedFolders) {
+          //get all files uppermost folder contains
           const folderFiles = await getDB().objects
-            .filter(obj => obj.name.startsWith(this.subfolders[0])
+            .filter(obj => obj.name.startsWith(this.folders[0])
               && obj.container === this.container)
             .toArray();
           if (folderFiles.length < 1) {
-            //if all subfolders empty, go to container
-            //see if more than one subfolder removed
-            this.subfolders.length > 1 ?
-              msg = this.$t("message.subfolders.deleteManySuccess") :
-              msg = this.$t("message.subfolders.deleteOneSuccess");
+            //if all folders empty, go to bucket
+            //see if more than one folder removed
+            this.folders.length > 1 ?
+              msg = this.$t("message.folders.deleteManySuccess") :
+              msg = this.$t("message.folders.deleteOneSuccess");
             this.$router.push({name: "ObjectsView"});
           }
           else {
             let newPrefix = this.prefix;
-            for (let level=0; level < this.subfolders.length; level++) {
+            for (let level=0; level < this.folders.length; level++) {
               let found = folderFiles.find(obj =>
                 obj.name.startsWith(newPrefix));
               if (found !== undefined) {
                 //if file with this prefix found
-                //go to containing subfolder
+                //go to containing folder
                 //files found at same level: leave "file(s) deleted" ^
-                //otherwise show "subfolder(s) deleted"
+                //otherwise show "folder(s) deleted"
                 if (level > 0) {
                   level > 1 ?
-                    msg = this.$t("message.subfolders.deleteManySuccess") :
-                    msg = this.$t("message.subfolders.deleteOneSuccess");
+                    msg = this.$t("message.folders.deleteManySuccess") :
+                    msg = this.$t("message.folders.deleteOneSuccess");
                   let path =
                     {name: "ObjectsView", query: { prefix: newPrefix}};
                   this.$router.push(path);
@@ -456,7 +456,7 @@ export default {
                 break;
               } else {
                 //files with this prefix not found
-                //go up a subfolder and check again
+                //go up a folder and check again
                 newPrefix = newPrefix
                   .substring(0, newPrefix.lastIndexOf("/"));
               }
