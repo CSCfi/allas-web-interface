@@ -57,25 +57,25 @@ const store = createStore({
     dropFiles: [],
     openConfirmRouteModal: false,
     routeTo: {},
-    openCreateFolderModal: false,
-    selectedFolderName: "",
-    uploadFolder: {name: "", owner: ""},
+    openCreateBucketModal: false,
+    selectedBucketName: "",
+    uploadBucket: {name: "", owner: ""},
     openUploadModal: false,
     openShareModal: false,
     openEditTagsModal: false,
     selectedObjectName: "",
-    openCopyFolderModal: false,
+    openCopyBucketModal: false,
     openDeleteModal: false,
     openTokenModal: false,
     deletableObjects: [],
-    isFolderCopied: false,
+    isBucketCopied: false,
     sourceProjectId: "",
     uploadAbortReason: undefined,
     renderedFolders: true,
     addUploadFiles: false,
     isLoaderVisible: false,
     prevActiveEl: null,
-    newFolder: "",
+    newBucket: "",
     sharingUpdated: false,
     sharingContainers: [],
     sharedContainers: [],
@@ -187,17 +187,17 @@ const store = createStore({
     setRouteTo(state, payload) {
       state.routeTo = payload;
     },
-    toggleCreateFolderModal(state, payload) {
-      state.openCreateFolderModal = payload;
+    toggleCreateBucketModal(state, payload) {
+      state.openCreateBucketModal = payload;
     },
-    setFolderName(state, payload) {
-      state.selectedFolderName = payload;
+    setBucketName(state, payload) {
+      state.selectedBucketName = payload;
     },
-    setUploadFolder(state, payload) {
+    setUploadBucket(state, payload) {
       //separate for upload because it's needed
       //for the duration of upload for "view destination"
-      state.uploadFolder.name = payload.name;
-      state.uploadFolder.owner = payload.owner;
+      state.uploadBucket.name = payload.name;
+      state.uploadBucket.owner = payload.owner;
     },
     toggleUploadModal(state, payload) {
       state.openUploadModal = payload;
@@ -217,8 +217,8 @@ const store = createStore({
     setObjectName(state, payload) {
       state.selectedObjectName = payload;
     },
-    toggleCopyFolderModal(state, payload) {
-      state.openCopyFolderModal = payload;
+    toggleCopyBucketModal(state, payload) {
+      state.openCopyBucketModal = payload;
     },
     toggleDeleteModal(state, payload) {
       state.openDeleteModal = payload;
@@ -229,8 +229,8 @@ const store = createStore({
     setDeletableObjects(state, payload) {
       state.deletableObjects = payload;
     },
-    setFolderCopiedStatus(state, payload) {
-      state.isFolderCopied = payload;
+    setBucketCopiedStatus(state, payload) {
+      state.isBucketCopied = payload;
     },
     setSourceProjectId(state, payload) {
       state.sourceProjectId = payload;
@@ -247,8 +247,8 @@ const store = createStore({
     setPreviousActiveEl(state, payload) {
       state.prevActiveEl = payload;
     },
-    setNewFolder(state, payload) {
-      state.newFolder = payload;
+    setNewBucket(state, payload) {
+      state.newBucket = payload;
     },
     setSharingUpdated(state, payload) {
       state.sharingUpdated = payload;
@@ -367,8 +367,8 @@ const store = createStore({
         .containers.where({ projectID })
         .toArray();
 
-      // sort "_segments" folder before original folder
-      // so that "_segments" folder could be updated first
+      // sort "_segments" bucket before original bucket
+      // so that "_segments" bucket could be updated first
       newContainers = sortContainer(newContainers);
 
       for (let i = 0; i < newContainers.length; i++) {

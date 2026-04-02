@@ -9,7 +9,7 @@
     >
       <h2 class="title is-4">
         {{ $t('message.share.share_title') }}
-        {{ folderName }}
+        {{ bucketName }}
       </h2>
       <c-button
         id="close-share-modal-btn"
@@ -155,10 +155,10 @@
       <ShareModalTable
         v-show="sharedDetails.length > 0"
         :shared-details="sharedDetails"
-        :folder-name="folderName"
+        :bucket-name="bucketName"
         :access-rights="accessRights"
-        @removeSharedFolder="removeSharedFolder"
-        @updateSharedFolder="updateSharedFolder"
+        @removeSharedBucket="removeSharedBucket"
+        @updateSharedBucket="updateSharedBucket"
       />
     </c-card-content>
     <c-toasts
@@ -213,8 +213,8 @@ export default {
     active() {
       return this.$store.state.active;
     },
-    folderName() {
-      return this.$store.state.selectedFolderName;
+    bucketName() {
+      return this.$store.state.selectedBucketName;
     },
     locale () {
       return this.$i18n.locale;
@@ -231,7 +231,7 @@ export default {
       this.setAccessRights();
     },
     visible: function () {
-      if (this.visible && this.folderName) this.getSharedDetails();
+      if (this.visible && this.bucketName) this.getSharedDetails();
     },
     read: function () {
       if(!this.read) {
@@ -320,7 +320,7 @@ export default {
     },
     shareSubmit: function () {
       this.loading = true;
-      this.shareContainer(this.folderName).then(
+      this.shareContainer(this.bucketName).then(
         (ret) => {
           if (ret) {
             this.getSharedDetails();
@@ -333,7 +333,7 @@ export default {
         },
       );
     },
-    shareContainer: async function (folder) {
+    shareContainer: async function (bucket) {
       let rights = [];
       if (this.view) {
         rights.push("v");
@@ -394,14 +394,14 @@ export default {
       try {
         await this.$store.state.client.shareNewAccess(
           this.$store.state.active.id,
-          folder,
+          bucket,
           this.tags,
           rights,
           await getSharedContainerAddress(this.$route.params.project),
         );
         await this.$store.state.client.shareNewAccess(
           this.$store.state.active.id,
-          `${this.folderName}_segments`,
+          `${this.bucketName}_segments`,
           this.tags,
           rights,
           await getSharedContainerAddress(this.$route.params.project),
@@ -433,14 +433,14 @@ export default {
 
       await addAccessControlMeta(
         this.$route.params.project,
-        folder,
+        bucket,
         rights,
         this.tags,
       );
 
       await addAccessControlMeta(
         this.$route.params.project,
-        `${this.folderName}_segments`,
+        `${this.bucketName}_segments`,
         rights,
         this.tags,
       );
@@ -454,7 +454,7 @@ export default {
     },
     toggleShareModal: function () {
       this.$store.commit("toggleShareModal", false);
-      this.$store.commit("setFolderName", "");
+      this.$store.commit("setBucketName", "");
       this.sharedAccessRight = null;
       this.openShareGuide = false;
       this.tags = [];
@@ -483,23 +483,23 @@ export default {
     getSharedDetails: function () {
       this.$store.state.client.getShareDetails(
         this.$route.params.project,
-        this.folderName,
+        this.bucketName,
       ).then((ret) => {
         this.sharedDetails = ret;
         this.tags = [];
       });
     },
-    updateSharedFolder: function () {
+    updateSharedBucket: function () {
       this.closeSharedNotification();
       this.isPermissionUpdated = true;
       this.closeSharedNotificationWithTimeout();
       this.getSharedDetails();
     },
-    removeSharedFolder: function (folderData) {
+    removeSharedBucket: function (bucketData) {
       this.closeSharedNotification();
       this.sharedDetails = this.sharedDetails.filter(
         item => {
-          return item.sharedTo !== folderData.projectId.value;
+          return item.sharedTo !== bucketData.projectId.value;
         });
       this.isPermissionRemoved = true;
       this.closeSharedNotificationWithTimeout();

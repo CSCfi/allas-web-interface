@@ -14,7 +14,7 @@
       </div>
       <div class="options-row options-row--actions">
         <div class="row-left">
-          <FolderFilterDrawer
+          <BucketFilterDrawer
             :all-containers="containers || []"
             :result-count="displayedCount"
             @apply="onFilterApply"
@@ -26,12 +26,12 @@
           <c-button
             size="small"
             outlined
-            data-testid="create-folder"
-            @click="toggleCreateFolderModal(false)"
-            @keyup.enter="toggleCreateFolderModal(true)"
+            data-testid="create-bucket"
+            @click="toggleCreateBucketModal(false)"
+            @keyup.enter="toggleCreateBucketModal(true)"
           >
             <c-icon :path="mdiPlus" />
-            {{ $t("message.createFolder") }}
+            {{ $t("message.createBucket") }}
           </c-button>
         </div>
       </div>
@@ -61,18 +61,18 @@ import { mdiPlus } from "@mdi/js";
 import {
   getSharingContainers,
   updateObjectsAndObjectTags,
-  toggleCreateFolderModal,
+  toggleCreateBucketModal,
 } from "@/common/globalFunctions";
 import ContainerTable from "@/components/ContainerTable.vue";
 import { setPrevActiveElement } from "@/common/keyboardNavigation";
-import FolderFilterDrawer from "@/components/FolderFilterDrawer.vue";
+import BucketFilterDrawer from "@/components/BucketFilterDrawer.vue";
 import SearchBox from "@/components/SearchBox.vue";
 
 export default {
   name: "ContainersView",
   components: {
     ContainerTable,
-    FolderFilterDrawer,
+    BucketFilterDrawer,
     SearchBox,
   },
   data: function () {
@@ -99,14 +99,14 @@ export default {
     active() {
       return this.$store.state.active;
     },
-    isFolderUploading() {
+    isBucketUploading() {
       return this.$store.state.isUploading;
     },
-    isFolderCopied() {
-      return this.$store.state.isFolderCopied;
+    isBucketCopied() {
+      return this.$store.state.isBucketCopied;
     },
-    newFolder() {
-      return this.$store.state.newFolder;
+    newBucket() {
+      return this.$store.state.newBucket;
     },
     locale() {
       return this.$i18n.locale;
@@ -133,8 +133,8 @@ export default {
     containers() {
       this.applyFilters();
 
-      if (this.containers && this.newFolder) {
-        const idx = this.containers.findIndex((c) => c.name === this.newFolder);
+      if (this.containers && this.newBucket) {
+        const idx = this.containers.findIndex((c) => c.name === this.newBucket);
         if (idx > 0) {
           this.containers.unshift(this.containers.splice(idx, 1)[0]);
           this.$refs.containerTable?.toFirstPage?.();
@@ -149,8 +149,8 @@ export default {
       },
     },
 
-    isFolderUploading() {
-      if (!this.isFolderUploading) {
+    isBucketUploading() {
+      if (!this.isBucketUploading) {
         this.contsLoading = true;
         setTimeout(() => {
           this.fetchContainers();
@@ -159,10 +159,10 @@ export default {
       }
     },
 
-    isFolderCopied() {
-      if (this.isFolderCopied) {
+    isBucketCopied() {
+      if (this.isBucketCopied) {
         this.fetchContainers();
-        this.$store.commit("setFolderCopiedStatus", false);
+        this.$store.commit("setBucketCopiedStatus", false);
       }
     },
 
@@ -334,13 +334,13 @@ export default {
       this.currentPage = this.$route.query.page ? parseInt(this.$route.query.page) : 1;
     },
 
-    toggleCreateFolderModal: function (keypress) {
-      toggleCreateFolderModal();
+    toggleCreateBucketModal: function (keypress) {
+      toggleCreateBucketModal();
       if (keypress) setPrevActiveElement();
       setTimeout(() => {
-        const newFolderInput = document.querySelector("#newFolder-input input");
-        newFolderInput.tabIndex = "0";
-        newFolderInput.focus();
+        const newBucketInput = document.querySelector("#newBucket-input input");
+        newBucketInput.tabIndex = "0";
+        newBucketInput.focus();
       }, 300);
     },
   },

@@ -28,8 +28,8 @@ async function checkProject (to, from, next){
 }
 async function checkContainer (to, from, next){
 
-  if(to.params.container === store.state.uploadFolder.name) {
-    //When new folder is created with upload but containers not updated yet
+  if(to.params.container === store.state.uploadBucket.name) {
+    //When new bucket is created with upload but containers not updated yet
     next();
   }
   else {
@@ -65,7 +65,7 @@ export default createRouter({
     {
       path: "/browse/:user/:project",
       beforeEnter: checkProject,
-      name: "AllFolders",
+      name: "AllBuckets",
       component: ContainersView,
     },
     {

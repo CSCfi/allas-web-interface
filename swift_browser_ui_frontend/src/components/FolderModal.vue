@@ -1,29 +1,29 @@
 <template>
   <c-card
-    ref="subFolderContainer"
+    ref="folderContainer"
     class="add-folder"
-    data-testid="create-subfolder-modal"
+    data-testid="create-folder-modal"
     @keydown="handleKeyDown"
   >
-    <div id="subFolder-modal-content" class="modal-content-wrapper">
-      <c-toasts id="subFolder-toasts" data-testid="subFolder-toasts" vertical="bottom" absolute />
+    <div id="folder-modal-content" class="modal-content-wrapper">
+      <c-toasts id="folder-toasts" data-testid="folder-toasts" vertical="bottom" absolute />
       <h2 class="title is-4">
         {{ $t('message.objects.createFolder') || 'Create folder' }}
       </h2>
 
       <c-card-content>
         <p class="info-text is-size-6">
-          {{ $t('message.container_ops.subfoldername') }}
+          {{ $t('message.container_ops.foldername') }}
         </p>
 
         <c-text-field
           id="newFolder-input"
           v-model="folderName"
           v-csc-control
-          :label="$t('message.objects.folderName') || $t('message.container_ops.folderName')"
-          name="subfoldername"
+          :label="$t('message.objects.folderName') || $t('message.container_ops.foldername')"
+          name="foldername"
           aria-required="true"
-          data-testid="subfolder-name"
+          data-testid="folder-name"
           :valid="errorMsg.length === 0"
           :validation="errorMsg"
           required
@@ -37,7 +37,7 @@
       <c-button
         outlined
         size="large"
-        data-testid="cancel-save-subfolder"
+        data-testid="cancel-save-folder"
         @click="close(false)"
         @keyup.enter="close(true)"
       >
@@ -46,7 +46,7 @@
 
       <c-button
         size="large"
-        data-testid="save-subfolder"
+        data-testid="save-folder"
         @click="create(false)"
         @keyup.enter="create(true)"
       >
@@ -67,7 +67,7 @@ import {
 } from "@/common/keyboardNavigation";
 
 export default {
-  name: "SubFolderModal",
+  name: "FolderModal",
   data() {
     return {
       folderName: "",
@@ -129,8 +129,8 @@ export default {
 
         this.close(keypress);
       } catch (err) {
-        document.querySelector("#subFolder-toasts")?.addToast({
-          id: "create-subfolder-toast",
+        document.querySelector("#folder-toasts")?.addToast({
+          id: "create-folder-toast",
           progress: false,
           type: "error",
           message: this.$t("message.container_ops.createFail") || "Failed to create folder.",
@@ -139,11 +139,11 @@ export default {
     },
 
     close(keypress) {
-      this.$store.commit("toggleCreateFolderModal", false);
+      this.$store.commit("toggleCreateBucketModal", false);
       this.folderName = "";
       this.interacted = false;
       this.errorMsg = "";
-      document.querySelector("#subFolder-toasts")?.removeToast("create-subfolder-toast");
+      document.querySelector("#folder-toasts")?.removeToast("create-folder-toast");
       if (keypress) moveFocusOutOfModal(this.prevActiveEl);
     },
 
@@ -156,7 +156,7 @@ export default {
     },
 
     handleKeyDown(e) {
-      const focusableList = this.$refs.subFolderContainer
+      const focusableList = this.$refs.folderContainer
         .querySelectorAll("input, c-link, c-button");
       const { first, last } = getFocusableElements(focusableList);
       keyboardNavigationInsideModal(e, first, last);

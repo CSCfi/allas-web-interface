@@ -1,6 +1,6 @@
 // Ready translated locale messages
 
-import bucket_overrides from "./bucketOverride";
+import lang_overrides from "@/assets/lang_overrides";
 
 let default_translations = {
   en: {
@@ -55,14 +55,14 @@ let default_translations = {
         Forbidden_text:
           "You are seeing this page because you were " +
           "trying to perform an action that you are not allowed to.",
-        inUse: "Folder name is already in use.",
-        inUseOtherPrj: "Folder name is already in use by another project.",
-        invalidName: "Folder name or tag is invalid.",
-        createFail: "Folder creation failed.",
+        inUse: "Bucket name is already in use.",
+        inUseOtherPrj: "Bucket name is already in use by another project.",
+        invalidName: "Bucket name or tag is invalid.",
+        createFail: "Bucket creation failed.",
         tooShort: "Please enter at least 3 characters",
-        forbiddenChars: "Folder name cannot contain special " +
+        forbiddenChars: "Bucket name cannot contain special " +
         "characters other than dot(.), hyphen(-), and underscore(_)",
-        segments: "Folder name cannot end with '_segments'",
+        segments: "Bucket name cannot end with '_segments'",
         idb: "Firefox in private mode is not supported.",
         idb_text:
           "Firefox is not supported in private mode. " +
@@ -74,9 +74,10 @@ let default_translations = {
       program_name: "Allas",
       program_description: "Allas Web UI provides a simple-to-use web user " +
           "interface for CSC Object Storage service, Allas.",
+      helplink: "https://docs.csc.fi/data/Allas/",
       currentProj: "Project",
       selectProj: "Select project",
-      createFolder: "Create folder",
+      createBucket: "Create bucket",
       uploadSecondaryNav: "Upload",
       logOut: "Log out",
       copyinprogress: "Copying in progress",
@@ -86,24 +87,24 @@ let default_translations = {
       copycancel: "Copy cancelled",
       copyfail: "Copy failed",
       copysuccess: "Copy finished",
-      folderTabs: {
-        all: "All folders",
-        sharedFrom: "Folders you have shared",
-        sharedTo: "Folders shared with you",
+      bucketTabs: {
+        all: "All buckets",
+        sharedFrom: "Buckets you have shared",
+        sharedTo: "Buckets shared with you",
       },
-      folderDetails: {
-        notShared: "This folder isn't shared with other projects.",
-        sharing_to_one_project: "This folder is shared to one project.",
-        sharing_to_many_projects: "This folder is shared to multiple projects.",
+      bucketDetails: {
+        notShared: "This bucket isn't shared with other projects.",
+        sharing_to_one_project: "This bucket is shared to one project.",
+        sharing_to_many_projects: "This bucket is shared to multiple projects.",
         shared_with_view:
-          "You can browse this folder. (@:message.share.view_perm)",
+          "You can browse this bucket. (@:message.share.view_perm)",
         shared_with_read:
-          "You can copy this folder and download files. " +
+          "You can copy this bucket and download files. " +
           "(@:message.share.read_perm)",
         shared_with_read_write:
-          "You can copy this folder and download files. " +
+          "You can copy this bucket and download files. " +
           "You can upload new files or delete existing files from this " +
-          "folder. (@:message.share.write_perm)",
+          "bucket. (@:message.share.write_perm)",
       },
       table: {
         name: "Name",
@@ -129,17 +130,17 @@ let default_translations = {
         sharing: "You have shared",
         shared: "Shared with you",
         edit_sharing: " Edit sharing",
-        source_project_id: "Share ID of this folder",
+        source_project_id: "Share ID of this bucket",
         date_of_sharing: "Date of sharing",
         unknown_date: "Unknown",
-        back_to_all_folders: "Back to all folders",
-        back_to_sharing_folders: "Back to folders you have shared",
-        back_to_shared_folders: "Back to folders shared with you",
+        back_to_all_buckets: "Back to all buckets",
+        back_to_sharing_buckets: "Back to buckets you have shared",
+        back_to_shared_buckets: "Back to buckets shared with you",
       },
       tableOptions: {
         displayOptions: "Display options",
-        render: "Display as folders",
-        text: "Display as file paths",
+        render: "Display as folders and Objects",
+        text: "Display as object paths",
         timestamp: "Display time of last activity",
         fromNow: "Display time since last activity",
         hideTags: "Hide tags",
@@ -157,52 +158,52 @@ let default_translations = {
           "a unique 32-digit code associated with your {tooltipb} " +
           "project. Provide the Share ID to members " +
           "of other projects (e.g., via email) so that they can " +
-          "share folders with you.",
+          "share buckets with you.",
         close: "Close",
-        instructions: "How to share a folder",
+        instructions: "How to share a bucket",
         close_instructions: "Hide",
-        share_title: "Share folder",
+        share_title: "Share bucket",
         share_other_projects: "Share with other projects",
         share_guide_intro:
-          "To share a folder with another project you need to:",
+          "To share a bucket with another project you need to:",
         share_guide_step1b: "1. Enter the Share ID. ",
         share_guide_step1:
           "You need to know in advance " +
           "the Share ID (a 32-digit code) associated " +
-          "with the project you want to share a folder with. The " +
+          "with the project you want to share a bucket with. The " +
           "recipient can copy the Share ID from the user " +
           "interface and provide it to you via email. You can share " +
-          "a folder with multiple projects.",
+          "a bucket with multiple projects.",
         share_guide_step2: "2. Select the permission rights:",
         permissions: "Permissions",
         view_perm: "View",
         view_perm_desc:
           ": The recipient project's members can only " +
-          "view the folder content. Use this when you " +
+          "view the bucket content. Use this when you " +
           "need maximum certainty that your files are not distributed " +
           "further. Note that you have to be also the project manager of " +
           "the recipient project.",
         read_perm: "Transfer data",
         read_perm_desc:
-          ": The recipient project's members can copy your folder " +
+          ": The recipient project's members can copy your bucket " +
           "and download files. Use this when you want to " +
           "transfer your data to another project.",
         write_perm: "Collaborate",
         write_perm_desc:
           ": In addition to @:message.share.read_perm permission, " +
           "the recipient project's members can upload new files or delete " +
-          "existing files from your folder. Use this when " +
-          "you want the folder to be your shared workspace.",
-        shared_successfully: "Folder was shared successfully!",
+          "existing files from your bucket. Use this when " +
+          "you want the bucket to be your shared workspace.",
+        shared_successfully: "Bucket was shared successfully!",
         remove_permission: "Permissions were removed successfully!",
         update_permission: "Permissions were changed successfully.",
-        shared_table_title: "This folder is shared with",
+        shared_table_title: "This bucket is shared with",
         field_placeholder: "Add Share IDs",
         cancel: "Cancel",
         confirm: "Share",
         fail_noperm: "Please select permissions to grant.",
         fail_noid: "Please enter at least one Share ID.",
-        fail_duplicate: "The project already has access to the folder.",
+        fail_duplicate: "The project already has access to the bucket.",
         invalid_share_id: " is not a valid Share ID. Please remove it.",
         invalid_share_ids: " are not valid Share IDs. Please remove them.",
         perm_change_confirm: "Change permissions",
@@ -211,25 +212,24 @@ let default_translations = {
           "delete the sharing permissions?",
         share_delete_confirm: "Delete permissions",
       },
-      emptyContainer: "This folder has no content.",
+      emptyContainer: "This bucket/folder has no content.",
       emptyProject: {
-        all: "There are no folders in this project.",
-        sharedFrom: "You haven't shared any folders.",
-        sharedTo: "No folders have been shared with you.",
+        all: "There are no buckets in this project.",
+        sharedFrom: "You haven't shared any buckets.",
+        sharedTo: "No buckets have been shared with you.",
       },
       sharing: "Sharing - ",
-      containers: "Folders - ",
-      containerFolder: "Folders",
+      containers: "Buckets - ",
       containerBucket: "Buckets",
       download: {
         startedInBrowser: "Download started in your browser.",
         download: " Download",
-        files: "Files can only be downloaded " +
-          "individually because there are file or subfolder names longer " +
+        files: "Objects can only be downloaded " +
+          "individually because there are object or folder names longer " +
           "than 99 characters.",
         inProgress: "Download in progress",
         complete: "Download completed",
-        gathering: "Gathering a list of files",
+        gathering: "Gathering a list of objects",
         warnWait: "Please wait for the download to finish.",
         warnTempFiles: "Opening temporary files or folders " +
           "(.crdownload, .crswap) may interrupt the process.",
@@ -242,12 +242,12 @@ let default_translations = {
           "can be downloaded.",
       },
       upload: {
-        addFiles: "Add files or folders first.",
-        duplicate: "Files with the same paths are not allowed.",
-        sizeZero: "Empty files cannot be uploaded.",
+        addFiles: "Please add objects to upload",
+        duplicate: "Objects with the same paths are not allowed.",
+        sizeZero: "Empty objects cannot be uploaded.",
         hasStarted: "Uploading has started",
         inProgress: "Upload in progress",
-        viewDestinationFolder: "View destination folder",
+        viewDestinationBucket: "View destination bucket",
         maximize: "Maximize",
         minimize: "Minimize",
         estimate: "It may take few minutes.",
@@ -255,9 +255,9 @@ let default_translations = {
         complete: "Uploading completed",
         cancelled: "Uploading cancelled",
         uploadedItems: "Uploaded items will be displayed soon",
-        addFiles: "Please add files to upload.",
+        addFiles: "Please add objects to upload.",
         error: "Upload couldn't start. Please try again.",
-        accessFail: "Folder could not be accessed.",
+        accessFail: "Bucket could not be accessed.",
       },
       close: "Close",
       copy: " Copy",
@@ -271,35 +271,35 @@ let default_translations = {
       options: "Options",
       copysuccess: "Copying in progress",
       copytime: "It may take few seconds",
-      copyfail: "Failed to copy the folder",
-      notDecryptable: "Some downloaded files need manual decryption.",
+      copyfail: "Failed to copy the bucket",
+      notDecryptable: "Some requested objects could not be decrypted.",
       tagName: "Tags (optional)",
       tagPlaceholder: "# Add a tag and press enter",
       container_ops: {
-        addContainer: "Create new folder",
-        createSuccess: "Folder created.",
-        createFail: "Folder creation failed.",
+        addContainer: "Create new bucket",
+        createSuccess: "Bucket created.",
+        createFail: "Bucket creation failed.",
         norename:
-          "Please note that folder names cannot be modified " +
+          "Please note that bucket names cannot be modified " +
+          "after creating a bucket.",
+        foldername: "Please note that folder names cannot be modified " +
           "after creating a folder.",
-        subfoldername: "Please note that folder names cannot be modified " +
-          "after creating a folder.",
-        createdFolder:
-          "Created folder will be shared with all project members in ",
+        createdBucket:
+          "Created bucket will be shared with all project members in ",
         viewProjectMembers: "View project members",
-        deleteNote: "Folder must be empty before " + "it can be deleted.",
-        deleteSuccess: "Folder was deleted.",
-        folderName: "Folder name",
+        deleteNote: "Bucket must be empty before " + "it can be deleted.",
+        deleteSuccess: "Bucket was deleted.",
+        bucketName: "Bucket name",
       },
-      subfolders: {
+      folders: {
         deleteNote:
-          "Subfolders are deleted by deleting all " + "items in them.",
-        deleteOneSuccess: "Subfolder was deleted.",
-        deleteManySuccess: "Subfolders were deleted.",
+          "Folders are deleted by deleting all " + "items in them.",
+        deleteOneSuccess: "Folder was deleted.",
+        deleteManySuccess: "Folders were deleted.",
       },
       objects: {
-        file: "File ",
-        files: "Files ",
+        file: "Object ",
+        files: "Objects ",
         folder: "Folder",
         folderName: "Folder name",
         info: "Info",
@@ -316,10 +316,10 @@ let default_translations = {
         backToBuckets: "back to all buckets",
         createFolder: "Create folder",
         overwriteConfirm: " already exists. Do you want to replace " +
-        "this file? (Previous file will be lost.)",
+        "this object? (Previous object will be lost.)",
         overwriteConfirmMany:
-          " already exist. Do you want to replace these files? " +
-          "(Previous files will be lost.)",
+          " already exist. Do you want to replace these objects? " +
+          "(Previous objects will be lost.)",
         overwrite: "Replace",
         filterBy: "Filter by name or tag",
         deleteConfirm: "Delete items",
@@ -329,15 +329,15 @@ let default_translations = {
         deleteOneSuccess: " item deleted",
         deleteSharedObjects:
           "This action will permanently delete " +
-          "items from a shared folder. " +
+          "items from a shared bucket. " +
           "Are you sure you want to proceed?",
         deleteObjectsMessage:
           "Items can't be restored after being deleted. " +
           "Are you sure you want to proceed?",
       },
       replicate: {
-        copy_folder: "Copy folder: ",
-        name_newFolder: "Name new folder",
+        copy: "Copy bucket: ",
+        name: "Name new bucket",
       },
       tokens: {
         empty: "No API tokens created for the project",
@@ -362,13 +362,13 @@ let default_translations = {
         creationFailed: "Token creation failed.",
       },
       encrypt: {
-        uploadFiles: "Upload files",
-        uploadDestination: "Destination folder: ",
-        upload_step1: "Create a new folder",
-        upload_step2: "Files to be uploaded",
-        dropMsg: "Select files",
+        uploadFiles: "Upload objects",
+        uploadDestination: "Destination bucket: ",
+        upload_step1: "Create a new bucket",
+        upload_step2: "Objects to be uploaded",
+        dropMsg: "Select objects",
         normup: "Upload",
-        empty: "No files selected",
+        empty: "No objects selected",
         cancel: "Cancel",
         table: {
           name: "Name",
@@ -377,11 +377,11 @@ let default_translations = {
           type: "Type",
         },
         uploadedFiles:
-          "Uploaded files will be shared with all project members in ",
+          "Uploaded object will be shared with all project members in ",
         unencryptedNotice: "Note this upload process is not suitable for sensitive data, In this case use",
         uploadedToShared:
           "and all members in other projects which " +
-          "have access to this shared folder.",
+          "have access to this shared bucket.",
       },
       route: {
         title: "Switch project",
@@ -391,16 +391,16 @@ let default_translations = {
         cancel: "Cancel",
       },
       search: {
-        container: "Folder",
+        container: "Bucket",
         object: "Item",
-        folder: "Subfolder",
+        folder: "Folder",
         tags: "Tags",
         objects: "Items",
         size: "Size",
         empty: "No results found",
         searchBy: "Search by name or tag",
         buildingIndex:
-          "This project has a large number of files. Please " +
+          "This project has a large number of objects. Please " +
           "wait a moment and try again.",
       },
       select: {
@@ -453,8 +453,8 @@ let default_translations = {
       shareid_tooltip: "tooltip for share id",
       shareid_instructions: "instructions for share id",
       list_of_shareids: "list of share ids",
-      folder_tabs: "different types of folder",
-      searchbox: "search for folders",
+      bucket_tabs: "different types of bucket",
+      searchbox: "search for buckets",
       tagsList: "list of tags",
       edit_tag: "edit tags",
       delete_tag: "delete tag",
@@ -642,14 +642,14 @@ let default_translations = {
         Forbidden_text:
           "Näet tämän sivun, koska yritit suorittaa " +
           "kielletyn toiminnon.",
-        inUse: "Kansion nimi on jo käytössä.",
-        inUseOtherPrj: "Kansion nimi on jo käytössä toisessa projektissa.",
-        invalidName: "Kansion nimi tai asiasana ei kelpaa.",
-        createFail: "Kansion luonti epäonnistui.",
+        inUse: "Ämpärin nimi on jo käytössä.",
+        inUseOtherPrj: "Ämpärin nimi on jo käytössä toisessa projektissa.",
+        invalidName: "Ämpärin nimi tai asiasana ei kelpaa.",
+        createFail: "Ämpärin luonti epäonnistui.",
         tooShort: "Anna vähintään 3 merkkiä",
-        forbiddenChars: "Kansion nimi ei voi sisältää muita " +
+        forbiddenChars: "Ämpärin nimi ei voi sisältää muita " +
         "erikoismerkkejä kuin piste(.), viiva(-) ja alaviiva(_)",
-        segments: "Kansion nimi ei saa päättyä '_segments'",
+        segments: "Ämpärin nimi ei saa päättyä '_segments'",
         idb: "Firefoxin yksityinen selaus ei ole tuettu.",
         idb_text:
           "Firefoxin yksityinen selaustila ei ole tuettu." +
@@ -661,9 +661,10 @@ let default_translations = {
       program_name: "Allas",
       program_description: "Allas Web UI tarjoaa yksinkertaisen " +
           "web-käyttöliittymän CSC:n Object Storage -palveluun, Altaaseen.",
+      helplink: "https://docs.csc.fi/data/Allas/",
       currentProj: "Projekti",
       selectProj: "Valitse projekti",
-      createFolder: "Luo kansio",
+      createBucket: "Luo Ämpäri",
       uploadSecondaryNav: "Lähetä",
       logOut: "Kirjaudu ulos",
       copyinprogress: "Kopiointi käynnissä",
@@ -673,25 +674,25 @@ let default_translations = {
       copycancel: "Kopiointi peruutettu",
       copyfail: "Kopiointi epäonnistui",
       copysuccess: "Kopiointi valmis",
-      folderTabs: {
-        all: "Kaikki kansiot",
-        sharedFrom: "Jakamasi kansiot",
-        sharedTo: "Sinulle jaetut kansiot",
+      bucketTabs: {
+        all: "Kaikki ämpärit",
+        sharedFrom: "Jakamasi ämpärit",
+        sharedTo: "Sinulle jaetut ämpärit",
       },
-      folderDetails: {
-        notShared: "Tätä kansiota ei ole jaettu toiselle projektille.",
-        sharing_to_one_project: "Tämä kansio on jaettu yhdelle projektille.",
-        sharing_to_many_projects: "Tämä kansio on jaettu useille projekteille.",
+      bucketDetails: {
+        notShared: "Tätä ämpäriä ei ole jaettu toiselle projektille.",
+        sharing_to_one_project: "Tämä ämpäri on jaettu yhdelle projektille.",
+        sharing_to_many_projects: "Tämä ämpäri on jaettu useille projekteille.",
         shared_with_view:
-          "Voit selata tätä kansiota. (@:message.share.view_perm)",
+          "Voit selata tätä ämpäriä. (@:message.share.view_perm)",
         shared_with_read:
-          "Voit kopioida kansion, ladata " +
-          "tiedostoja tässä kansiossa ja purkaa kansion sisällön " +
+          "Voit kopioida ämpärin, ladata " +
+          "tiedostoja tässä ämpärissä ja purkaa ämpärin sisällön " +
           "salauksen. (@:message.share.read_perm)",
         shared_with_read_write:
           "Voit kopioida ja ladata " +
-          "tiedostoja, sekä purkaa kansion sisällön salauksen. " +
-          "Voit lähettää uusia tai poistaa jo kansiossa olevia tiedostoja. " +
+          "tiedostoja, sekä purkaa ämpärin sisällön salauksen. " +
+          "Voit lähettää uusia tai poistaa jo ämpärissä olevia tiedostoja. " +
           "(@:message.share.write_perm)",
       },
       table: {
@@ -705,7 +706,7 @@ let default_translations = {
         fileHash: "Tarkistussumma",
         fileType: "Tyyppi",
         fileDown: "Tiedoston lataus",
-        folderDetails: "Ei yksityiskohtia kansioille",
+        bucketDetails: "Ei yksityiskohtia ämpäreille",
         clearChecked: "Poista valinnat",
         tags: "Asiasanat",
         editTags: "Muokkaa asiasanoja",
@@ -726,9 +727,9 @@ let default_translations = {
         source_project_id: "Jakamistunnus",
         date_of_sharing: "Jakamispäivämäärä",
         unknown_date: "Tuntematon",
-        back_to_all_folders: "Takaisin",
-        back_to_sharing_folders: "Takaisin",
-        back_to_shared_folders: "Takaisin",
+        back_to_all_buckets: "Takaisin",
+        back_to_sharing_buckets: "Takaisin",
+        back_to_shared_buckets: "Takaisin",
       },
       tableOptions: {
         displayOptions: "Näyttöasetukset",
@@ -750,13 +751,13 @@ let default_translations = {
           "Tällä toiminnolla voit kopioida jakamistunnuksen: uniikin " +
           "32-numeroisen koodin, joka on yhdistetty {tooltipb} " +
           "projektiin. Lähetä tunnus (esim. sähköpostilla) muiden projektien " +
-          "jäsenille, niin he voivat jakaa kansioita sinulle.",
+          "jäsenille, niin he voivat jakaa ämpäriä sinulle.",
         close: "Sulje",
-        instructions: "Kuinka jaan kansion",
+        instructions: "Kuinka jaan ämpärin",
         close_instructions: "Sulje ohjeet",
-        share_title: "Jaa kansio ",
+        share_title: "Jaa ämpäri ",
         share_other_projects: "Jaa toisen projektin kanssa",
-        share_guide_intro: "Kun haluat jakaa kansion toisen projektin kanssa: ",
+        share_guide_intro: "Kun haluat jakaa ämpärin toisen projektin kanssa: ",
         share_guide_step1b: "1. Syötä jakamistunnus. ",
         share_guide_step1:
           "Sinun tulee tietää " +
@@ -764,36 +765,36 @@ let default_translations = {
           "koodi). Vastaanottaja voi kopioida " +
           "jakamistunnuksen Kopioi jakamistunnus -napilla " +
           "ja lähettää sen sinulle esim. sähköpostilla. " +
-          "Voit jakaa kansion useiden projektien kanssa.",
+          "Voit jakaa ämpärin useiden projektien kanssa.",
         share_guide_step2: "2. Valitse käyttöoikeudet: ",
         permissions: "Käyttöoikeudet",
         view_perm: "Katsele",
         view_perm_desc:
-          ": Vastaanottavan projektin jäsenet voivat tarkastella kansion " +
+          ": Vastaanottavan projektin jäsenet voivat tarkastella ämpärin " +
           "sisältöä. Käytä tätä, kun tarvitset varmuuden, ettei " +
           "tiedostojasi jaeta eteenpäin. Huomaa, että " +
           "sinun tulee olla myös vastaanottavan projektin omistaja.",
         read_perm: "Siirrä tiedostot",
         read_perm_desc:
-          ": Vastaanottavan projektin jäsenet voivat kopioida kansiosi " +
-          ", ladata tiedostot sekä purkaa kansion sisällön salauksen. " +
+          ": Vastaanottavan projektin jäsenet voivat kopioida ämpärisi " +
+          ", ladata tiedostot sekä purkaa ämpärin sisällön salauksen. " +
           "Käytä tätä, kun haluat siirtää tiedostosi toiselle projektille.",
         write_perm: "Yhteiskäyttö",
         write_perm_desc:
           ": @:message.share.read_perm -oikeuksien lisäksi vastaanottavan " +
-          "projektin jäsenet voivat lähettää uusia tai poistaa jo kansiossa " +
+          "projektin jäsenet voivat lähettää uusia tai poistaa jo ämpärissä " +
           "olevia tiedostoja. Käytä tätä, kun haluat käyttää " +
-          "kansiota jaettuna työtilana.",
-        shared_successfully: "Kansion jakaminen onnistui.",
+          "ämpäriä jaettuna työtilana.",
+        shared_successfully: "Ämpärin jakaminen onnistui.",
         remove_permission: "Käyttöoikeus poistettiin onnistuneesti.",
         update_permission: "Käyttöoikeus muutettiin onnistuneesti.",
-        shared_table_title: "Tämä kansio on jaettu",
+        shared_table_title: "Tämä ämpäri on jaettu",
         field_placeholder: "Lisää jakamistunnus",
         cancel: "Peru",
         confirm: "Jaa",
         fail_noperm: "Valitse käyttöoikeudet.",
         fail_noid: "Anna vähintään yhden projektin jakamistunnus.",
-        fail_duplicate: "Kansio on jo jaettu kyseiselle projektille.",
+        fail_duplicate: "Ämpäri on jo jaettu kyseiselle projektille.",
         invalid_share_id: " ei ole kelvollinen jakamistunnus. Poistakaa se.",
         invalid_share_ids:
           " eivät ole kelvollisia jakamistunnuksia. Poistakaa ne.",
@@ -801,15 +802,14 @@ let default_translations = {
         share_delete_text: "Haluatko varmasti poistaa käyttöoikeuden?",
         share_delete_confirm: "Poista käyttöoikeus",
       },
-      emptyContainer: "Tämä kansio on tyhjä.",
+      emptyContainer: "Tämä ämpäri on tyhjä.",
       emptyProject: {
-        all: "Tässä projektissa ei ole kansioita.",
-        sharedFrom: "Et ole jakanut yhtään kansiota.",
-        sharedTo: "Sinulle ei ole jaettu kansioita.",
+        all: "Tässä projektissa ei ole ämpäreitä.",
+        sharedFrom: "Et ole jakanut yhtään ämpäriä.",
+        sharedTo: "Sinulle ei ole jaettu ämpäreitä.",
       },
       sharing: "Jako - ",
-      containers: "Kansiot - ",
-      containerFolder: "Kansiot",
+      containers: "Ämpärit - ",
       containerBucket: "Ämpärit",
       download: {
         startedInBrowser: "Lataus on alkanut selaimessasi.",
@@ -830,12 +830,12 @@ let default_translations = {
           "tiedostot voivat kuitenkin olla tämän kokoisia ja ne voidaan ladata",
       },
       upload: {
-        addFiles: "Lisää ensin tiedostoja tai kansioita.",
+        addFiles: "Lisää ensin tiedostoja tai ämpäreitä.",
         duplicate: "Tiedostot, joilla on samat polut, eivät ole sallittuja.",
         sizeZero: "Tyhjiä tiedostoja ei voi lähettää.",
         hasStarted: "Lähetys aloitettu",
         inProgress: "Lähetys käynnissä",
-        viewDestinationFolder: "Näytä kohdekansio",
+        viewDestinationBucket: "Näytä kohdeämpäri",
         maximize: "Suurenna",
         minimize: "Pienennä",
         estimate: "Toiminto voi kestää muutamia minuutteja.",
@@ -845,7 +845,7 @@ let default_translations = {
         uploadedItems: "Lähetetyt tiedostot näytetään pian",
         addFiles: "Lisää ladattavat tiedostot.",
         error: "Lataus ei alkanut. Yritä uudelleen.",
-        accessFail: "Kansioon ei ole pääsyä.",
+        accessFail: "Ämpäriin ei ole pääsyä.",
       },
       close: "Sulje",
       copy: " Kopioi",
@@ -857,35 +857,35 @@ let default_translations = {
       cancel: "Peruuta",
       save: "Tallenna",
       options: "Valinnat",
-      copysuccess: "Kansiota kopioidaan",
+      copysuccess: "Ämpäriä kopioidaan",
       copytime: "Se voi kestää muutaman sekunnin",
-      copyfail: "Kansion kopiointi epäonnistui",
+      copyfail: "Ämpärin kopiointi epäonnistui",
       notDecryptable:
         "Joidenkin tiedostojen salaus on purettava erikseen latauksen " +
         "jälkeen.",
       tagName: "Asiasanat",
       tagPlaceholder: "# Lisää asiasana ja paina rivinvaihtoa",
       container_ops: {
-        addContainer: "Luo uusi kansio",
-        createSuccess: "Kansio luotu.",
-        createFail: "Kansion luonti epäonnistui.",
+        addContainer: "Luo uusi ämpäri",
+        createSuccess: "Ämpäri luotu.",
+        createFail: "Ämpärin luonti epäonnistui.",
         norename:
-          "Kansiota ei voi nimetä uudelleen, " +
+          "Ämpäriä ei voi nimetä uudelleen, " +
           "mutta sen voi kopioida uudella nimellä.",
         createdFolder: "Luotu kansio jaetaan kaikille jäsenille projektissa ",
         viewProjectMembers: "Näytä projektin jäsenet",
         deleteNote:
           "Kansion poistaminen edellyttää kaikkien " +
           "tiedostojen poistamista ensin.",
-        deleteSuccess: "Kansio poistettu",
-        folderName: "Kansion nimi",
+        deleteSuccess: "Ämpäri poistettu",
+        bucketName: "Ämpärin nimi",
       },
       subfolders: {
         deleteNote:
-          "Alikansion poistaminen edellyttää sen kaikkien " +
+          "Kansion poistaminen edellyttää sen kaikkien " +
           "tiedostojen poistamista.",
-        deleteOneSuccess: "Alikansio poistettu.",
-        deleteManySuccess: "Alikansiot poistettu.",
+        deleteOneSuccess: "Kansio poistettu.",
+        deleteManySuccess: "Kansiot poistettu.",
       },
       objects: {
         file: "Tiedosto ",
@@ -920,15 +920,15 @@ let default_translations = {
         deleteOneSuccess: " tiedosto poistettu",
         deleteSharedObjects:
          "Tällä toiminnolla poistat " +
-         "tiedostot jaetusta kansiosta pysyvästi. " +
+         "tiedostot jaetusta ämpäristä pysyvästi. " +
          "Haluatko varmasti poistaa nämä tiedostot?",
         deleteObjectsMessage:
           "Tiedostoja ei voi palauttaa poistamisen jälkeen. " +
           "Haluatko varmasti poistaa nämä tiedostot?",
       },
       replicate: {
-        copy_folder: "Kopioi kansio: ",
-        name_newFolder: "Nimeä uusi kansio",
+        copy: "Kopioi ämpäri: ",
+        name: "Nimeä uusi ämpäri",
       },
       tokens: {
         empty: "Tälle projektille ei ole luotu API-avaimia",
@@ -955,8 +955,8 @@ let default_translations = {
       },
       encrypt: {
         uploadFiles: "Lataa tiedostoja",
-        uploadDestination: "Kohdekansio: ",
-        upload_step1: "Luo uusi kansio",
+        uploadDestination: "Kohdeämpäri: ",
+        upload_step1: "Luo uusi ämpäri",
         upload_step2: "Ladattavat tiedostot",
         dropMsg: "Valitse tiedostot",
         normup: "Lähetä",
@@ -974,7 +974,7 @@ let default_translations = {
           "sensitiivisille tiedoille. Tällöin käytä",
         uploadedToShared:
           "ja myös kaikille jäsenille muissa projekteissa, " +
-          "joilla on pääsy tähän jaettuun kansioon.",
+          "joilla on pääsy tähän jaettuun ämpäriin.",
       },
       route: {
         title: "Vaihda projektia",
@@ -984,9 +984,9 @@ let default_translations = {
         cancel: "Peruuta",
       },
       search: {
-        container: "Kansio",
+        container: "Ämpäri",
         object: "Tiedosto",
-        folder: "Alikansio",
+        folder: "Kansio",
         tags: "Asiasanat",
         objects: "Tiedostoa",
         size: "Koko",
@@ -1045,8 +1045,8 @@ let default_translations = {
       shareid_tooltip: "työkaluvinkki jaa tunnukselle",
       shareid_instructions: "ohjeita varten jaa tunnukselle",
       list_of_shareids: "lista jaa tunnuksista",
-      folder_tabs: "erityyppisiä kansioita",
-      searchbox: "etsi kansioita",
+      bucket_tabs: "erityyppisiä ämpäreitä",
+      searchbox: "etsi ämpäreitä",
       tagsList: "luettelo tunnisteista",
       edit_tag: "muokata nykyisiä tunnisteita",
       delete_tag: "poista tunniste",
@@ -1206,6 +1206,6 @@ function nestedJoin(dst, src) {
 }
 
 // Override keys according to lang_overrides
-translations = nestedJoin(translations, bucket_overrides);
+translations = nestedJoin(translations, lang_overrides);
 
 export default translations;

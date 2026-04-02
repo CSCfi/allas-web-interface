@@ -175,7 +175,7 @@
 
 <script>
 export default {
-  name: "FolderFilterDrawer",
+  name: "BucketFilterDrawer",
   props: {
     allContainers: { type: Array, default: () => [] },
     resultCount: { type: Number, default: 0 },
