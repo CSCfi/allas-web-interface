@@ -4,7 +4,7 @@ SHELL := /bin/bash
 # Dependencies without version are also supported, eg. "docker"
 REQ_CMDS := node:22 npm:9 pnpm:9 python:3.12 docker
 
-.PHONY: ceph-attach ceph-bootstrap ceph-clean ceph-down ceph-install-ssl ceph-up check-deps clean clean-browsers dev-all dev-ca dev-ca-clean dev-chromium dev-docker-build dev-docker-down dev-docker-up dev-down dev-ff dev-up refresh-submodules test-data volumes
+.PHONY: ceph-attach ceph-bootstrap ceph-clean ceph-down ceph-install-ssl ceph-up check-deps clean clean-browsers dev-all dev-ca dev-ca-clean dev-chromium dev-docker-build dev-docker-down dev-docker-up dev-down dev-ff dev-up refresh-submodules test-data volumes clean-all clean-docker-networks
 
 dev-all:
 	@echo Checking dependencies
@@ -26,6 +26,7 @@ dev-docker-all:
 	@echo Checking dependencies
 	make refresh-submodules
 	make check-deps
+	make frontend-install
 	@echo Building the docker-only development environment
 	make dev-ca
 	make volumes
@@ -134,7 +135,10 @@ check-deps:
 	$(MAKE) -C submodules/local-single-host-ceph check-deps
 
 refresh-submodules:
-	git submodule foreach "git pull"
+	git submodule update --init --recursive
+
+frontend-install:
+	cd swift_browser_ui_frontend && pnpm install
 
 clean-browsers:
 	sudo rm -rf .docker-volumes
@@ -142,3 +146,17 @@ clean-browsers:
 clean:
 	make dev-ca-clean
 	make ceph-clean
+
+clean-docker-networks:
+	-@docker network rm s3_migration_sd-connect-dev 2>/dev/null || true
+	-@docker network rm swift-browser-ui_sd-connect-dev 2>/dev/null || true
+
+clean-all:
+	-@docker compose -f docker-compose-dev.yml down --remove-orphans --volumes
+	-@make ceph-down || true
+	-@sudo rm -rf .docker-volumes
+	-@rm -rf .devres
+	-@ssh-keygen -f "$(HOME)/.ssh/known_hosts" -R '[localhost]:3022' || true
+	-@ssh-keygen -f "$(HOME)/.ssh/known_hosts" -R '[localhost]:3122' || true
+	-@docker network rm s3_migration_sd-connect-dev 2>/dev/null || true
+	-@docker network rm swift-browser-ui_sd-connect-dev 2>/dev/null || true
