@@ -1,30 +1,16 @@
-// Worker script for uploading objects using s3
-
-// Upload information will be handled using Emscripten WorkerFS.
-// WorkerFS allows us to use the files natively, which frees us from
-// having to read the files fully in memory during transfer, and greatly
-// simplifies operation.
-
-// Worker gets a list of files to upload, general upload information,
-// necessary file handles and slices. Worker will report finished chunks
-// to the main thread for upload completion.
-
-// Smaller files will be uploaded normally without using multipart uploads,
-// the main thread is aware of the difference.
+// Worker script for uploading objects using S3
+// Plain version: no encryption, no headers, no vault, no FS mounting
 
 import { PutObjectCommand, S3Client, UploadPartCommand } from "@aws-sdk/client-s3";
 import { checkPollutingName } from "./nameCheck";
 
 let s3client = undefined;
 
-waitAsm().then(() => {
-  console.log("Assembler initialized, initalizing entropy source...");
-  Module.ccall("libinit", undefined, undefined, undefined);
-  console.log("Entropy source initalized.");
+// Keep files in memory by bucket + key so we can upload parts directly
+const mountedFiles = {};
 
-  postMessage({
-    eventType: "runtimeInitialized",
-  })
+postMessage({
+  eventType: "runtimeInitialized",
 });
 
 // Create an s3 client for the worker instance
@@ -49,78 +35,81 @@ function createS3Client(access, secret, endpoint) {
   }
 }
 
-async function encryptSegment (e) {
-  console.log("Encrypting segment");
-  let enChunk = Module.ccall(
-    "encrypt_file_part",
-    "number",
-    ["array", "number", "string", "number"],
-    [
-      e.data.part.secret,
-      e.data.part.size,
-      `/${e.data.part.bucket}/${e.data.part.key}`,
-      e.data.part.offset,
-    ],
-  );
-  let enChunkPtr = Module.ccall(
-    "wrap_chunk_content",
-    "number",
-    ["number"],
-    [enChunk],
-  );
-  let enChunkLen = Module.ccall(
-    "wrap_chunk_len",
-    "number",
-    ["number"],
-    [enChunk],
-  );
+function ensureBucket(bucket) {
+  if (!mountedFiles[bucket]) {
+    mountedFiles[bucket] = {};
+  }
+}
 
-  // Create the AWS request and push the upload part
-  console.log("Chunk encrypted, pushing chunk to multipart upload.");
+function storeFiles(bucket, files) {
+  ensureBucket(bucket);
+
+  for (const obj of files) {
+    const key = obj.relativePath || obj.file.name;
+    mountedFiles[bucket][key] = obj.file;
+  }
+}
+
+function removeBucketFiles(bucket) {
+  if (mountedFiles[bucket]) {
+    delete mountedFiles[bucket];
+  }
+}
+
+async function uploadSegment(e) {
+  if (!s3client) {
+    throw new Error("S3 client has not been created");
+  }
+
+  const part = e.data.part;
+  const bucketFiles = mountedFiles[part.bucket];
+
+  if (!bucketFiles) {
+    throw new Error(`No files stored for bucket ${part.bucket}`);
+  }
+
+  const file = bucketFiles[part.key];
+  if (!file) {
+    throw new Error(`No file stored for key ${part.key} in bucket ${part.bucket}`);
+  }
+
+  const blob = file.slice(part.offset, part.offset + part.size);
+  const body = new Uint8Array(await blob.arrayBuffer());
+
   let command = undefined;
-  let enBody = new Uint8Array(HEAPU8.subarray(enChunkPtr, enChunkPtr + enChunkLen));
+
   if (e.data.session !== "") {
     const input = {
-      Body: enBody,
-      Bucket: e.data.part.bucket,
-      ContentLength: enChunkLen,
-      Key: e.data.part.key.concat(".c4gh"),
-      PartNumber: e.data.part.orderNumber,
+      Body: body,
+      Bucket: part.bucket,
+      ContentLength: body.length,
+      Key: part.key,
+      PartNumber: part.orderNumber,
       UploadId: e.data.session,
     };
     command = new UploadPartCommand(input);
   } else {
     const input = {
-      Body: enBody,
-      Bucket: e.data.part.bucket,
-      ContentLength: enChunkLen,
-      Key: e.data.part.key.concat(".c4gh"),
-    }
+      Body: body,
+      Bucket: part.bucket,
+      ContentLength: body.length,
+      Key: part.key,
+    };
     command = new PutObjectCommand(input);
   }
 
-  console.log("Sending encrypted chunk via s3 client.")
   const completedPart = await s3client.send(command);
 
   postMessage({
     eventType: "progress",
-    amount: e.data.part.size,
+    amount: body.length,
   });
-
-  // Free the encrypted chunk content buffer
-  console.log("Freeing encrypted chunk from buffer.");
-  Module.ccall(
-    "free_chunk",
-    "number",
-    ["number"],
-    [enChunk],
-  );
 
   postMessage({
     eventType: "uploadPartComplete",
-    key: e.data.part.key,
-    bucket: e.data.part.bucket,
-    orderNumber: e.data.session !== "" ? e.data.part.orderNumber : 0,
+    key: part.key,
+    bucket: part.bucket,
+    orderNumber: e.data.session !== "" ? part.orderNumber : 0,
     ETag: completedPart.ETag,
   });
 }
@@ -128,41 +117,33 @@ async function encryptSegment (e) {
 self.addEventListener("message", (e) => {
   e.stopImmediatePropagation();
 
-  // Sanity check container name
-  if (checkPollutingName(e.data.bucket)) return;
+  if (e.data.bucket && checkPollutingName(e.data.bucket)) return;
 
-  switch(e.data.command) {
+  switch (e.data.command) {
     case "mountFiles":
-      console.log(`Adding files to bucket ${e.data.bucket}`);
-      const filesToMount = e.data.files.map((obj) => {
-        // Use relative path to preserve folder structure in WORKERFS
-        const fileName = obj.relativePath || obj.file.name;
-        console.log(`Mapping file ${fileName}`);
-        return new File([obj.file], fileName, {
-          type: obj.file?.type || "", lastModified: obj.file?.lastModified || Date.now() });
-      });
-      FS.mkdir(`/${e.data.bucket}`);
-      FS.mount(
-        WORKERFS,
-        {
-          files: filesToMount,
-        },
-        `/${e.data.bucket}`,
-      );
-      console.log("Successfully added the listed files.");
+      storeFiles(e.data.bucket, e.data.files);
       postMessage({
         eventType: "filesAdded",
       });
       break;
+
     case "nextPart":
-      encryptSegment(e).then(() => {});
+      uploadSegment(e).catch((err) => {
+        console.log("Failed uploading plain chunk");
+        console.log(err);
+        postMessage({
+          eventType: "abort",
+          reason: "error",
+        });
+      });
       break;
+
     case "createS3Client":
       createS3Client(e.data.access, e.data.secret, e.data.endpoint);
       break;
+
     case "uploadFinished":
-      FS.unmount(`/${e.data.bucket}`);
-      FS.rmdir(`/${e.data.bucket}`);
+      removeBucketFiles(e.data.bucket);
       postMessage({
         eventType: "filesRemoved",
       });

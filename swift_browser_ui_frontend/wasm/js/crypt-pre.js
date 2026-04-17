@@ -10,14 +10,6 @@ function timeout(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-const waitAsm = async () => {
-  while (!moduleStartComplete) {
-    await timeout(250);
-  }
-
-  return true;
-}
-
 var Module = {
   onRuntimeInitialized: () => {
     moduleStartComplete = true;

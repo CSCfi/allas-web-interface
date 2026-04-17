@@ -1,212 +1,220 @@
 // Tar convenience functions
 
-function calcChecksum(header) {
+const enc = new TextEncoder();
+
+/** UTF-8 byte length of a JS string */
+function byteLen(s) {
+  return enc.encode(s).length;
+}
+
+/**
+ * Encode JS string to a "binary string" where each charCode is a single byte 0..255.
+ * Safe input for convertToArray() and calcChecksum().
+ */
+function utf8BinaryString(s) {
+  const bytes = enc.encode(s);
+  let out = "";
+  for (let i = 0; i < bytes.length; i++) out += String.fromCharCode(bytes[i]);
+  return out;
+}
+
+/** Encode a JS string to exactly N bytes (UTF-8), truncating by BYTES, then pad with NULs */
+function utf8ToFixedBytesBinaryString(s, n) {
+  const bytes = enc.encode(s);
+  const slice = bytes.length > n ? bytes.slice(0, n) : bytes;
+  let out = "";
+  for (let i = 0; i < slice.length; i++) out += String.fromCharCode(slice[i]);
+  if (slice.length < n) out += "\x00".repeat(n - slice.length);
+  return out;
+}
+
+/** Convert a "binary string" (each charCode is a byte) to Uint8Array */
+function convertToArray(binaryStr) {
+  const ret = new Uint8Array(binaryStr.length);
+  for (let i = 0; i < binaryStr.length; i++) {
+    ret[i] = binaryStr.charCodeAt(i) & 0xff;
+  }
+  return ret;
+}
+
+/** TAR checksum: sum of all bytes in the 512-byte header */
+function calcChecksum(header512BinaryStr) {
   let checksum = 0;
-  for(let i = 0, length = 512; i < length; i++) {
-    checksum += header.charCodeAt(i);
-  }
-  let checksumStr = checksum.toString(8).padStart(6, "0") + "\x00 ";
-  return checksumStr;
+  for (let i = 0; i < 512; i++) checksum += header512BinaryStr.charCodeAt(i) & 0xff;
+  // 6 digits octal, NUL, space => total 8 bytes
+  return checksum.toString(8).padStart(6, "0") + "\x00 ";
 }
 
-// Convert a header to an array, since TextEncoder can't deal with non 7-bit ASCII
-function convertToArray(header) {
-  let ret = [];
-
-  for (let i = 0; i < header.length; i++) {
-    ret.push(header.charCodeAt(i));
-  }
-
-  return new Uint8Array(ret);
+function setChecksum(header512) {
+  // checksum field is bytes 148..155 (8 bytes)
+  const checksum = calcChecksum(header512);
+  return header512.slice(0, 148) + checksum + header512.slice(156);
 }
 
+
+// Common header end fields (after typeflag)
 const headerEnd =
-  //header end (355B) same for all cases
-  "\x00".repeat(100)  // Linked file name, 100 bytes, skip as NUL
-  + "ustar "  // ustar indicator
-  + " \x00"  // ustar version
-  + "\x00".repeat(32)  // Owner user name
-  + "\x00".repeat(32)  // Owner group name
-  + "0000000\x000000000\x00" // device major and minor numbers
-  + "\x00".repeat(12) // last accessed, atime
-  + "\x00".repeat(12)// last changed, ctime
-  // skip as NUL the following:
-  // offset[12], longnames[4], unused[1],
-  // sparse[4*24], isextended[1], realsize[12]
-  + "\x00".repeat(126)
-  + "\x00".repeat(17) // pad to 512 bytes
-;
+  "\x00".repeat(100) +
+  "ustar\x00" +
+  "00" +
+  "\x00".repeat(32) +
+  "\x00".repeat(32) +
+  "0000000\x00" +
+  "0000000\x00" +
+  "\x00".repeat(155) +
+  "\x00".repeat(12);
+
+
+function octal11(n) {
+  return n.toString(8).padStart(11, "0") + "\x00";
+}
+
+function mtimeOctal() {
+  return Math.floor(Date.now() / 1000).toString(8).padStart(11, "0") + "\x00";
+}
+
+/**
+ * Build a GNU LongLink block (+ data block) for a UTF-8 path.
+ * Returns a binary string with length multiple of 512.
+ */
+function buildLongLinkBlocks(path) {
+  // LongLink data is the full pathname in bytes + trailing NUL
+  const pathDataBinary = utf8BinaryString(path) + "\x00";
+  const pathBytesWithNul = byteLen(path) + 1;
+
+  // Pad data to 512 boundary (BYTES)
+  let pathBlock = pathDataBinary;
+  const rem = pathBytesWithNul % 512;
+  if (rem !== 0) pathBlock += "\x00".repeat(512 - rem);
+
+  // LongLink header: name "././@LongLink" and typeflag 'L'
+  let lHeader =
+    utf8ToFixedBytesBinaryString("././@LongLink", 100) +
+    "0000644\x00" +
+    "0000000\x00" +
+    "0000000\x00" +
+    octal11(pathBytesWithNul) +
+    "00000000000\x00" + // mtime not used here
+    "        " +         // checksum placeholder (8 spaces)
+    "L" +                // typeflag
+    headerEnd;
+
+  // Fill checksum
+  lHeader = setChecksum(lHeader);
+
+  return lHeader + pathBlock;
+}
+
+/**
+ * Build a regular TAR header (one 512-byte block).
+ * name100Binary must be exactly 100 bytes (binary string).
+ */
+function buildHeader({ name100Binary, mode, uid, gid, sizeField, mtimeField, typeflag }) {
+  let header =
+    name100Binary +
+    mode +
+    uid +
+    gid +
+    sizeField +
+    mtimeField +
+    "        " + // checksum placeholder
+    typeflag +
+    headerEnd;
+
+  header = setChecksum(header);
+  return header;
+}
 
 // Add a folder to the tar archive structure
 export function addTarFolder(path) {
-  let mtime = Math.floor(Date.now() / 1000).toString(8);
-  let header = "";
+  const mtime = mtimeOctal();
+  let out = "";
 
-  if (path.length > 100) {
+  // TAR directory entries should end with '/'
+  const dirPath = path.endsWith("/") ? path : path + "/";
 
-    //extra header block for long path name
-    let lBlock =
-      "././@LongLink" + "\x00".repeat(87)
-      + "0000755\x00"  // File mode, 7 bytes octal + padding NUL
-      // Owner UID, 7 bytes octal + padding NUL, default to root
-      + "0000000\x00"
-      // Owner GID, 7 bytes octal + padding NUL, default to root
-      + "0000000\x00"
-      // Size in octal ASCII, 11 bytes + padding NUL
-      + (path.length + 1).toString(8).padStart(11, "0") + "\x00"
-      // Last modification, not used, 11 bytes + padding NUL
-      + "00000000000\x00"
-      + "        "  // checksum placeholder
-      + "L" // 1 byte type flag, L for long pathname
-      + headerEnd
-    ;
-    //next block is the whole path
-    let pathBlock = path;
-    //pad the path to be divisable by 512 to get full blocks
-    const pathRemainder = path.length % 512;
+  if (byteLen(dirPath) > 100) {
+    out += buildLongLinkBlocks(dirPath);
 
-    if (pathRemainder !== 0) {
-      let padding = 512 - pathRemainder;
-      pathBlock += "\x00".repeat(padding);
-    }
+    // Name field is 100 BYTES, so truncate by bytes
+    const name100 = utf8ToFixedBytesBinaryString(dirPath, 100);
 
-    lBlock = lBlock.replace("        ", calcChecksum(lBlock));
-
-    let regularBlock =
-      path.substring(0, 100)  // when path too long, truncate
-      + "0000755\x00"  // File mode, 7 bytes octal + padding NUL
-      // Owner UID, 7 bytes octal + padding NUL, default to root
-      + "0000000\x00"
-      // Owner GID, 7 bytes octal + padding NUL, default to root
-      + "0000000\x00"
-      // Size in octal ASCII, 11 bytes + padding NUL
-      + "00000000000\x00"
-      // Last modification, not used, 11 bytes + padding NUL
-      + mtime.padStart(11, "0") + "\x00"
-      + "        "  // checksum placeholder
-      + "5"  // 1 byte type flag, 5 for folder
-      + headerEnd
-    ;
-    regularBlock = regularBlock.replace("        ", calcChecksum(regularBlock));
-    // Calculate checksum in between to ease header calculation
-    header = lBlock.concat(pathBlock, regularBlock);
-
+    out += buildHeader({
+      name100Binary: name100,
+      mode: "0000755\x00",
+      uid: "0000000\x00",
+      gid: "0000000\x00",
+      sizeField: "00000000000\x00",
+      mtimeField: mtime,
+      typeflag: "5",
+    });
   } else {
-
-    header =
-      path.padEnd(100, "\x00") // Tar name, max 100 char padded with NUL
-      + "0000755\x00"  // File mode, 7 bytes octal + padding NUL
-      // Owner UID, 7 bytes octal + padding NUL, default to root
-      + "0000000\x00"
-      // Owner GID, 7 bytes octal + padding NUL, default to root
-      + "0000000\x00"
-      + "00000000000\x00"  // Size in octal ASCII, 11 bytes + padding NUL
-      // Last modification, 11 bytes + padding nul
-      + mtime.padStart(11, "0") + "\x00"
-      + "        "  // checksum placeholder
-      + "5"  // 1 byte type flag, 5 for folder
-      + headerEnd
-    ;
-    header = header.replace("        ", calcChecksum(header));
+    const name100 = utf8ToFixedBytesBinaryString(dirPath, 100);
+    out += buildHeader({
+      name100Binary: name100,
+      mode: "0000755\x00",
+      uid: "0000000\x00",
+      gid: "0000000\x00",
+      sizeField: "00000000000\x00",
+      mtimeField: mtime,
+      typeflag: "5",
+    });
   }
-  return convertToArray(header);
+
+  return convertToArray(out);
 }
 
 // Add a file to the tar archive structure
 export function addTarFile(path, size) {
-  let mtime = Math.floor(Date.now() / 1000).toString(8);
-  let header = "";
-  let sizeStr = "";
-  let maxOctal = 8589934592;
+  const mtime = mtimeOctal();
+  let out = "";
+
+  // Size field: octal up to < 8 GiB, else base-256 (12 bytes)
+  const maxOctal = 8589934592; // 8 GiB
+  let sizeField = "";
 
   if (size < maxOctal) {
-    //display smaller sizes than 8GiB in octal
-    sizeStr = size.toString(8).padStart(11, "0") + "\x00";
+    sizeField = octal11(size);
   } else {
-    //use base256 (signed) for larger numbers
+    // base-256 (signed) 12 bytes
     let bytes = BigInt(size);
-
-    let base256 = [];
+    const base256 = [];
     do {
-      base256.unshift(Number(bytes%256n));
-      bytes = bytes/256n;
+      base256.unshift(Number(bytes % 256n));
+      bytes = bytes / 256n;
     } while (bytes);
 
     while (base256.length < 12) base256.unshift(0);
-    base256[0] |= 0x80;
-    base256 = base256.map(i => String.fromCharCode(i));
-    sizeStr = base256.join("");
+    base256[0] |= 0x80; // set base-256 indicator
+    sizeField = base256.map((b) => String.fromCharCode(b)).join("");
   }
 
-  if (path.length > 100) {
+  if (byteLen(path) > 100) {
+    out += buildLongLinkBlocks(path);
 
-    //extra header block for long path name
-    let lBlock =
-      "././@LongLink" + "\x00".repeat(87)
-      + "0000644\x00"  // File mode, 7 bytes octal + padding NUL
-      // Owner UID, 7 bytes octal + padding NUL, default to root
-      + "0000000\x00"
-      // Owner GID, 7 bytes octal + padding NUL, default to root
-      + "0000000\x00"
-      // Path length in octal ASCII, 11 bytes + padding NUL
-      + (path.length + 1).toString(8).padStart(11, "0") + "\x00"
-      // Last modification, not used, 11 bytes + padding NUL
-      + "00000000000\x00"
-      + "        "  // checksum placeholder
-      + "L" // 1 byte type flag, L for long pathname
-      + headerEnd
-    ;
+    const name100 = utf8ToFixedBytesBinaryString(path, 100);
 
-    let pathBlock = path;
-    //pad the path to be divisable by 512 to get full blocks
-    const pathRemainder = path.length % 512;
-
-    if (pathRemainder !== 0) {
-      let padding = 512 - pathRemainder;
-      pathBlock += "\x00".repeat(padding);
-    }
-
-    lBlock = lBlock.replace("        ", calcChecksum(lBlock));
-
-    let regularBlock =
-      path.substring(0, 100)  // when path too long, truncate to 100
-      + "0000644\x00"  // File mode, 7 bytes octal + padding NUL
-      // Owner UID, 7 bytes octal + padding NUL, default to root
-      + "0000000\x00"
-      // Owner GID, 7 bytes octal + padding NUL, default to root
-      + "0000000\x00"
-      // Size in octal ASCII or base256, 11 bytes + padding NUL
-      + sizeStr
-      // Last modification, not used, 11 bytes + padding NUL
-      + mtime.padStart(11, "0") + "\x00"
-      + "        "  // checksum placeholder
-      + "0"  // 1 byte type flag, 0 for normal file
-      + headerEnd
-    ;
-    regularBlock = regularBlock.replace("        ", calcChecksum(regularBlock));
-    // Calculate checksum in between to ease header calculation
-    header = lBlock.concat(pathBlock, regularBlock);
-
+    out += buildHeader({
+      name100Binary: name100,
+      mode: "0000644\x00",
+      uid: "0000000\x00",
+      gid: "0000000\x00",
+      sizeField,
+      mtimeField: mtime,
+      typeflag: "0",
+    });
   } else {
-    header =
-      path.padEnd(100, "\x00")  // Tar name, 100 char padded with NUL
-      + "0000644\x00"  // File mode, 7 bytes octal + padding NUL
-      // Owner UID, 7 bytes octal + padding NUL, default to root
-      + "0000000\x00"
-      // Owner GID, 7 bytes octal + padding NUL, default to root
-      + "0000000\x00"
-      // Size in octal ASCII or base256, 11 bytes + padding NUL
-      + sizeStr
-      // Last modification, not used, 11 bytes + padding NUL
-      + mtime.padStart(11, "0") + "\x00"
-      + "        "  // checksum placeholder
-      + "0"  // 1 byte type flag, 0 for normal file
-      + headerEnd
-    ;
-
-    // Calculate checksum in between to ease header calculation
-    header = header.replace("        ", calcChecksum(header));
+    const name100 = utf8ToFixedBytesBinaryString(path, 100);
+    out += buildHeader({
+      name100Binary: name100,
+      mode: "0000644\x00",
+      uid: "0000000\x00",
+      gid: "0000000\x00",
+      sizeField,
+      mtimeField: mtime,
+      typeflag: "0",
+    });
   }
 
-  return convertToArray(header);
+  return convertToArray(out);
 }

@@ -20,7 +20,6 @@ Schema for storing the download information:
 let downloads = {};
 // Text encoder for quickly encoding tar headers
 let enc = new TextEncoder();
-let libinitDone = false;
 let downProgressInterval = undefined;
 let totalDone = 0;
 let totalToDo = 0;
@@ -56,36 +55,17 @@ const fileUrlStart = new RegExp("/file/[^/]*/[^/]*/");
 const archiveUrlStart = new RegExp("/archive/[^/]*/");
 
 if (inServiceWorker) {
-  self.addEventListener("install", (event) => {
-    event.waitUntil(waitAsm());
-  });
   self.addEventListener("activate", (event) => {
     event.waitUntil(self.clients.claim());
   });
-
 }
+
 
 // Create a download session
 function createDownloadSession(id, container, handle, archive, test = false) {
   aborted = false; //reset
 
-  let keypairPtr = Module.ccall(
-    "create_keypair",
-    "number",
-    [],
-    [],
-  );
-
-  let pubkeyPtr = Module.ccall(
-    "get_keypair_public_key",
-    "number",
-    ["number"],
-    [keypairPtr],
-  );
-
   downloads[id] = {
-    keypair: keypairPtr,
-    pubkey: new Uint8Array(HEAPU8.subarray(pubkeyPtr, pubkeyPtr + 32)),
     handle: handle,
     direct: !inServiceWorker,
     archive: archive,
@@ -95,83 +75,17 @@ function createDownloadSession(id, container, handle, archive, test = false) {
   };
 }
 
-function getFileSize(size, key) {
-  // Use encrypted size as the total file size if the file can't be decrypted
-  return key !=0 ?
-    (Math.floor(size / 65564) * 65536) +
-    (size % 65564 > 0 ? size % 65564 - 28 : 0) :
-    size;
-}
-
-// Add a file to the download session
-function createDownloadSessionFile(id, container, path, header, url, size) {
+function addFileToSession(id, path, url, size) {
   if (checkPollutingName(path)) return;
 
-  let headerPath = `header_${container}_`
-    + Math.random().toString(36)
-    + Math.random().toString(36);
-  FS.writeFile(
-    headerPath,
-    header,
-  );
-
-  let sessionKeyPtr = Module.ccall(
-    "get_session_key_from_header",
-    "number",
-    ["number", "string"],
-    [downloads[id].keypair, headerPath],
-  );
-
   downloads[id].files[path] = {
-    key: sessionKeyPtr,
+    key: 0,
     url: url,
-    size: getFileSize(size, sessionKeyPtr),
-    realsize: getFileSize(size, 0),
+    size: size,
+    realsize: size,
   };
-
-  // Remove the header after parsing
-  FS.unlink(headerPath);
-
-  // Cache the header if no suitable key couldn't be found
-  if (sessionKeyPtr <= 0) {
-    downloads[id].files[path].header = header;
-  }
-
-  return sessionKeyPtr > 0;
 }
 
-
-// Decrypt a single chunk of a download
-function decryptChunk(id, path, enChunk) {
-  let chunk = Module.ccall(
-    "decrypt_chunk",
-    "number",
-    ["number", "array", "number"],
-    [
-      downloads[id].files[path].key,
-      enChunk,
-      enChunk.length,
-    ],
-  );
-  let chunkPtr = Module.ccall(
-    "wrap_chunk_content",
-    "number",
-    ["number"],
-    [chunk],
-  );
-  let chunkLen = Module.ccall(
-    "wrap_chunk_len",
-    "number",
-    ["number"],
-    [chunk],
-  );
-  // Don't clone the view, as async writes can't happen in parallel.
-  // ServiceWorker download takes care of cloning as needed.
-  let ret = HEAPU8.subarray(chunkPtr, chunkPtr + chunkLen);
-  totalDone += chunkLen;
-
-  return ret;
-}
 
 function startProgressInterval() {
   const interval = setInterval(() => {
@@ -194,11 +108,7 @@ class FileSlicer {
     this.path = path;
     this.chunk = undefined;
     this.done = false;
-    this.offset = 0;
-    this.remainder = 0;
-    this.bytes = 0;
     this.totalBytes = 0;
-    this.enChunkBuf = new Uint8Array(65564);
 
     // Cache total file size to properly iterate through responses
     // as fetch bodies larger than 4 GiB can cause issues with memory
@@ -209,11 +119,12 @@ class FileSlicer {
   async getNextSegment() {
     let resp;
 
+    const fileInfo = downloads[this.id].files[this.path];
+    const fileSize = fileInfo.realsize;
+
     // Don't separate smaller downloads (< 250 MiB) into ranges
-    if (downloads[this.id].files[this.path].realsize < DOWNLOAD_MAX_NONSEGMENTED_SIZE) {
-      resp = await fetch(
-        downloads[this.id].files[this.path].url,
-      ).catch(() => {});
+    if (fileSize < DOWNLOAD_MAX_NONSEGMENTED_SIZE) {
+      resp = await fetch(fileInfo.url).catch(() => {});
       this.segmentOffset += DOWNLOAD_MAX_NONSEGMENTED_SIZE;
       this.reader = resp.body.getReader();
       return;
@@ -222,7 +133,7 @@ class FileSlicer {
     let end = this.segmentOffset + DOWNLOAD_SEGMENT_SIZE - 1;
     let range = `bytes=${this.segmentOffset}-${end}`;
     resp = await fetch(
-      downloads[this.id].files[this.path].url,
+      fileInfo.url,
       {
         headers: {
           "Range": range,
@@ -244,35 +155,6 @@ class FileSlicer {
     this.output = controller;
   }
 
-  async getSlice() {
-    this.bytes = 0;
-
-    while (!this.done) {
-      this.remainder = 65564 - this.bytes;
-      this.enChunkBuf.set(this.chunk.subarray(this.offset, this.offset + this.remainder), this.bytes);
-      this.bytes += this.chunk.subarray(this.offset, this.offset + this.remainder).length;
-
-      if (this.chunk.length - this.offset > this.remainder) {
-        this.offset += this.remainder;
-        this.totalBytes += 65536;
-        return;
-      } else {
-        this.offset = 0;
-        ({ value: this.chunk, done: this.done } = await this.reader.read());
-        if (this.done && this.segmentOffset < downloads[this.id].files[this.path].realsize) {
-          await this.getNextSegment();
-          ({ value: this.chunk, done: this.done } = await this.reader.read());
-        }
-      }
-    }
-
-    if(this.bytes > 0) {
-      this.totalBytes += this.bytes - 28;
-    }
-
-    return;
-  }
-
   async padFile() {
     if (this.totalBytes % 512 > 0 && downloads[this.id].archive) {
       let padding = "\x00".repeat(512 - this.totalBytes % 512);
@@ -285,15 +167,6 @@ class FileSlicer {
   }
 
   async concatFile() {
-    // If the file can't be decrypted, add the header and concat the encrypted
-    // file to the stream
-    if (downloads[this.id].files[this.path].header.length > 0) {
-      if (this.output instanceof WritableStream) {
-        await this.output.write(downloads[this.id].files[this.path].header);
-      } else {
-        this.output.enqueue(downloads[this.id].files[this.path].header);
-      }
-    }
 
     await this.getStart();
 
@@ -323,53 +196,6 @@ class FileSlicer {
     return true;
   }
 
-  async sliceFile() {
-    // Get the first chunk from stream
-    await this.getStart();
-
-    // Slice the file and write decrypted content to output
-    while (!this.done) {
-      if (aborted) return;
-      await this.getSlice();
-
-      if (this.output instanceof WritableStream) {
-        // Write the decrypted contents directly in the file stream if
-        // downloading to File System
-        if (this.bytes > 0) {
-          await this.output.write(decryptChunk(
-            this.id,
-            this.path,
-            this.enChunkBuf.subarray(0, this.bytes),
-          ));
-        }
-      } else {
-        // Otherwise queue to the streamController since we're using a
-        // ServiceWorker for downloading
-        while(this.output.desiredSize <= 0) {
-          await timeout(10);
-        }
-        if (this.bytes > 0) {
-          this.output.enqueue(new Uint8Array(decryptChunk(
-            this.id,
-            this.path,
-            this.enChunkBuf.subarray(0, this.bytes),
-          )));
-        }
-      }
-    }
-
-    // Round up to a multiple of 512, because tar
-    await this.padFile();
-
-    // Free the session key
-    Module.ccall(
-      "free_crypt4gh_session_key",
-      undefined,
-      ["number"],
-      [downloads[this.id].files[this.path].key],
-    );
-    return true;
-  }
 }
 
 function clear() {
@@ -400,41 +226,34 @@ function startAbort(direct, abortReason) {
 
 async function abortDownload(id, stream = null) {
   if (downloads[id].direct) {
-    //remove temp files
-    if (stream) await stream.abort();
-    await downloads[id].handle.remove();
-  }
-  finishDownloadSession(id);
-}
-
-// Safely free and remove a download session
-function finishDownloadSession(id) {
-  Module.ccall(
-    "free_keypair",
-    undefined,
-    ["number"],
-    [downloads[id].keypair],
-  );
-  delete downloads[id];
-}
-
-
-async function addSessionFiles(
-  id,
-  container,
-  headers,
-) {
-  let undecryptable = false;
-
-  for (const file in headers) {
-    if (!createDownloadSessionFile(id, container, file, headers[file].header, headers[file].url, headers[file].size)) {
-      undecryptable = true;
+    // Direct download: FileSystemWritableFileStream with abort/remove support
+    if (stream && typeof stream.abort === "function") {
+      try {
+        await stream.abort();
+      } catch (_) {}
+    }
+    if (downloads[id].handle && typeof downloads[id].handle.remove === "function") {
+      try {
+        await downloads[id].handle.remove();
+      } catch (_) {}
+    }
+  } else {
+    // ServiceWorker: stream is a ReadableStream controller
+    if (stream && typeof stream.close === "function") {
+      try {
+        stream.close();
+      } catch (_) {}
     }
   }
 
-  return undecryptable;
+  finishDownloadSession(id);
 }
 
+
+// Safely free and remove a download session
+function finishDownloadSession(id) {
+  delete downloads[id];
+}
 
 async function beginDownloadInSession(
   id,
@@ -449,33 +268,47 @@ async function beginDownloadInSession(
   }
 
   // Add the archive folder structure
-  if (downloads[id].archive) {
-    let folderPaths = Object.keys(downloads[id].files)
-      .map(path => path.split("/"))  // split paths to items
-      .map(path => path.slice(0, -1))  // remove the file names from paths
-      .filter(path => path.length > 0)  // remove empty paths (root level files)
-      .sort((a, b) => a.length - b.length)  // sort by path length as levels
-      .reduce((unique, path) => {  // strip paths down to just the unique ones
-        let check = unique.find(item => item === path.join("/"));
-        if (check === undefined) {
-          unique.push(path.join("/"));
-        }
-        return unique;
-      }, []);
+  const writtenDirs = new Set();
+  const dirKey = (p) => p.replace(/\/+$/, ""); // remove trailing slash
 
-    for (const path of folderPaths) {
-      if (downloads[id].direct) {
-        await fileStream.write(
-          addTarFolder(path),
-        );
-      } else {
-        fileStream.enqueue(addTarFolder(path));
+  const writeDirOnce = async (dirPathNoSlash) => {
+    const key = dirKey(dirPathNoSlash);
+    if (!key || writtenDirs.has(key)) return;
+
+    const entry = addTarFolder(key);
+    if (downloads[id].direct) {
+      await fileStream.write(entry);
+    } else {
+      fileStream.enqueue(entry);
+    }
+    writtenDirs.add(key);
+  };
+
+  if (downloads[id].archive) {
+    // Derived directories from file paths
+    const allDirs = new Set();
+
+    for (const objPath of Object.keys(downloads[id].files)) {
+      // Add all parent directories
+      const isDirMarker = objPath.endsWith("/") && downloads[id].files[objPath].size === 0;
+      const parts = dirKey(objPath).split("/").filter(Boolean);
+
+      // If it's a directory marker, include the full path
+      const upto = isDirMarker ? parts.length : Math.max(parts.length - 1, 0);
+      for (let i = 1; i <= upto; i++) {
+        allDirs.add(parts.slice(0, i).join("/"));
       }
+    }
+
+    // Write directories in order of path length
+    const folderPaths = Array.from(allDirs).sort((a, b) => a.length - b.length);
+    for (const d of folderPaths) {
+      await writeDirOnce(d);
     }
   }
 
   if (downloads[id].direct) {
-    //get total download size and periodically report download progress
+    // Get total download size and periodically report download progress
     for (const file in downloads[id].files) {
       totalToDo += downloads[id].files[file].size;
     }
@@ -498,7 +331,17 @@ async function beginDownloadInSession(
       });
     }
 
-    let path = file.replace(".c4gh", "");
+    let path = file;
+
+    // write as directory (0755), not a file (0644)
+    if (
+      downloads[id].archive &&
+      path.endsWith("/") &&
+      downloads[id].files[file].size === 0
+    ) {
+      await writeDirOnce(path);
+      continue;
+    }
 
     if (downloads[id].archive) {
       const size = downloads[id].files[file].size;
@@ -521,15 +364,10 @@ async function beginDownloadInSession(
       file);
 
     let res;
-    if (downloads[id].files[file].key <= 0) {
-      res = await slicer.concatFile().catch(() => {
-        return false;
+    // Always use concatFile since there's no decryption key
+    res = await slicer.concatFile().catch(() => {
+      return false;
       });
-    } else {
-      res = await slicer.sliceFile().catch(() => {
-        return false;
-      });
-    }
     if (!res) {
       if (!aborted) startAbort(!inServiceWorker, "error");
       await abortDownload(id, fileStream);
@@ -641,97 +479,72 @@ self.addEventListener("message", async (e) => {
   switch(e.data.command) {
     case "downloadFile":
       if (inServiceWorker) {
-        while (!libinitDone) {
-          await timeout(250);
-        }
-        if (libinitDone) {
-          createDownloadSession(e.data.id, e.data.container, undefined, false);
-          e.source.postMessage({
-            eventType: "getHeaders",
-            id: e.data.id,
-            container: e.data.container,
-            files: [
-              e.data.file,
-            ],
-            pubkey: downloads[e.data.id].pubkey,
-            owner: e.data.owner,
-            ownerName: e.data.ownerName,
-          });
-        }
-      } else {
-        createDownloadSession(
-          e.data.id, e.data.container, e.data.handle, false, e.data.test);
-        postMessage({
-          eventType: "getHeaders",
+        createDownloadSession(e.data.id, e.data.container, undefined, false);
+        addFileToSession(
+          e.data.id,
+          e.data.file.path,
+          e.data.file.url,
+          e.data.file.size,
+        );
+
+        // Tell the main thread to open the SW download URL
+        e.source.postMessage({
+          eventType: "downloadStarted",
           id: e.data.id,
           container: e.data.container,
-          files: [
-            e.data.file,
-          ],
-          pubkey: downloads[e.data.id].pubkey,
-          owner: e.data.owner,
-          ownerName: e.data.ownerName,
+          archive: false,
+          path: e.data.file.path,
+        });
+      } else {
+        // Direct worker path
+        createDownloadSession(
+          e.data.id,
+          e.data.container,
+          e.data.handle,
+          false,
+          e.data.test,
+        );
+        addFileToSession(
+          e.data.id,
+          e.data.file.path,
+          e.data.file.url,
+          e.data.file.size,
+        );
+
+        // Start the actual download
+        beginDownloadInSession(e.data.id);
+        postMessage({
+          eventType: "downloadStarted",
+          container: e.data.container,
         });
       }
       break;
     case "downloadFiles":
       if (inServiceWorker) {
-        while (!libinitDone) {
-          await timeout(250);
+        createDownloadSession(e.data.id, e.data.container, undefined, true);
+        for (const f of e.data.files) {
+          addFileToSession(e.data.id, f.path, f.url, f.size);
         }
-        if (libinitDone) {
-          createDownloadSession(e.data.id, e.data.container, undefined, true);
-          e.source.postMessage({
-            eventType: "getHeaders",
-            id: e.data.id,
-            container: e.data.container,
-            files: e.data.files,
-            pubkey: downloads[e.data.id].pubkey,
-            owner: e.data.owner,
-            ownerName: e.data.ownerName,
-          });
-        }
-      } else {
-        createDownloadSession(
-          e.data.id, e.data.container, e.data.handle, true, e.data.test);
-        postMessage({
-          eventType: "getHeaders",
-          id: e.data.id,
-          container: e.data.container,
-          files: e.data.files,
-          pubkey: downloads[e.data.id].pubkey,
-          owner: e.data.owner,
-          ownerName: e.data.ownerName,
-        });
-      }
-      break;
-    case "addHeaders":
-      addSessionFiles(e.data.id, e.data.container, e.data.headers).then(ret => {
-        if (ret && inServiceWorker) {
-          e.source.postMessage({
-            eventType: "notDecryptable",
-            container: e.data.container,
-          });
-        } else if (ret) {
-          postMessage({
-            eventType: "notDecryptable",
-            container: e.data.container,
-          });
-        }
-      }).catch(async () => {
-        if (!aborted) startAbort(!inServiceWorker, "error");
-        await abortDownload(e.data.id);
-      });
-      if (inServiceWorker) {
+
         e.source.postMessage({
           eventType: "downloadStarted",
           id: e.data.id,
           container: e.data.container,
-          archive: downloads[e.data.id].archive,
-          path: downloads[e.data.id].archive ? undefined
-            : Object.keys(e.data.headers)[0],
+          archive: true,
+          path: undefined,
         });
       } else {
+        createDownloadSession(
+          e.data.id,
+          e.data.container,
+          e.data.handle,
+          true,
+          e.data.test,
+        );
+        for (const f of e.data.files) {
+          addFileToSession(e.data.id, f.path, f.url, f.size);
+        }
+
         beginDownloadInSession(e.data.id);
         postMessage({
           eventType: "downloadStarted",
@@ -748,11 +561,6 @@ self.addEventListener("message", async (e) => {
       if (!aborted) startAbort(!inServiceWorker, e.data.reason);
       break;
   }
-});
-
-waitAsm().then(() => {
-  Module.ccall("libinit", undefined, undefined, undefined);
-  libinitDone = true;
 });
 
 export var downloadRuntime = Module;
