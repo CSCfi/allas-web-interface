@@ -1,6 +1,5 @@
 """Container and object replication handlers using aiohttp."""
 
-import base64
 import logging
 import math
 import os
@@ -8,8 +7,6 @@ from typing import Any
 
 import aiohttp.web
 import botocore.exceptions
-
-import swift_browser_ui.common.vault_client
 
 LOGGER = logging.getLogger(__name__)
 LOGGER.setLevel(os.environ.get("LOG_LEVEL", "INFO"))
@@ -27,7 +24,6 @@ class ObjectReplicator:
     def __init__(
         self,
         s3client: Any,
-        vault: swift_browser_ui.common.vault_client.VaultClient,
         project: str,
         bucket: str,
         source_project: str,
@@ -35,9 +31,8 @@ class ObjectReplicator:
         project_name: str = "",
         source_project_name: str = "",
     ) -> None:
-        """."""
+        """Initialize object replicator."""
         self.s3client = s3client
-        self.vault = vault
         self.project = project
         self.bucket = bucket
         self.source_project = source_project
@@ -71,12 +66,15 @@ class ObjectReplicator:
                     text="Cannot create destination bucket"
                 )
 
-    async def _multipart_copy(self, obj):
+    async def _multipart_copy(self, obj: dict[str, Any]) -> None:
         """Make a multipart copy of an object."""
         size = obj["Size"]
+        key = obj["Key"]
+
         upload_id = (
             await self.s3client.create_multipart_upload(
-                Bucket=self.bucket, Key=obj["Key"]
+                Bucket=self.bucket,
+                Key=key,
             )
         )["UploadId"]
 
@@ -93,15 +91,21 @@ class ObjectReplicator:
 
                 part = await self.s3client.upload_part_copy(
                     Bucket=self.bucket,
-                    Key=obj["Key"],
-                    CopySource={"Bucket": self.source_bucket, "Key": obj["Key"]},
+                    Key=key,
+                    CopySource={
+                        "Bucket": self.source_bucket,
+                        "Key": key,
+                    },
                     CopySourceRange=f"bytes={byte_position}-{last_byte}",
                     PartNumber=part_number,
                     UploadId=upload_id,
                 )
 
                 parts.append(
-                    {"ETag": part["CopyPartResult"]["ETag"], "PartNumber": part_number}
+                    {
+                        "ETag": part["CopyPartResult"]["ETag"],
+                        "PartNumber": part_number,
+                    }
                 )
 
                 byte_position += part_size
@@ -109,24 +113,30 @@ class ObjectReplicator:
 
             await self.s3client.complete_multipart_upload(
                 Bucket=self.bucket,
-                Key=obj["Key"],
+                Key=key,
                 UploadId=upload_id,
                 MultipartUpload={"Parts": parts},
             )
+
         except Exception:
             await self.s3client.abort_multipart_upload(
-                Bucket=self.bucket, Key=obj["Key"], UploadId=upload_id
+                Bucket=self.bucket,
+                Key=key,
+                UploadId=upload_id,
             )
             raise
 
-    async def _replicate_object(self, obj) -> None:
-        """Copy header and object."""
+    async def _replicate_object(self, obj: dict[str, Any]) -> None:
+        """Copy an object."""
         key = obj["Key"]
 
         if obj["Size"] <= SINGLE_COPY_SIZE:
             try:
                 await self.s3client.copy_object(
-                    CopySource={"Bucket": self.source_bucket, "Key": key},
+                    CopySource={
+                        "Bucket": self.source_bucket,
+                        "Key": key,
+                    },
                     Bucket=self.bucket,
                     Key=key,
                 )
@@ -138,43 +148,11 @@ class ObjectReplicator:
             except Exception as e:
                 LOGGER.exception(f"Failed to multipart-copy {key}: {e}")
 
-        if ".c4gh" in key and self.project_name:
-            LOGGER.debug(f"Copying the header for encrypted object {key}")
-            header = await self.vault.get_header(
-                self.project_name,
-                self.source_bucket,
-                key,
-                owner=self.source_project_name,
-            )
-            # Skip adding header if header was empty
-            if header:
-                await self.vault.put_header(self.project_name, self.bucket, key, header)
-
     async def replicate_objects(self) -> None:
         """Copy all bucket objects."""
-        await self.check_public_key()
-        try:
-            paginator = self.s3client.get_paginator("list_objects_v2")
+        paginator = self.s3client.get_paginator("list_objects_v2")
 
-            async for page in paginator.paginate(Bucket=self.source_bucket):
-                for obj in page.get("Contents", []):
-                    await self._replicate_object(obj)
-            LOGGER.info(f"Replication task for {self.source_bucket} finished")
-        finally:
-            await self.remove_public_key()
-
-    async def check_public_key(self) -> None:
-        """Check that the source project public key is whitelisted."""
-        if self.project_name:
-            pubkey = await self.vault.get_public_key(self.project_name)
-            LOGGER.debug(
-                f"Add public key of {self.project_name} temporarily for re-encryption."
-            )
-            await self.vault.put_whitelist_key(
-                self.project_name, "crypt4gh", base64.urlsafe_b64decode(pubkey)
-            )
-
-    async def remove_public_key(self) -> None:
-        """Remove the project public key from whitelist if it's been added."""
-        if self.project_name:
-            await self.vault.remove_whitelist_key(self.project_name)
+        async for page in paginator.paginate(Bucket=self.source_bucket):
+            for obj in page.get("Contents", []):
+                await self._replicate_object(obj)
+        LOGGER.info(f"Replication task for {self.source_bucket} finished")

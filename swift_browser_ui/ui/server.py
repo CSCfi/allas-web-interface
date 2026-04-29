@@ -2,7 +2,6 @@
 
 # Generic imports
 import asyncio
-import base64
 import logging
 import secrets
 import ssl
@@ -12,12 +11,10 @@ import typing
 import aiohttp.web
 import aiohttp_session
 import aiohttp_session.redis_storage
-import cryptography.fernet
 import uvloop
 from idpyoidc.client.rp_handler import RPHandler
 
 import swift_browser_ui.ui.middlewares
-from swift_browser_ui.common.vault_client import VaultClient
 from swift_browser_ui.ui._convenience import get_redis_client
 from swift_browser_ui.ui.api import (
     aws_bulk_update_bucket_cors,
@@ -25,7 +22,6 @@ from swift_browser_ui.ui.api import (
     aws_list_buckets,
     aws_update_bucket_cors,
     close_upload_session,
-    get_crypted_upload_session,
     get_os_user,
     get_upload_session,
     keystone_gen_ec2,
@@ -78,7 +74,6 @@ from swift_browser_ui.ui.signature import (
     handle_ext_token_remove,
     handle_signature_request,
 )
-from swift_browser_ui.upload.common import VAULT_CLIENT
 
 # temporarily ignore typecheck from mypy until
 # this issue is fixed https://github.com/MagicStack/uvloop/issues/575
@@ -94,7 +89,6 @@ async def open_client_to_app(app: aiohttp.web.Application) -> None:
     else:
         api_client = aiohttp.ClientSession()
     app["api_client"] = api_client
-    app[VAULT_CLIENT] = VaultClient(api_client)
 
 
 async def kill_dload_client(app: aiohttp.web.Application) -> None:
@@ -107,6 +101,7 @@ async def servinit(
 ) -> aiohttp.web.Application:
     """Create an aiohttp server with the correct arguments and routes."""
     middlewares = [
+        swift_browser_ui.ui.middlewares.statsd_middleware,
         swift_browser_ui.ui.middlewares.error_middleware,
         swift_browser_ui.ui.middlewares.check_session,
         swift_browser_ui.ui.middlewares.check_session_taintness,
@@ -130,7 +125,6 @@ async def servinit(
         redis_client,
         cookie_name="SWIFT_UI_SESSION",
     )
-    app["seckey"] = base64.urlsafe_b64decode(cryptography.fernet.Fernet.generate_key())
     aiohttp_session.setup(
         app,
         storage,
@@ -139,9 +133,8 @@ async def servinit(
     # Add the rest of the middlewares
     [app.middlewares.append(i) for i in middlewares]  # type: ignore
 
-    # Create a signature salt to prevent editing the signature on the client
-    # side. Hash function doesn't need to be cryptographically secure, it's
-    # just a convenient way of getting ascii output from byte values.
+    # Create a signature salt to prevent editing the signature on the client side.
+    # This is not object encryption; it is only for protecting signed request data.
     app["Salt"] = secrets.token_hex(64)
     # Set application specific logging
     app["Log"] = logging.getLogger("swift-browser-ui")
@@ -229,7 +222,11 @@ async def servinit(
         )
 
     # Add signature endpoint
-    app.add_routes([aiohttp.web.get("/sign/{valid}", handle_signature_request)])
+    app.add_routes(
+        [
+            aiohttp.web.get("/sign/{valid}", handle_signature_request),
+        ]
+    )
 
     # Add token functionality
     app.add_routes(
@@ -265,10 +262,6 @@ async def servinit(
         [
             aiohttp.web.delete("/upload/{project}", close_upload_session),
             aiohttp.web.get("/upload/{project}/{container}", get_upload_session),
-            aiohttp.web.get(
-                "/enupload/{project}/{container}/{object_name:.*}",
-                get_crypted_upload_session,
-            ),
         ]
     )
 
@@ -289,7 +282,9 @@ async def servinit(
 
     # Add direct routes
     app.add_routes(
-        [aiohttp.web.get("/direct/request", handle_bounce_direct_access_request)]
+        [
+            aiohttp.web.get("/direct/request", handle_bounce_direct_access_request),
+        ]
     )
 
     # Add health check endpoint

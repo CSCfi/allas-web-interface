@@ -37,6 +37,7 @@ dependencies = [
     "ldap3==2.9.1",
     "aioboto3==15.2.0",
     "setuptools==71.1.0",
+    "statsd==3.3.0",
 ]
 
 [project.optional-dependencies]

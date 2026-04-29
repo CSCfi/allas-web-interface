@@ -21,8 +21,9 @@ async def db_graceful_start(app: aiohttp.web.Application) -> None:
 
 async def db_graceful_close(app: aiohttp.web.Application) -> None:
     """Gracefully close the database."""
-    if app["db_conn"] is not None:
-        await app["db_conn"].close()
+    conn = app.get("db_conn")
+    if conn is not None:
+        await conn.close()
 
 
 class BaseDBConn:
@@ -43,6 +44,7 @@ class BaseDBConn:
         """Safely close the database connection."""
         if self.pool is not None:
             await self.pool.close()
+            self.pool = None
 
     async def _open(self, **kwargs) -> None:
         """Initialize the database connection."""
@@ -97,12 +99,12 @@ class UploadDBConn(BaseDBConn):
             port=int(os.environ.get("UPLOAD_DB_PORT", 5432)),
             ssl=os.environ.get("UPLOAD_DB_SSL", "prefer"),
             database=os.environ.get("UPLOAD_DB_NAME", "swiftbrowserdb"),
-            min_size=int(os.environ.get("UPLOAD_DB_MIN_CONNECTIONS", 0)),
-            max_size=int(os.environ.get("UPLOAD_DB_MAX_CONNECTIONS", 2)),
+            min_size=int(os.environ.get("UPLOAD_DB_MIN_CONNECTIONS", 1)),
+            max_size=int(os.environ.get("UPLOAD_DB_MAX_CONNECTIONS", 10)),
             timeout=int(os.environ.get("UPLOAD_DB_TIMEOUT", 120)),
-            command_timeout=int(os.environ.get("UPLOAD_DB_COMMAND_TIMEOUT", 180)),
+            command_timeout=int(os.environ.get("UPLOAD_DB_COMMAND_TIMEOUT", 9)),
             max_inactive_connection_lifetime=int(
-                os.environ.get("UPLOAD_DB_MAX_INACTIVE_CONN_LIFETIME", 10)
+                os.environ.get("UPLOAD_DB_MAX_INACTIVE_CONN_LIFETIME", 300)
             ),
         )
 
@@ -123,12 +125,12 @@ class SharingDBConn(BaseDBConn):
             port=int(os.environ.get("SHARING_DB_PORT", 5432)),
             ssl=os.environ.get("SHARING_DB_SSL", "prefer"),
             database=os.environ.get("SHARING_DB_NAME", "swiftbrowserdb"),
-            min_size=int(os.environ.get("SHARING_DB_MIN_CONNECTIONS", 0)),
-            max_size=int(os.environ.get("SHARING_DB_MAX_CONNECTIONS", 2)),
+            min_size=int(os.environ.get("SHARING_DB_MIN_CONNECTIONS", 1)),
+            max_size=int(os.environ.get("SHARING_DB_MAX_CONNECTIONS", 10)),
             timeout=int(os.environ.get("SHARING_DB_TIMEOUT", 120)),
-            command_timeout=int(os.environ.get("SHARING_DB_COMMAND_TIMEOUT", 180)),
+            command_timeout=int(os.environ.get("SHARING_DB_COMMAND_TIMEOUT", 9)),
             max_inactive_connection_lifetime=int(
-                os.environ.get("SHARING_DB_MAX_INACTIVE_CONN_LIFETIME", 10)
+                os.environ.get("SHARING_DB_MAX_INACTIVE_CONN_LIFETIME", 300)
             ),
         )
 

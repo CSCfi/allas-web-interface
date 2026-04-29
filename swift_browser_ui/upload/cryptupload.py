@@ -1,12 +1,13 @@
 """Class for session crypt upload/download websocket."""
 
 import asyncio
-import base64
+import hashlib
 import logging
 import os
 import random
 import secrets
 import ssl
+import time
 import typing
 
 import aiohttp.client
@@ -15,7 +16,6 @@ import certifi
 import msgpack
 from aiohttp import ClientTimeout
 
-import swift_browser_ui.common.vault_client as vault_client
 import swift_browser_ui.upload.common as common
 
 ssl_context = ssl.create_default_context()
@@ -41,7 +41,6 @@ class FileUpload:
     def __init__(
         self,
         client: aiohttp.client.ClientSession,
-        vault: vault_client.VaultClient,
         session: typing.Dict[str, typing.Any],
         socket: aiohttp.web.WebSocketResponse,
         project: str,
@@ -51,11 +50,11 @@ class FileUpload:
         total: int,
         owner: str = "",
         owner_name: str = "",
+        content_type: str = "application/octet-stream",
     ):
         """."""
         self.session = session
         self.client = client
-        self.vault = vault
         self.socket = socket
 
         self.project = project
@@ -66,6 +65,9 @@ class FileUpload:
 
         self.owner = owner
         self.owner_name = owner_name
+        self.content_type = content_type or "application/octet-stream"
+        self.sha256 = hashlib.sha256()
+        self.created_epoch = int(time.time())
 
         # Initialize backend generated values
         self.segment_id = secrets.token_urlsafe(32)
@@ -102,8 +104,8 @@ class FileUpload:
             await asyncio.sleep(random.uniform(0.1, 0.2))  # nosec  # noqa: S311
         return True
 
-    async def add_header(self, header: bytes) -> None:
-        """Add header for the file."""
+    async def init_upload(self) -> None:
+        """Initialize the upload."""
         if (
             not await self.a_create_container()
             and self.socket is not None
@@ -120,17 +122,6 @@ class FileUpload:
                 )
             )
             self.failed = True
-
-        b64_header = base64.standard_b64encode(header).decode("ascii")
-
-        # Upload the header both to Vault and to Swift storage as failsafe during Vault introduction period
-        await self.vault.put_header(
-            self.name,
-            self.container,
-            self.path,
-            b64_header,
-            owner=self.owner_name,
-        )
 
         self.tasks = [
             asyncio.create_task(self.upload_segment(i))
@@ -232,6 +223,7 @@ class FileUpload:
                         pass
             self.done_chunks.add(i)
             chunk = self.chunk_cache.pop(i)
+            self.sha256.update(chunk)
             yield chunk
 
         # Finally yield eof
@@ -305,6 +297,9 @@ class FileUpload:
                 "X-Auth-Token": self.token,
                 "X-Object-Manifest": f"{self.container}{common.SEGMENTS_CONTAINER}/{self.path}/{self.segment_id}/",
                 "Content-Length": "0",
+                "Content-Type": self.content_type,
+                "X-Object-Meta-Created": str(self.created_epoch),
+                "X-Object-Meta-SHA256": self.sha256.hexdigest(),
             },
             ssl=ssl_context,
         ) as resp:
@@ -363,7 +358,6 @@ class UploadSession:
     ):
         """."""
         self.client: aiohttp.client.ClientSession = request.app["client"]
-        self.vault: vault_client.VaultClient = request.app[common.VAULT_CLIENT]
         self.project: str = request.match_info["project"]
         self.session = session
 
@@ -386,6 +380,7 @@ class UploadSession:
         if "owner_name" in msg:
             owner_name = str(msg["owner_name"])
         total = int(msg["total"])
+        content_type = str(msg.get("content_type", "application/octet-stream"))
 
         if (
             container in self.uploads
@@ -402,7 +397,6 @@ class UploadSession:
         # We can ignore typing for self.ws, as these functions are only called after messages
         self.uploads[container][path] = FileUpload(
             self.client,
-            self.vault,
             self.session,
             self.ws,  # type: ignore
             self.project,
@@ -410,11 +404,12 @@ class UploadSession:
             name,
             path,
             total,
-            owner,
-            owner_name,
+            owner=owner,
+            owner_name=owner_name,
+            content_type=content_type,
         )
 
-        await self.uploads[container][path].add_header(bytes(msg["data"]))
+        await self.uploads[container][path].init_upload()
 
     async def handle_upload_chunk(self, msg: typing.Dict[str, typing.Any]):
         """Handle the addition of a new chunk."""

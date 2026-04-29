@@ -13,7 +13,6 @@ import aiohttp_session
 import botocore.exceptions
 import certifi
 
-from swift_browser_ui.common.vault_client import VaultClient
 from swift_browser_ui.ui._convenience import (
     ldap_get_project_titles,
     open_upload_runner_session,
@@ -21,7 +20,6 @@ from swift_browser_ui.ui._convenience import (
 )
 from swift_browser_ui.ui.replicate import ObjectReplicator
 from swift_browser_ui.ui.settings import setd
-from swift_browser_ui.upload.common import VAULT_CLIENT
 
 ssl_context = ssl.create_default_context()
 ssl_context.load_verify_locations(certifi.where())
@@ -91,8 +89,8 @@ async def swift_list_containers(
                         _check_last_modified(request, container)
                         for container in json.loads(chunk)
                     ]
-                    ret = await asyncio.gather(*tasks)
-                    chunk = json.dumps(ret).encode()
+                    containers = await asyncio.gather(*tasks)
+                    chunk = json.dumps(containers).encode()
                     await resp.write(chunk)
             await resp.write_eof()
         return resp
@@ -137,7 +135,8 @@ async def aws_list_buckets(
     ) as s3_client:
         try:
             bucket_page = await s3_client.list_buckets(
-                MaxBuckets=max_buckets, ContinuationToken=continuation_token
+                MaxBuckets=max_buckets,
+                ContinuationToken=continuation_token,
             )
         except botocore.exceptions.ClientError as e:
             error_code = e.response["Error"]["Code"]
@@ -145,14 +144,13 @@ async def aws_list_buckets(
                 raise aiohttp.web.HTTPNotFound(
                     text="Project doesn't have any buckets or storage access."
                 )
-            elif error_code == "401":
+            if error_code == "401":
                 raise aiohttp.web.HTTPUnauthorized(
                     text="Unauthorized. Credentials might be stale."
                 )
-            else:
-                raise aiohttp.web.HTTPInternalServerError(
-                    text="Coudln't retrieve the bucket page from storage."
-                )
+            raise aiohttp.web.HTTPInternalServerError(
+                text="Couldn't retrieve the bucket page from storage."
+            )
 
     bucket_page["Buckets"] = [
         {
@@ -357,7 +355,8 @@ async def aws_bulk_update_bucket_cors(
             # in the end of loop execution, not start
             while True:
                 bucket_page = await s3_client.list_buckets(
-                    MaxBuckets=100, ContinuationToken=continuation_token
+                    MaxBuckets=100,
+                    ContinuationToken=continuation_token,
                 )
 
                 # Immediately apply new cors to the bucket
@@ -388,12 +387,13 @@ async def aws_bulk_update_bucket_cors(
 
 
 async def _check_last_modified(
-    request: aiohttp.web.Request, container: typing.Dict[str, typing.Any]
+    request: aiohttp.web.Request,
+    container: typing.Dict[str, typing.Any],
 ) -> typing.Dict[str, typing.Any]:
     """Ensure container data includes 'last_modified' key and value.
 
     :param request: A request instance
-    :param data: Containers basic info
+    :param container: Container basic info
     """
     session = await aiohttp_session.get_session(request)
     client = request.app["api_client"]
@@ -448,7 +448,12 @@ async def _get_ec2_credentials(session, client, project) -> dict:
         },
     ) as ret:
         creds = await ret.json()
-        keys = list(filter(lambda key: key["tenant_id"] == project, creds["credentials"]))
+        keys = list(
+            filter(
+                lambda key: key["tenant_id"] == project,
+                creds["credentials"],
+            )
+        )
 
     if len(keys) > 0:
         return keys[0]
@@ -495,8 +500,6 @@ async def replicate_bucket(
     source_bucket = request.query["from_bucket"]
     source_project = request.query["from_project"]
 
-    vault_client: VaultClient = request.app[VAULT_CLIENT]
-
     logger.info(
         f"API call to replicate bucket {source_bucket} to {bucket} from "
         f"{request.remote}, sess: {session} :: {time.ctime()}"
@@ -509,34 +512,36 @@ async def replicate_bucket(
         aws_secret_access_key=creds["secret"],
     )
 
-    async with s3session.client(
+    s3_client_context = s3session.client(
         "s3",
         region_name="us-east-1",
         endpoint_url=setd["s3api_endpoint"],
         verify=setd["check_certificate"],
-    ) as s3_client:
+    )
 
-        replicator = ObjectReplicator(
-            s3_client,
-            vault_client,
-            project,
-            bucket,
-            source_project,
-            source_bucket,
-            request.query["project_name"] if "project_name" in request.query else "",
-            (
-                request.query["from_project_name"]
-                if "from_project_name" in request.query
-                else ""
-            ),
-        )
+    s3_client = await s3_client_context.__aenter__()
+
+    replicator = ObjectReplicator(
+        s3_client,
+        project,
+        bucket,
+        source_project,
+        source_bucket,
+    )
 
     # Create destination bucket
     await replicator.create_destination_bucket()
     # Add CORS entries for the newly created bucket to allow access via browser
     await _update_bucket_cors(logger, s3session, bucket)
 
-    asyncio.create_task(replicator.replicate_objects())
+    async def run_replication() -> None:
+        try:
+            await replicator.replicate_objects()
+        finally:
+            await s3_client_context.__aexit__(None, None, None)
+
+    asyncio.create_task(run_replication())
+
     return aiohttp.web.HTTPAccepted(text="Replication started")
 
 
@@ -561,47 +566,6 @@ async def get_upload_session(
             "url": f"{setd['upload_external_endpoint']}{path}",
             "host": setd["upload_external_endpoint"],
             "signature": signature,
-        }
-    )
-
-
-async def get_crypted_upload_session(
-    request: aiohttp.web.Request,
-) -> aiohttp.web.Response:
-    """Return a pre-signed upload runner session for upload target."""
-    session = await aiohttp_session.get_session(request)
-    request.app["Log"].info(
-        "API call for object upload runner info request from "
-        f"{request.remote}, sess: {session} :: {time.ctime()}"
-    )
-    project = ""
-    if "project" in request.query:
-        project = request.query["project"]
-    runner_id = await open_upload_runner_session(request, project=project)
-    path = (
-        f"/cryptic/{request.match_info['project']}/{request.match_info['container']}"
-        + f"/{request.match_info['object_name']}"
-    )
-    signature = await sign(3600, path)
-    ws_path = (
-        f"/cryptic/{request.match_info['project']}/{request.match_info['container']}"
-        + f"/{request.match_info['object_name']}"
-    )
-    ws_sign_path = (
-        f"/cryptic/{request.match_info['project']}/{request.match_info['container']}"
-        + f"/{request.match_info['object_name']}"
-    )
-    ws_signature = await sign(3600, ws_sign_path)
-    return aiohttp.web.json_response(
-        {
-            "id": runner_id,
-            "url": f"{setd['upload_external_endpoint']}{path}",
-            "wsurl": f"{setd['upload_external_endpoint']}{ws_path}".replace(
-                "https", "wss"
-            ),
-            "host": setd["upload_external_endpoint"],
-            "signature": signature,
-            "wssignature": ws_signature,
         }
     )
 

@@ -1,9 +1,11 @@
 """Middlewares for the swift-browser-ui."""
 
+import os
 import time
 import typing
 
 import aiohttp_session
+import statsd
 from aiohttp import web
 
 from swift_browser_ui.ui.settings import setd
@@ -12,6 +14,51 @@ AiohttpHandler = typing.Callable[
     [web.Request],
     typing.Coroutine[typing.Awaitable[typing.Any], typing.Any, web.Response],
 ]
+
+# Load StatsD config from environment, like the rest of the app
+STATSD_HOST = str(os.environ.get("SWIFT_UI_STATSD_HOST", "localhost"))
+STATSD_PORT = int(os.environ.get("SWIFT_UI_STATSD_PORT", "9125"))
+
+statsd_client = statsd.StatsClient(
+    host=STATSD_HOST, port=STATSD_PORT, prefix="swiftbrowser"
+)
+
+
+@web.middleware
+async def statsd_middleware(
+    request: web.Request, handler: AiohttpHandler
+) -> web.StreamResponse:
+    """Export HTTP metrics to StatsD."""
+    start = time.time()
+    method = request.method.upper()
+
+    try:
+        response = await handler(request)
+        status = response.status
+        return response
+    except web.HTTPException as ex:
+        status = ex.status
+        raise
+    except Exception:
+        status = 500
+        raise
+    finally:
+        duration = (time.time() - start) * 1000
+
+        statsd_client.incr("requests")
+        statsd_client.timing("request.duration", duration)
+        statsd_client.incr(f"requests.{method}")
+
+        if 200 <= status < 300:
+            statsd_client.incr("responses.2xx")
+        elif 300 <= status < 400:
+            statsd_client.incr("responses.3xx")
+        elif 400 <= status < 500:
+            statsd_client.incr("responses.4xx")
+        elif 500 <= status < 600:
+            statsd_client.incr("responses.5xx")
+
+        statsd_client.incr(f"status.{status}")
 
 
 def return_error_response(

@@ -15,8 +15,10 @@ import aiohttp.web
 import aiohttp_session
 import certifi
 import redis.asyncio as redis
-from ldap3 import Connection, Server
 from redis.asyncio.sentinel import Sentinel
+from redis.backoff import ExponentialBackoff
+from redis.exceptions import ConnectionError, ReadOnlyError, TimeoutError
+from redis.retry import Retry
 
 import swift_browser_ui.common.signature
 from swift_browser_ui.ui.settings import setd
@@ -185,20 +187,38 @@ async def get_redis_client() -> redis.Redis:
     """Initialize and return a Python Redis client."""
     sentinel_url = str(os.environ.get("SWIFT_UI_REDIS_SENTINEL_HOST", ""))
     sentinel_port = str(os.environ.get("SWIFT_UI_REDIS_SENTINEL_PORT", ""))
-    sentinel_master = os.environ.get("SWIFT_UI_REDIS_SENTINEL_MASTER", "mymaster")
+    sentinel_master = os.environ.get("SWIFT_UI_REDIS_SENTINEL_MASTER", "")
+    sentinel_password = os.environ.get("SWIFT_UI_REDIS_SENTINEL_PASSWORD", "")
 
     redis_user = str(os.environ.get("SWIFT_UI_REDIS_USER", ""))
     redis_password = str(os.environ.get("SWIFT_UI_REDIS_PASSWORD", ""))
 
+    retry_conf = Retry(ExponentialBackoff(), retries=8)
+    retry_errors = (ReadOnlyError, ConnectionError, TimeoutError)
+
     if sentinel_url and sentinel_port:
         # Auth is forwarded to redis so no need for auth on sentinel
-        sentinel = Sentinel([(str(sentinel_url), int(sentinel_port))])
+        sentinel = Sentinel(
+            [(str(sentinel_url), int(sentinel_port))],
+            sentinel_kwargs={
+                "password": sentinel_password,
+                "client_name": "sentinel_allas_ui",
+                "socket_connect_timeout": 2,
+                "socket_timeout": 2,
+            },
+        )
 
         redis_client = sentinel.master_for(
             service_name=sentinel_master,
             redis_class=redis.Redis,
             password=redis_password,
             username=redis_user,
+            health_check_interval=5,
+            retry=retry_conf,
+            retry_on_error=retry_errors,
+            socket_connect_timeout=2,
+            socket_timeout=2,
+            client_name="redis_allas_ui",
         )
     else:
         redis_port = str(os.environ.get("SWIFT_UI_REDIS_PORT", ""))
@@ -207,7 +227,16 @@ async def get_redis_client() -> redis.Redis:
         redis_creds = ""
         if redis_user and redis_password:
             redis_creds = f"{redis_user}:{redis_password}@"
-        redis_client = redis.from_url(f"redis://{redis_creds}{redis_host}:{redis_port}")
+
+        redis_client = redis.from_url(
+            f"redis://{redis_creds}{redis_host}:{redis_port}",
+            health_check_interval=5,
+            retry=retry_conf,
+            retry_on_error=retry_errors,
+            socket_connect_timeout=2,
+            socket_timeout=2,
+            client_name="redis_allas_ui",
+        )
     return redis_client
 
 

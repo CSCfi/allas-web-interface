@@ -13,30 +13,20 @@ import uvloop
 import swift_browser_ui.common.common_middleware
 import swift_browser_ui.common.common_util
 import swift_browser_ui.common.db
-from swift_browser_ui.common.vault_client import VaultClient
 from swift_browser_ui.upload.api import (
-    handle_batch_add_sharing_whitelist,
-    handle_batch_remove_sharing_whitelist,
-    handle_check_sharing_whitelist,
-    handle_delete_project_whitelist,
     handle_download_shared_object_options,
     handle_get_object,
-    handle_get_object_header,
     handle_health_check,
     handle_post_object_chunk,
     handle_post_object_options,
-    handle_project_key,
-    handle_project_whitelist,
-    handle_put_object_header,
-    handle_upload_encrypted_object_options,
+    handle_replicate_cancel,
+    handle_replicate_status,
     handle_upload_ws,
-    handle_whitelist_options,
 )
 from swift_browser_ui.upload.auth import (
     handle_login,
     handle_logout,
 )
-from swift_browser_ui.upload.common import VAULT_CLIENT
 
 # temporarily ignore typecheck from mypy until
 # this issue is fixed https://github.com/MagicStack/uvloop/issues/575
@@ -76,6 +66,7 @@ async def servinit() -> aiohttp.web.Application:
     app.on_startup.append(swift_browser_ui.common.common_util.read_in_keys)
     app.on_shutdown.append(kill_client)
     app.on_shutdown.append(swift_browser_ui.common.db.db_graceful_close)
+    app.on_cleanup.append(swift_browser_ui.common.db.db_graceful_close)
 
     # Add client session for aiohttp requests
     if (
@@ -88,7 +79,6 @@ async def servinit() -> aiohttp.web.Application:
     else:
         http_client = aiohttp.client.ClientSession()
     app["client"] = http_client
-    app[VAULT_CLIENT] = VaultClient(http_client)
 
     app.add_routes([aiohttp.web.get("/health", handle_health_check)])
 
@@ -105,54 +95,7 @@ async def servinit() -> aiohttp.web.Application:
     # Add api routes
     app.add_routes(
         [
-            aiohttp.web.options(
-                "/header/{project}/{container}/{object_name:.*}",
-                handle_upload_encrypted_object_options,
-            ),
-            aiohttp.web.get(
-                "/header/{project}/{container}/{object_name:.*}",
-                handle_get_object_header,
-            ),
-            aiohttp.web.put(
-                "/header/{project}/{container}/{object_name:.*}",
-                handle_put_object_header,
-            ),
-            aiohttp.web.get(
-                "/cryptic/{project}/keys",
-                handle_project_key,
-            ),
-            aiohttp.web.options(
-                "/cryptic/{project}/whitelist",
-                handle_whitelist_options,
-            ),
-            aiohttp.web.put(
-                "/cryptic/{project}/whitelist",
-                handle_project_whitelist,
-            ),
-            aiohttp.web.delete(
-                "/cryptic/{project}/whitelist",
-                handle_delete_project_whitelist,
-            ),
-            aiohttp.web.put(
-                "/cryptic/{project}/{container}",
-                handle_batch_add_sharing_whitelist,
-            ),
-            aiohttp.web.delete(
-                "/cryptic/{project}/{container}",
-                handle_batch_remove_sharing_whitelist,
-            ),
-            aiohttp.web.get(
-                "/check/{project}/{container}/{receiver}",
-                handle_check_sharing_whitelist,
-            ),
-            aiohttp.web.options(
-                "/cryptic/{project}/{container}",
-                handle_whitelist_options,
-            ),
-            aiohttp.web.get(
-                "/cryptic/{project}",
-                handle_upload_ws,
-            ),
+            aiohttp.web.get("/cryptic/{project}", handle_upload_ws),
         ]
     )
 
@@ -167,6 +110,17 @@ async def servinit() -> aiohttp.web.Application:
             aiohttp.web.options("/{project}/{container}", handle_post_object_options),
         ]
     )
+
+    # Add replication routes
+    app.add_routes(
+        [
+            aiohttp.web.get("/replicate/status/{job_id}", handle_replicate_status),
+            aiohttp.web.post("/replicate/cancel/{job_id}", handle_replicate_cancel),
+        ]
+    )
+
+    # Dictionary for tracking ongoing replication jobs
+    app["replication_jobs"] = {}
 
     return app
 
