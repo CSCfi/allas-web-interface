@@ -4,10 +4,8 @@
 Schema for storing the upload information:
 {
   "containerName": {  // Container level session for the upload
-    receivers: int;  // pointer to the receiver public key list (see uptypes.h)
-    receiversLen: int;  // The amount of receivers listed
     files: {  // Files to upload, stored in an object
-      "filePath": int;  // pointer to the unique session key (see uptypes.h)
+      "filePath": File;
       ...
       path_n: int;
     }

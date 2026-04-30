@@ -6,10 +6,9 @@ import { checkPollutingName } from "./nameCheck";
 /*
 Schema for storing the download information:
 {
-  "containerName": {  // Container level session for the upload
-    keyPair: int;  // pointer to the ephemeral keypair for decryption (see uptypes.h)
+  "containerName": {  // Container level session for the download
     files: {  // Files to download, stored in an object
-      "filePath": int;  // pointer to the unique session key (see uptypes.h)
+      "filePath": File;
       ...
       path_n: int;
     }
@@ -39,7 +38,7 @@ File System API altogether.
 
 SerivceWorker based approach streams the file through ServiceWorker, into
 a specific file download. This is a tad slower, since multiple files can't
-be downloaded / decrypted in parallel due to the lack of random access,
+be downloaded in parallel due to the lack of random access,
 but is reasonably performant anyways.
 
 OPFS based version might not be worth it in real world use, since it needs
@@ -47,7 +46,7 @@ intermediary storage and the ServiceWorker doesn't.
 */
 
 
-// Example: https://devenv:8443/file/session-id/test-container/examplefile.txt.c4gh
+// Example: https://devenv:8443/file/session-id/test-container/examplefile.txt
 const fileUrl = new RegExp("/file/[^/]*/[^/]*/.*$");
 // Example: https://devenv:8443/archive/session-id/test-container.tar
 const archiveUrl = new RegExp("/archive/[^/]*/[^/]*\\.tar$");
@@ -364,7 +363,6 @@ async function beginDownloadInSession(
       file);
 
     let res;
-    // Always use concatFile since there's no decryption key
     res = await slicer.concatFile().catch(() => {
       return false;
       });
@@ -456,14 +454,14 @@ if (inServiceWorker) {
       response.headers.append(
         "Content-Disposition",
         "attachment; filename=\"" +
-          fileName.split("/").at(-1).replace(".c4gh", "") + "\"",
+          fileName.split("/").at(-1) + "\"",
       );
 
       // Map the streamController as the stream for the download
       downloads[sessionId].handle = streamController;
 
-      // Start the decrypt slicer and respond, tell worker to stay open
-      // until stream is consumed
+      // Start the file slicer and respond, tell worker to stay open until
+      // stream is consumed
       e.respondWith((() => {
         e.waitUntil(beginDownloadInSession(sessionId));
         return response;

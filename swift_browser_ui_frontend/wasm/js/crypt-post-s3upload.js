@@ -1,5 +1,5 @@
 // Worker script for uploading objects using S3
-// Plain version: no encryption, no headers, no vault, no FS mounting
+// Plain version with direct file part uploads.
 
 import { PutObjectCommand, S3Client, UploadPartCommand } from "@aws-sdk/client-s3";
 import { checkPollutingName } from "./nameCheck";
