@@ -20,7 +20,7 @@
       </h2>
       <c-card-content>
         <p class="info-text">
-          {{ $t("message.encrypt.uploadStep1.nonModifiable") }}
+          {{ $t("message.uploadDialog.uploadStep1.nonModifiable") }}
         </p>
         <c-text-field
           id="newBucket-input"

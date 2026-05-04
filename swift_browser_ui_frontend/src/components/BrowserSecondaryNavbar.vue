@@ -77,9 +77,9 @@
         data-testid="copy-toasts"
       />
       <c-toasts
-        id="decryption-toasts"
+        id="download-error-toasts"
         vertical="center"
-        data-testid="decryption-toasts"
+        data-testid="download-error-toasts"
       />
       <c-spacer />
       <div class="nav-item">

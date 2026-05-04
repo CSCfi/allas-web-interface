@@ -236,9 +236,7 @@ export default {
                   title: "Download",
                   path: mdiTrayArrowDown,
                   onClick: ({ event }) => {
-                    item.name.match(".c4gh") || item?.folder
-                      ? this.beginDownload(item, event.isTrusted)
-                      : this.navDownload(item.url);
+                    this.beginDownload(item, event.isTrusted);
                   },
                   disabled: this.owner != undefined &&
                     this.accessRights.length === 0,
@@ -436,7 +434,7 @@ export default {
           test,
         ).then(() => {
           if (DEV) console.log(`Started downloading folder ${object.name}`);
-        }).catch(() => {
+        }).catch((error) => {
           if (DEV) {
             console.log(error);
           }
@@ -457,9 +455,6 @@ export default {
           addErrorToastOnMain(this.$t("message.download.error"));
         });
       }
-    },
-    navDownload(url) {
-      window.open(url, "_blank");
     },
     setHeaders() {
       this.headers = [

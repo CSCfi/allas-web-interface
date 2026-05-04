@@ -5,7 +5,6 @@ Download file list:
 {
     bucket: string,
     key: string,
-    header: string,
     orderNumber: number,
     size: number,
     uuid: string,  // Unique identifier for the download session
@@ -20,14 +19,7 @@ import {
   ensureObjectSizes,
   timeout,
 } from "./globalFunctions";
-import {
-  getUploadEndpoint,
-  signedFetch,
-} from "./api";
 import { awsListObjects, ensureCollaborateAccessPolicy } from "./s3commands";
-
-// Use 50 MiB as download slice size
-const FILE_PART_SIZE = 52428800;
 
 export default class S3DownloadSocket {
   constructor(
@@ -77,7 +69,7 @@ export default class S3DownloadSocket {
       }
     } else {
       if (DEV) console.log("Could not register a worker for download.");
-      if (DEV) console.log("Decrypted downloads are not available.");
+      if (DEV) console.log("Direct downloads are not available.");
     }
 
     this.toastMessage = {
@@ -89,59 +81,6 @@ export default class S3DownloadSocket {
     // Add message handler for the download worker
     let handleDownloadWorker = (e) => {
       switch(e.data.eventType) {
-        case "getHeaders":
-          if (DEV) console.log("Socket got call to retrieve headers");
-          if (DEV) console.log(`Fetching headers for bucket ${e.data.bucket}`);
-          if (DEV) console.log(`Fetching headers for files: ${e.data.files}`);
-          if (this.$store.downloadCount >= 0) {
-            if (DEV) {
-              console.log(
-                "Overriding existing download progress with the new one.",
-              );
-            }
-            this.$store.eraseDownloadProgress();
-          }
-          this.$store.addDownload();
-          this.getHeaders(
-            e.data.id,
-            e.data.bucket,
-            e.data.files,
-            e.data.pubkey,
-            e.data.ownerName,
-          ).then(() => {
-            if (this.useServiceWorker) {
-              this.$store.removeDownload();
-              this.$store.toggleDownloadNotification(false);
-            } else {
-              if (this.$store.downloadProgress === undefined) {
-                this.$store.updateDownloadProgress(0);
-              }
-            }
-            if (DEV) {
-              console.log(
-                `Got headers for download in bucket ${e.data.bucket}`,
-              );
-            }
-          }).catch(err => {
-            if (DEV) {
-              console.log(err);
-            }
-            if (this.useServiceWorker) {
-              navigator.serviceWorker.ready.then((reg) => {
-                reg.active.postMessage({
-                  command: "abort",
-                  reason: "error",
-                });
-              });
-            }
-            else {
-              this.downWorker.postMessage({
-                command: "abort",
-                reason: "error",
-              });
-            }
-          });
-          break;
         case "downloadStarted":
           if (DEV) console.log(`Started download in ${e.data.bucket}`);
           if (this.useServiceWorker) {
@@ -175,22 +114,8 @@ export default class S3DownloadSocket {
             });
           }
           break;
-        case "notDecryptable":
-          if (DEV) {
-            console.log(`Could not decrypt all files in bucket ${e.data.bucket}`);
-          }
-          document.querySelector("#decryption-toasts").addToast(
-            {
-              ...this.toastMessage,
-              type: "warning",
-              message: this.$t("message.notDecryptable"),
-            },
-          );
-          break;
         case "abort":
           this.$store.setDownloadAbortReason(e.data.reason);
-          this.$store.setHeadersTotal(0);
-          this.$store.setHeadersProcessed(0);
           if (!this.useServiceWorker) {
             this.$store.removeDownload(true);
             this.$store.eraseDownloadProgress();
@@ -255,98 +180,23 @@ export default class S3DownloadSocket {
     }
   }
 
-  async getHeaders(uuid, bucket, fileList, pubkey, ownerName) {
-    let headers = {};
-
-    // Retrieve the bucket objects
+  async resolveDownloadObjects(bucket, objectNames) {
     let bucketFiles = await awsListObjects(bucket);
     if (bucketFiles.length == 0) {
       throw new Error(`No objects for bucket ${bucket}, aborting`);
     }
 
-    // If files are specified, use only the specified file listing
-    if (fileList.length >= 1) {
+    if (objectNames.length >= 1) {
       bucketFiles = bucketFiles.filter(
-        item => fileList.includes(item.name),
+        item => objectNames.includes(item.name),
       );
     }
 
-    // Swift objects don't have a size on S3 side before retrieval
-    // Run function to check legacy object sizes for listing
     bucketFiles = await ensureObjectSizes(bucket, bucketFiles);
-
-    // Store total amount of required headers to display header progress
-    this.$store.setHeadersTotal(bucketFiles.length);
-
-    let whitelistPath = `/cryptic/${this.project}/whitelist`;
-    let upInfo = await getUploadEndpoint(
-      this.active,
-      this.project,
-      bucket,
-    );
-    await signedFetch(
-      "PUT",
-      this.$store.uploadEndpoint,
-      whitelistPath,
-      pubkey,
-      {
-        flavor: "crypt4gh",
-        session: upInfo.id,
-      },
-    );
-
-    let headersRetrieved = 0;
-
-    for (const file of bucketFiles) {
-      // Get the file header
-      let header = await signedFetch(
-        "GET",
-        this.$store.uploadEndpoint,
-        `/header/${this.project}/${bucket}/${file.name}`,
-        undefined,
-        {
-          session: upInfo.id,
-          owner: ownerName,
-        },
-      );
-      header = await header.text();
-
-      headers[file.name] = {
-        header: Uint8Array.from(atob(header), c => c.charCodeAt(0)),
-        size: file.bytes,
-      };
-
-      headersRetrieved++;
-      this.$store.setHeadersProcessed(headersRetrieved);
-    }
-
-    await signedFetch(
-      "DELETE",
-      this.$store.uploadEndpoint,
-      whitelistPath,
-      undefined,
-      {
-        session: upInfo.id,
-      },
-    );
-
-    if (!this.useServiceWorker) {
-      this.downWorker.postMessage({
-        command: "addHeaders",
-        id: uuid,
-        bucket: bucket,
-        headers: headers,
-      });
-    } else {
-      navigator.serviceWorker.ready.then(reg => {
-        reg.active.postMessage({
-          command: "addHeaders",
-          id: uuid,
-          bucket: bucket,
-          headers: headers,
-        });
-      });
-    }
+    return bucketFiles.map(file => ({
+      path: file.name,
+      size: file.bytes,
+    }));
   }
 
   cancelDownload() {
@@ -368,7 +218,7 @@ export default class S3DownloadSocket {
       } catch {
         if (DEV) console.log(`Could not retain access in bucket ${bucket}`);
 
-        document.querySelector("#decryption-toasts").addToast(
+        document.querySelector("#download-error-toasts").addToast(
           {
             ...this.toastMessage,
             type: "error",
@@ -387,18 +237,13 @@ export default class S3DownloadSocket {
       console.log(`Beginning download session with UUID ${sessionId}`);
     }
 
-    let ownerName = "";
-    if (owner) {
-      let ids = await this.$store.sharingClient.projectCheckIDs(owner);
-      ownerName = ids.name;
-    }
-
+    const selectedObjects = await this.resolveDownloadObjects(bucket, objects);
     let fileHandle = undefined;
     if (objects.length == 1) {
       // Download directly into the file if available.
       // Otherwise, use streaming + ServiceWorker
       if (!this.useServiceWorker) {
-        const fileName = objects[0].replace(".c4gh", "");
+        const fileName = objects[0];
 
         if (test) {
           // OPFS root for direct download e2e testing
@@ -407,8 +252,7 @@ export default class S3DownloadSocket {
             await testDirHandle.getFileHandle(fileName, { create: true });
         } else {
           // Match the file identifier
-          const fident = objects[0].replace(".c4gh", "")
-            .match(/(?<!^)\.[^.]{1,}$/g);
+          const fident = objects[0].match(/(?<!^)\.[^.]{1,}$/g);
           const opts = {
             suggestedName: fileName,
           };
@@ -432,9 +276,9 @@ export default class S3DownloadSocket {
           id: sessionId,
           bucket: bucket,
           file: objects[0],
+          size: selectedObjects[0].size,
           handle: fileHandle,
           owner: owner,
-          ownerName: ownerName,
           test: test,
         });
 
@@ -451,8 +295,8 @@ export default class S3DownloadSocket {
             id: sessionId,
             bucket: bucket,
             file: objects[0],
+            size: selectedObjects[0].size,
             owner: owner,
-            ownerName: ownerName,
           });
         });
       }
@@ -483,10 +327,9 @@ export default class S3DownloadSocket {
           command: "downloadFiles",
           id: sessionId,
           bucket: bucket,
-          files: objects.length < 1 ? [] : objects,
+          files: selectedObjects,
           handle: fileHandle,
           owner: owner,
-          ownerName: ownerName,
           test: test,
         });
       } else {
@@ -495,9 +338,8 @@ export default class S3DownloadSocket {
             command: "downloadFiles",
             id: sessionId,
             bucket: bucket,
-            files: objects.length < 1 ? [] : objects,
+            files: selectedObjects,
             owner: owner,
-            ownerName: ownerName,
           });
         });
       }

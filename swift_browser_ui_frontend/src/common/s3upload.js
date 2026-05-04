@@ -1,4 +1,4 @@
-// Functions for handling s3 upload and header worker communication
+// Functions for handling s3 upload worker communication
 
 /*
 Upload cache schema:
@@ -25,15 +25,14 @@ Parts cache schema:
 {
   bucket: string,
   key: string,
-  secret: Uint8Array,
-  orderNumber: number,
-  size: number,
-  offset: number,
+    orderNumber: number,
+    size: number,
+    offset: number,
 }
 */
 
 import { DEV, timeout } from "./globalFunctions";
-import { signedFetch, awsCreateBucket, awsAddBucketCors } from "./api";
+import { awsCreateBucket, awsAddBucketCors } from "./api";
 import {
   checkBucketAccessible,
   awsCreateMultipartUpload,
@@ -42,7 +41,6 @@ import {
 } from "./s3commands";
 
 const MAX_UPLOAD_WORKERS = 8;
-const MAX_SIMULTANEOUS_HEADER_UPLOADS = 8;
 const FILE_PART_SIZE = 52428800;
 
 export default class S3UploadSocket {
@@ -74,10 +72,6 @@ export default class S3UploadSocket {
 
     this.totalSize = 0;
     this.totalCompleted = 0;
-    this.headersNeeded = 0;
-    this.headersAdded = 0;
-
-    this.headerUploads = 0;
 
     // Initialize the workers.
     // Upload workers will use each available logical thread, maximum
@@ -104,30 +98,6 @@ export default class S3UploadSocket {
       console.log(`${this.upWorkers.length} upload worker threads were created`);
       console.log(this.upWorkers);
     }
-
-    // Initialize the header worker
-    if (DEV) {
-      // Load the workers from frontend work directory when in
-      // development mode
-      this.headerWorker = new Worker("/s3headerworker.js");
-    } else {
-      // In production the worker is defined in the static folder
-      this.headerWorker = new Worker("/static/s3headerworker.js");
-    }
-
-    let headerWorkerHandler = (e) => {
-      switch(e.data.eventType) {
-        case "headerDone":
-          if (DEV) console.log("File header done");
-          this.processFile(
-            e.data.bucket, e.data.key, e.data.header, e.data.secret,
-          ).then(() => {
-            if (DEV) console.log(`Initialized file ${e.data.bucket}/${e.data.key}`);
-          });
-          break;
-      }
-    };
-    this.headerWorker.onmessage = headerWorkerHandler;
 
     this.toastMessage = {
       duration: 6000,
@@ -277,7 +247,7 @@ export default class S3UploadSocket {
 
       const response = await awsCompleteMultipartUpload(
         bucket,
-        key.concat(".c4gh"),
+        key,
         parts,
         this.uploads[bucket][key].multipartSession,
       );
@@ -293,8 +263,6 @@ export default class S3UploadSocket {
     if (nextPart === undefined) {
       return;
     }
-
-    this.$store.setEncryptedFile(nextPart.key);
 
     if (this.uploads[nextPart.bucket][nextPart.key].multipartKeyPending){
       while (
@@ -312,7 +280,7 @@ export default class S3UploadSocket {
 
       const response = await awsCreateMultipartUpload(
         nextPart.bucket,
-        nextPart.key.concat(".c4gh"),
+        nextPart.key,
         "bucket-owner-full-control",
       );
 
@@ -336,8 +304,8 @@ export default class S3UploadSocket {
     }
   }
 
-  // Process a file header to begin uploading
-  async processFile(bucket, key, header, secret) {
+  // Queue a file for uploading
+  async processFile(bucket, key) {
     if (this.uploads[bucket][key].isMultipart) {
       let partsTotal = Math.floor(
         this.uploads[bucket][key].size / FILE_PART_SIZE,
@@ -348,7 +316,6 @@ export default class S3UploadSocket {
         this.parts.push({
           bucket: bucket,
           key: key,
-          secret: secret,
           orderNumber: i + 1,
           size: FILE_PART_SIZE,
           offset: i * FILE_PART_SIZE,
@@ -364,7 +331,6 @@ export default class S3UploadSocket {
         this.parts.push({
           bucket: bucket,
           key: key,
-          secret: secret,
           orderNumber: partsTotal + 1,
           size: finalPart,
           offset: partsTotal * FILE_PART_SIZE,
@@ -379,59 +345,15 @@ export default class S3UploadSocket {
       this.parts.push({
         bucket: bucket,
         key: key,
-        secret: secret,
         orderNumber: 0,
         size: this.uploads[bucket][key].size,
         offset: 0,
       });
     }
-
-    if (DEV) console.log(`Header for ${bucket}/${key}: ${header}`);
-
-    // Throttle header pushes to stay under fetch pending request limit
-    while (this.headerUploads >= MAX_SIMULTANEOUS_HEADER_UPLOADS) {
-      // Wait for a random amount of ms to stagger header upload waits
-      await timeout(Math.floor(1 + Math.random() * 100));
-    }
-
-    this.headerUploads++;
-
-    if (DEV && this.uploads[bucket][key].ownerName) {
-      console.log(`Shared upload, using ${this.uploads[bucket][key].ownerName} as owner.`);
-    }
-
-    // Push header to Vault
-    let headerBase = this.$store.uploadEndpoint;
-    let headerPath = `/header/${this.project}/${bucket}/${key}.c4gh`;
-    await signedFetch(
-      "PUT",
-      headerBase,
-      headerPath,
-      header,
-      this.uploads[bucket][key].ownerName
-        ? {owner: this.uploads[bucket][key].ownerName}
-        : undefined,
-    );
-
-    this.headerUploads--;
-    this.headersAdded++;
-
-    // Update uploaded header amount to display header progress
-    this.$store.setHeadersProcessed(this.headersAdded);
-
-    if (this.headersNeeded == this.headersAdded) {
-      if (DEV) console.log("All headers are done, starting upload");
-      this.headersAdded = 0;
-      this.headersNeeded = 0;
-      this.$store.updateProgress(0);
-      this.beginUpload().then(() => {
-        if (DEV) console.log("Upload started successfully.");
-      });
-    }
   }
 
-  // Add files for encrypted upload
-  async addEncryptedUploads(bucket, files, receivers, ownerName) {
+  // Add files for upload
+  async addUploads(bucket, files) {
     // If the upload is already defined, we're adding files to an ongoing
     // upload – no need to check existence or initialization.
     if (this.uploads[bucket] === undefined) {
@@ -479,11 +401,8 @@ export default class S3UploadSocket {
 
       this.uploads[bucket] = {};
     }
-    this.headersNeeded = files.length;
-    // Commit total header amount to the shared state, to display header progress
-    this.$store.setHeadersTotal(this.headersNeeded);
-    this.$store.setEncryptedFile("file pending...");
-
+    this.totalSize = 0;
+    this.totalCompleted = 0;
     if (DEV) console.log("Adding the listed files to the worker filesystems.");
     // Preserve file paths
     const filesWithPath = files.map((file) => ({ file: file, relativePath: file.relativePath }));
@@ -506,24 +425,20 @@ export default class S3UploadSocket {
         multipartParts: {},
         finished: false,
         f: file,
-        ownerName: ownerName,
       };
 
       if (DEV) console.log(this.uploads[bucket][file.relativePath]);
 
-      this.headerWorker.postMessage({
-        command: "createHeader",
-        bucket: bucket,
-        key: file.relativePath,
-        receivers: receivers,
-        // file: this.uploads[bucket][file.relativePath],
-      });
-
+      await this.processFile(bucket, file.relativePath);
       this.totalSize += file.size;
     }
     if (DEV) console.log(`Scheduled files for uploading in bucket ${bucket}`);
     this.$store.eraseProgress();
     this.$store.setUploading();
+    this.$store.updateProgress(0);
+    this.beginUpload().then(() => {
+      if (DEV) console.log("Upload started successfully.");
+    });
   }
 
   // Cancel the ongoing upload in bucket
@@ -537,7 +452,7 @@ export default class S3UploadSocket {
       // Cancel the multipart process
       await awsAbortMultipartUpload(
         bucket,
-        key.concat(".c4gh"),
+        key,
         this.uploads[bucket][key].multipartSession,
       ).catch((err) => {
         if (DEV) {
@@ -559,9 +474,6 @@ export default class S3UploadSocket {
     }
     this.$store.eraseDropFiles();
     this.$store.stopUploading();
-    this.$store.setEncryptedFile("");
     this.$store.eraseProgress();
-    this.$store.setHeadersProcessed(0);
-    this.$store.setHeadersTotal(0);
   }
 }

@@ -24,7 +24,6 @@ import { vControl } from "@/common/csc-ui-vue-directive";
 import { i18n } from "@/common/i18n";
 import {
   getUser,
-  signedFetch,
   getProjects,
 } from "@/common/api";
 
@@ -291,15 +290,6 @@ const app = createApp({
       }
       if (discovery.upload_endpoint) {
         this.$store.setUploadEndpoint(discovery.upload_endpoint);
-
-        let key = await signedFetch(
-          "GET",
-          discovery.upload_endpoint,
-          `/cryptic/${this.active.name}/keys`,
-        );
-        key = await key.text();
-        key = `-----BEGIN CRYPT4GH PUBLIC KEY-----\n${key}\n-----END CRYPT4GH PUBLIC KEY-----\n`;
-        this.$store.appendPubKey(key);
       }
       await initS3(this.active.id, this.active.name, this.$store, this.$t);
     };

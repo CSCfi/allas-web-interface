@@ -19,12 +19,8 @@
           }} {{
             !finished
               ? type === "upload"
-                ? $store.uploadProgress === undefined
-                  ? `(${$t("message.upload.addHeaders")} ${headersProcessed}/${headersTotal})`
-                  : ""
-                : !isProgressing
-                  ? `(${headersProcessed}/${headersTotal})`
-                  : ""
+                ? ""
+                : ""
               : ""
           }}
         </h3>
@@ -127,12 +123,6 @@ export default {
       return !this.finished &&
         (!this.usingServiceWorker ||
           this.type === "upload");
-    },
-    headersTotal() {
-      return this.$store.headersTotal;
-    },
-    headersProcessed() {
-      return this.$store.headersProcessed;
     },
   },
   watch: {

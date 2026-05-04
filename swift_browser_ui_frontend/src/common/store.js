@@ -15,7 +15,6 @@ const useStore = defineStore("global", {
     socket: undefined,
     isUploading: false,
     isDeleting: false,
-    encryptedFile: "",
     uploadProgress: undefined,
     uploadNotification: {
       visible: false,
@@ -29,7 +28,6 @@ const useStore = defineStore("global", {
     },
     downloadAbortReason: undefined,
     uploadEndpoint: "",
-    pubkey: [],
     dropFiles: [],
     openConfirmRouteModal: false,
     routeTo: {},
@@ -57,8 +55,6 @@ const useStore = defineStore("global", {
     s3upload: undefined,
     s3download: undefined,
     workersInitializing: true,
-    headersProcessed: 0,
-    headersTotal: 0,
   }),
   getters: {
     multipleProjects: (state) => state.projects.length > 1,
@@ -94,9 +90,6 @@ const useStore = defineStore("global", {
     },
     setDeleting(payload) {
       this.isDeleting = payload;
-    },
-    setEncryptedFile(file) {
-      this.encryptedFile = file;
     },
     toggleUploadNotification(payload) {
       this.uploadNotification.visible = payload;
@@ -158,12 +151,6 @@ const useStore = defineStore("global", {
     },
     eraseDropFiles() {
       this.dropFiles = [];
-    },
-    appendPubKey(key) {
-      this.pubkey.push(key);
-    },
-    erasePubKey() {
-      this.pubkey = [];
     },
     toggleConfirmRouteModal(payload) {
       this.openConfirmRouteModal = payload;
@@ -248,12 +235,6 @@ const useStore = defineStore("global", {
     },
     setWorkersInitializing(payload) {
       this.workersInitializing = payload;
-    },
-    setHeadersTotal(payload) {
-      this.headersTotal = payload;
-    },
-    setHeadersProcessed(payload) {
-      this.headersProcessed = payload;
     },
   },
 });

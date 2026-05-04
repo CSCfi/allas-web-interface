@@ -206,40 +206,6 @@ export async function killUploadEndpoint(
   }
 }
 
-// Convenience function for performing a signed fetch
-export async function signedFetch(
-  method,
-  base,
-  path,
-  body,
-  params,
-  lifetime = 60,
-) {
-  let signatureUrl = new URL(`/sign/${lifetime}`, document.location.origin);
-  signatureUrl.searchParams.append("path", path);
-  let signed = await GET(signatureUrl);
-  signed = await signed.json();
-
-  let fetchUrl = new URL(base.concat(path));
-  fetchUrl.searchParams.append("valid", signed.valid);
-  fetchUrl.searchParams.append("signature", signed.signature);
-  if (params !== undefined) {
-    for (const param in params) {
-      fetchUrl.searchParams.append(param, params[param]);
-    }
-  }
-
-  let resp = await fetch(
-    fetchUrl,
-    {
-      method,
-      body,
-    },
-  );
-
-  return resp;
-}
-
 // Proxy ListBuckets command through the backend
 export async function awsListBuckets(
   project,

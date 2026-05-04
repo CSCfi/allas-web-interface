@@ -78,10 +78,10 @@ let default_translations = {
         shared_with_view:
           "You can browse this bucket. (@:message.share.view_perm)",
         shared_with_read:
-          "You can copy this bucket and download files in decrypted format. " +
+          "You can copy this bucket and download files. " +
           "(@:message.share.read_perm)",
         shared_with_read_write:
-          "You can copy this bucket and download files in decrypted format. " +
+          "You can copy this bucket and download files. " +
           "You can upload new files or delete existing files from this " +
           "bucket. (@:message.share.write_perm)",
       },
@@ -164,7 +164,7 @@ let default_translations = {
         read_perm: "Transfer data",
         read_perm_desc:
           ": The recipient project's members can copy your bucket " +
-          "and download files in decrypted format. Use this when you want to " +
+          "and download files. Use this when you want to " +
           "transfer your data to another project.",
         write_perm: "Collaborate",
         write_perm_desc:
@@ -232,7 +232,6 @@ let default_translations = {
         error: "Upload couldn't start. Please try again.",
         accessFail: "Bucket could not be accessed.",
         remove: "Remove from list",
-        addHeaders: "Preparing files: ",
       },
       close: "Close",
       copy: " Copy",
@@ -247,7 +246,6 @@ let default_translations = {
       copysuccess: "Copying in progress",
       copytime: "Please wait for copying to finish",
       copyfail: "Failed to copy the bucket",
-      notDecryptable: "Some downloaded files need manual decryption.",
       tagName: "Tags (optional)",
       tagPlaceholder: "# Add a tag and press enter",
       container_ops: {
@@ -333,7 +331,7 @@ let default_translations = {
         required: "API key name is required",
         creationFailed: "API key creation failed.",
       },
-      encrypt: {
+      uploadDialog: {
         uploadFiles: "Upload files",
         uploadDestination: "Destination bucket: ",
         uploadStep1: {
@@ -345,12 +343,6 @@ let default_translations = {
             "please do not include any confidential information.",
         },
         uploadStep2: "Files to be uploaded",
-        multipleReceivers: "Additional encryption keys (public keys only)",
-        pubkey: "Paste public key",
-        pubkeyLabel: "Public keys (SHA-256)",
-        pubkeyError: "Please enter a valid ssh-ed25519 or Crypt4GH public key",
-        noRecipients: "No public keys added",
-        addkey: "Add key",
         dropMsg: "Select files",
         normup: "Upload",
         empty: "No files selected",
@@ -366,7 +358,6 @@ let default_translations = {
         uploadedToShared:
           "and all members in other projects which " +
           "have access to this shared bucket.",
-        advancedOptions: "Advanced encryption options",
       },
       route: {
         title: "Switch project",
@@ -647,12 +638,10 @@ let default_translations = {
         shared_with_view:
           "Voit selata tätä ämpäriä. (@:message.share.view_perm)",
         shared_with_read:
-          "Voit kopioida ämpärin, ladata " +
-          "tiedostoja tässä ämpärissä ja purkaa ämpärin sisällön " +
-          "salauksen. (@:message.share.read_perm)",
+          "Voit kopioida ämpärin ja ladata " +
+          "tiedostoja tässä ämpärissä. (@:message.share.read_perm)",
         shared_with_read_write:
-          "Voit kopioida ja ladata " +
-          "tiedostoja, sekä purkaa ämpärin sisällön salauksen. " +
+          "Voit kopioida ämpärin ja ladata tiedostoja. " +
           "Voit lähettää uusia tai poistaa jo ämpärissä olevia tiedostoja. " +
           "(@:message.share.write_perm)",
       },
@@ -737,7 +726,7 @@ let default_translations = {
         read_perm: "Siirrä tiedostot",
         read_perm_desc:
           ": Vastaanottavan projektin jäsenet voivat kopioida ämpärisi " +
-          ", ladata tiedostot sekä purkaa ämpärin sisällön salauksen. " +
+          "ja ladata tiedostot. " +
           "Käytä tätä, kun haluat siirtää tiedostosi toiselle projektille.",
         write_perm: "Yhteiskäyttö",
         write_perm_desc:
@@ -804,7 +793,6 @@ let default_translations = {
         error: "Lataus ei alkanut. Yritä uudelleen.",
         accessFail: "Ämpäriin ei ole pääsyä.",
         remove: "Poista listalta",
-        addHeaders: "Valmistellaan tiedostoja: ",
       },
       close: "Sulje",
       copy: " Kopioi",
@@ -819,9 +807,6 @@ let default_translations = {
       copysuccess: "Ämpäriä kopioidaan",
       copytime: "Odota, kunnes kopiointi valmistuu",
       copyfail: "Ämpärin kopiointi epäonnistui",
-      notDecryptable:
-        "Joidenkin tiedostojen salaus on purettava erikseen latauksen " +
-        "jälkeen.",
       tagName: "Asiasanat",
       tagPlaceholder: "# Lisää asiasana ja paina rivinvaihtoa",
       container_ops: {
@@ -908,7 +893,7 @@ let default_translations = {
         inUse: "Avaimen nimi on jo käytössä",
         required: "Avaimen nimi on pakollinen",
       },
-      encrypt: {
+      uploadDialog: {
         uploadFiles: "Lataa tiedostoja",
         uploadDestination: "Kohdeämpäri: ",
         uploadStep1: {
@@ -919,12 +904,6 @@ let default_translations = {
           "julkisia ja niissä ei tulisi käyttää luottamuksellisia tietoja.",
         },
         uploadStep2: "Ladattavat tiedostot",
-        multipleReceivers: "Lisää salausavaimia (vain julkiset avaimet)",
-        addkey: "Lisää avain",
-        pubkey: "Liitä julkinen avain",
-        pubkeyLabel: "Julkiset avaimet (SHA-256)",
-        pubkeyError: "Anna kelvollinen ssh-ed25519 tai Crypt4GH julkinen avain",
-        noRecipients: "Ei lisättyjä julkisia avaimia",
         dropMsg: "Valitse tiedostot",
         normup: "Lähetä",
         empty: "Ei valittuja tiedostoja",
@@ -940,7 +919,6 @@ let default_translations = {
         uploadedToShared:
           "ja myös kaikille jäsenille muissa projekteissa, " +
           "joilla on pääsy tähän jaettuun ämpäriin.",
-        advancedOptions: "Edistyneitä salausvaihtoehtoja",
       },
       route: {
         title: "Vaihda projektia",

@@ -138,22 +138,22 @@ services:
       - 9091
       - 9092
 
-  dev-vault:
-    build:
-      context: .
-      dockerfile: devproxy/Dockerfile-vault
-    networks:
-      - sd-connect-dev
-    dns: 172.31.2.2
-    depends_on:
-      - dev-dns
-    image: swiftui-dev-vault:dev-latest
-    volumes:
-      - ./submodules/c4gh-transit:/gosrc
-    ports:
-      - 8200
-    expose:
-      - 8200
+  # dev-vault:
+  #   build:
+  #     context: .
+  #     dockerfile: devproxy/Dockerfile-vault
+  #   networks:
+  #     - sd-connect-dev
+  #   dns: 172.31.2.2
+  #   depends_on:
+  #     - dev-dns
+  #   image: swiftui-dev-vault:dev-latest
+  #   volumes:
+  #     - ./submodules/c4gh-transit:/gosrc
+  #   ports:
+  #     - 8200
+  #   expose:
+  #     - 8200
 
 networks:
   sd-connect-dev:

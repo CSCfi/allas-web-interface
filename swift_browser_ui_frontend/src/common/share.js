@@ -4,7 +4,7 @@ import { DEV } from "./globalFunctions";
 import { getDB } from "./idb";
 import { getBucketPolicyStatements } from "./s3commands";
 import { updateCorsFlag } from "./idbFunctions";
-import { awsBulkAddBucketListCors, signedFetch } from "./api";
+import { awsBulkAddBucketListCors } from "./api";
 
 function getSharingClient() {
   const store = useStore();
@@ -64,9 +64,6 @@ export async function deleteStaleShares(project, bucket) {
 
 export async function syncBucketPolicies(project) {
   if (DEV) console.log("Starting sharing sync...");
-  const store = useStore();
-  const projectName = store.active.name;
-
   const client = getSharingClient();
   // Add CORS and sync bucket policies to sharing DB according to s3 bucket policies
 
@@ -121,7 +118,7 @@ export async function syncBucketPolicies(project) {
     let statements = [];
     try {
       statements = (await getBucketPolicyStatements(bucket))
-        .filter(statement => statement?.Sid === "GrantSDConnectSharedAccessToProject");
+        .filter(statement => statement?.Sid === "GrantAllasUISharedAccessToProject");
     } catch (e) {
       // Don't delete shares if statements cannot be retrieved
       console.error(`Failed to fetch bucket policy for ${bucket}:`, e);
@@ -149,37 +146,26 @@ export async function syncBucketPolicies(project) {
       }
       const shareID = principal.match(/::([0-9a-fA-F]+):root$/)[1];
       const currentPolicy = currentPolicies[shareID];
+      const actions = Array.isArray(statement.Action)
+        ? statement.Action
+        : [statement.Action];
       const bucketPolicy = {
-        read: statement.Action.includes("s3:GetObject"),
-        write: statement.Action.includes("s3:PutObject"),
+        view: actions.includes("s3:ListBucket"),
+        read: actions.includes("s3:GetObject"),
+        write: actions.includes("s3:PutObject"),
       };
 
       toBeDeleted = toBeDeleted.filter(item => item !== shareID);
 
-      // Check vault whitelist to distinguish between view and read
       const accesslist = [];
-      try {
-        const receiver = await client.projectCheckIDs(shareID);
-        let resp = await signedFetch(
-          "GET",
-          store.uploadEndpoint,
-          `/check/${projectName}/${bucket}/${receiver.name}`,
-        );
-        const whitelisted = resp.status === 204 ? false :
-          resp.status === 200 ? true : null;
-
-        if (bucketPolicy.read && !bucketPolicy.write && whitelisted === false) {
-          accesslist.push("v");
-        } else if (bucketPolicy.read && !bucketPolicy.write && whitelisted) {
-          accesslist.push("v", "r");
-        } else if (bucketPolicy.read && bucketPolicy.write && whitelisted) {
-          accesslist.push("v", "r", "w");
-        } else {
-          throw new Error(`Incongruous bucket policy and sharing whitelist on ${bucket}`);
-        }
-      } catch(e) {
-        console.error("Could not create a valid access list:", e);
-        continue;
+      if (bucketPolicy.view || bucketPolicy.read || bucketPolicy.write) {
+        accesslist.push("v");
+      }
+      if (bucketPolicy.read || bucketPolicy.write) {
+        accesslist.push("r");
+      }
+      if (bucketPolicy.write) {
+        accesslist.push("w");
       }
 
       if (currentPolicy) {
@@ -187,7 +173,7 @@ export async function syncBucketPolicies(project) {
         const policiesMatch = accesslist.length === currentPolicy.length &&
           accesslist.every((p) => currentPolicy.includes(p));
         if (policiesMatch) {
-          // Sharing DB matches bucket policies and vault
+          // Sharing DB matches bucket policies
           continue;
         } else {
           try {

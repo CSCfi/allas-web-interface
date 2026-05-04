@@ -63,7 +63,7 @@
       data-testid="share-modal-table"
       :data.prop="tableData"
       :headers.prop="headers"
-      :no-data-text="$t('message.encrypt.empty')"
+      :no-data-text="$t('message.uploadDialog.empty')"
       :pagination.prop="pagination"
       :footerOptions.prop="footer"
       horizontal-scrolling
@@ -72,7 +72,6 @@
 </template>
 
 <script>
-import { signedFetch } from "@/common/api";
 import { DEV } from "@/common/globalFunctions";
 import { addAccessControlBucketPolicy, removeAccessControlBucketPolicy } from "@/common/s3commands";
 import { mdiDelete } from "@mdi/js";
@@ -307,37 +306,6 @@ export default {
         this.newPerms,
       );
 
-      let projectIDs = await this.$store.sharingClient.projectCheckIDs(
-        sharedProjectId,
-      );
-
-      if (projectIDs !== undefined) {
-        if (this.newPerms.length === 1 && this.newPerms[0] === "v") {
-          await signedFetch(
-            "DELETE",
-            this.$store.uploadEndpoint,
-            `/cryptic/${this.$store.active.name}/${this.bucketName}`,
-            JSON.stringify([projectIDs.name]),
-            [],
-          ).then(() => {
-            if (DEV) console.log(`Deleted sharing whitelist entry for ${sharedProjectId}`);
-          });
-        } else {
-          await signedFetch(
-            "PUT",
-            this.$store.uploadEndpoint,
-            `/cryptic/${this.$store.active.name}/${this.bucketName}`,
-            JSON.stringify([projectIDs]),
-            [],
-          ).then(() => {
-            if (DEV) console.log(`Edited sharing whitelist entry for ${sharedProjectId}`);
-          });
-        }
-      } else {
-        if (DEV) console.log("Unable to alter whitelist status without cached project name");
-        this.$emit("failUpdateSharedBucket");
-      }
-
       this.$emit("updateSharedBucket");
     },
     confirmDelete: async function () {
@@ -372,29 +340,6 @@ export default {
         `${this.bucketName}_segments`,
         [bucketData.projectId.value],
       );
-
-      let projectIDs = await this.$store.sharingClient.projectCheckIDs(
-        bucketData.projectId.value,
-      );
-
-      if (projectIDs !== undefined) {
-        await signedFetch(
-          "DELETE",
-          this.$store.uploadEndpoint,
-          `/cryptic/${this.$store.active.name}/${this.bucketName}`,
-          JSON.stringify([
-            projectIDs.name,
-          ]),
-          [],
-        );
-        if (DEV) {
-          console.log(
-            `Deleted sharing whitelist entry for ${bucketData.projectId.value}`,
-          );
-        }
-      } else {
-        if (DEV) console.log(`Skipping delete share whitelist for ${bucketData.projectId.value}`);
-      }
 
       if (DEV) console.log(`Share deletion for ${bucketData.projectId.value} finished.`);
     },

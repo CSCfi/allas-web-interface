@@ -169,7 +169,6 @@
 </template>
 
 <script>
-import { signedFetch } from "@/common/api";
 import {
   addNewTag,
   deleteTag,
@@ -449,24 +448,6 @@ export default {
           this.tags,
         );
       } catch {}
-
-      let toShare = [];
-      for (const item of this.tags) {
-        toShare.push(
-          await this.$store.sharingClient.projectCheckIDs(item),
-        );
-      }
-
-      // Add access to cross-project sharing in case of read or read+write
-      if (this.read | this.write) {
-        await signedFetch(
-          "PUT",
-          this.$store.uploadEndpoint,
-          `/cryptic/${this.$store.active.name}/${bucket}`,
-          JSON.stringify(toShare),
-          [],
-        );
-      }
 
       // signal to update sharing containers in container table
       this.$store.setSharingUpdated(true);

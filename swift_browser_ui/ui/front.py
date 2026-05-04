@@ -48,45 +48,6 @@ async def map_up_swjs(_: aiohttp.web.Request) -> aiohttp.web.FileResponse:
     )
 
 
-async def head_swjs(_: aiohttp.web.Request) -> aiohttp.web.FileResponse:
-    """Serve header worker js in worker scope."""
-    return aiohttp.web.FileResponse(
-        str(setd["static_directory"]) + "/s3headerworker.js",
-        headers={
-            "Cache-Control": "no-cache, no-store, must-revalidate",
-            "Pragma": "no-cache",
-            "Expires": "0",
-            "Service-Worker-Allowed": "/",
-        },
-    )
-
-
-async def head_swasm(_: aiohttp.web.Request) -> aiohttp.web.FileResponse:
-    """Serve header worker wasm in worker scope."""
-    return aiohttp.web.FileResponse(
-        str(setd["static_directory"]) + "/s3headerworker.wasm",
-        headers={
-            "Cache-Control": "no-cache, no-store, must-revalidate",
-            "Pragma": "no-cache",
-            "Expires": "0",
-            "Service-Worker-Allowed": "/",
-        },
-    )
-
-
-async def map_head_swjs(_: aiohttp.web.Request) -> aiohttp.web.FileResponse:
-    """Serve header worker js dev map in worker scope."""
-    return aiohttp.web.FileResponse(
-        str(setd["static_directory"]) + "/crypt-post-headers.js.map",
-        headers={
-            "Cache-Control": "no-cache, no-store, must-revalidate",
-            "Pragma": "no-cache",
-            "Expires": "0",
-            "Service-Worker-Allowed": "/",
-        },
-    )
-
-
 async def down_swjs(_: aiohttp.web.Request) -> aiohttp.web.FileResponse:
     """Serve download worker js in worker scope."""
     return aiohttp.web.FileResponse(

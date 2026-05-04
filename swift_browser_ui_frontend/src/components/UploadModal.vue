@@ -17,18 +17,18 @@
         absolute
       />
       <h2 class="title is-4">
-        {{ $t("message.encrypt.uploadFiles") }}
+        {{ $t("message.uploadDialog.uploadFiles") }}
       </h2>
       <c-card-content>
         <div v-if="!currentBucket" class="content-div">
           <h3 class="title is-6">
-            1. {{ $t("message.encrypt.uploadStep1.title") }}
+            1. {{ $t("message.uploadDialog.uploadStep1.title") }}
           </h3>
           <p>
-            {{ $t('message.encrypt.uploadStep1.createAtRoot') }}
+            {{ $t('message.uploadDialog.uploadStep1.createAtRoot') }}
           </p>
           <p>
-            {{ $t('message.encrypt.uploadStep1.nonModifiable') }}
+            {{ $t('message.uploadDialog.uploadStep1.nonModifiable') }}
           </p>
           <c-text-field
             id="upload-bucket-input"
@@ -46,12 +46,12 @@
             :result="validationResult"
           />
           <h3 class="title is-6">
-            2. {{ $t("message.encrypt.uploadStep2") }}
+            2. {{ $t("message.uploadDialog.uploadStep2") }}
           </h3>
         </div>
         <div v-else>
           <p>
-            <b>{{ $t("message.encrypt.uploadDestination") }}</b>
+            <b>{{ $t("message.uploadDialog.uploadDestination") }}</b>
             {{ currentBucket }}
           </p>
         </div>
@@ -69,7 +69,7 @@
             @cancel="buttonAddingFiles=false"
           >
             <span>
-              {{ $t("message.encrypt.dropMsg") }}
+              {{ $t("message.uploadDialog.dropMsg") }}
             </span>
           </CUploadButton>
         </div>
@@ -141,7 +141,7 @@
           class="files-table"
           :data.prop="paginatedDropFiles"
           :headers.prop="fileHeaders"
-          :no-data-text="$t('message.encrypt.empty')"
+          :no-data-text="$t('message.uploadDialog.empty')"
           :pagination.prop="filesPagination"
           :sort-by="sortBy"
           :sort-direction="sortDirection"
@@ -153,7 +153,7 @@
         <p
           class="info-text is-6"
         >
-          {{ $t("message.encrypt.uploadedFiles") }}
+          {{ $t("message.uploadDialog.uploadedFiles") }}
           <b>{{ active.name }}</b>{{ !owner ? "." : " (" }}
           <c-link
             :href="projectInfoLink"
@@ -164,53 +164,8 @@
             <i class="mdi mdi-open-in-new" />
           </c-link>
           {{ !owner ? "" :
-            ") " + $t("message.encrypt.uploadedToShared") }}
+            ") " + $t("message.uploadDialog.uploadedToShared") }}
         </p>
-        <c-accordion
-          id="accordion"
-          value="advancedOptions"
-          v-show="false"
-        >
-          <c-accordion-item
-            :heading="$t('message.encrypt.advancedOptions')"
-            :value="$t('message.encrypt.advancedOptions')"
-          >
-            <c-container>
-              <c-flex>
-                <h3 class="title is-6">
-                  {{ $t('message.encrypt.multipleReceivers') }}
-                </h3>
-                <c-text-field
-                  v-model="addRecvkey"
-                  v-csc-control
-                  :label="$t('message.encrypt.pubkey')"
-                  type="text"
-                  rows="2"
-                  :valid="validatePubkey(addRecvkey) || addRecvkey.length === 0"
-                  :validation="$t('message.encrypt.pubkeyError')"
-                />
-                <c-button
-                  :disabled="!validatePubkey(addRecvkey)"
-                  @click="appendPublicKey"
-                  @keyup.enter="appendPublicKey"
-                >
-                  {{ $t("message.encrypt.addkey") }}
-                </c-button>
-                <!-- Footer options needs to be in CamelCase,
-                because csc-ui wont recognise it otherwise. -->
-                <c-data-table
-                  class="publickey-table"
-                  :data.prop="recvHashedKeys"
-                  :headers.prop="publickeyHeaders"
-                  :no-data-text="$t('message.encrypt.noRecipients')"
-                  :pagination.prop="keyPagination"
-                  :footerOptions.prop="{hideDetails: true}"
-                  @click="checkPage($event,true)"
-                />
-              </c-flex>
-            </c-container>
-          </c-accordion-item>
-        </c-accordion>
       </c-card-content>
     </div>
     <c-card-actions justify="space-between">
@@ -220,7 +175,7 @@
         @click="cancelUpload"
         @keyup.enter="cancelUpload"
       >
-        {{ $t("message.encrypt.cancel") }}
+        {{ $t("message.uploadDialog.cancel") }}
       </c-button>
       <c-button
         data-testid="start-upload"
@@ -229,7 +184,7 @@
         @click="onUploadClick"
         @keyup.enter="onUploadClick"
       >
-        {{ $t("message.encrypt.normup") }}
+        {{ $t("message.uploadDialog.normup") }}
       </c-button>
     </c-card-actions>
   </c-card>
@@ -239,7 +194,6 @@
 import { getDB } from "@/common/idb";
 
 import {
-  computeSHA256,
   getProjectNumber,
   validateBucketName,
   addErrorToastOnMain,
@@ -257,7 +211,6 @@ import {
 } from "@/common/keyboardNavigation";
 import CUploadButton from "@/components/CUploadButton.vue";
 import BucketNameValidation from "./BucketNameValidation.vue";
-import { signedFetch } from "@/common/api";
 import { awsListObjects } from "@/common/s3commands";
 
 import { debounce, delay } from "lodash";
@@ -275,14 +228,10 @@ export default {
   data() {
     return {
       inputBucket: "",
-      addRecvkey: "",
-      recvkeys: [],
-      recvHashedKeys: [],
       CUploadButton,
       projectInfoLink: "",
       addingFiles: false,
       buttonAddingFiles: false,
-      currentKeyPage: 1,
       validationResult: {},
       toastMsg : "",
       containers: [],
@@ -311,9 +260,6 @@ export default {
     locale() {
       return this.$i18n.locale;
     },
-    pubkey() {
-      return this.$store.pubkey;
-    },
     currentBucket() {
       return this.$route.params.container;
     },
@@ -333,25 +279,25 @@ export default {
       return [
         {
           key: "name",
-          value: this.$t("message.encrypt.table.name"),
+          value: this.$t("message.uploadDialog.table.name"),
           width: "30%",
           sortable: this.dropFiles.length > 1,
         },
         {
           key: "type",
-          value: this.$t("message.encrypt.table.type"),
+          value: this.$t("message.uploadDialog.table.type"),
           width: "15%",
           sortable: this.dropFiles.length > 1,
         },
         {
           key: "size",
-          value: this.$t("message.encrypt.table.size"),
+          value: this.$t("message.uploadDialog.table.size"),
           width: "10%",
           sortable: this.dropFiles.length > 1,
         },
         {
           key: "relativePath",
-          value: this.$t("message.encrypt.table.path"),
+          value: this.$t("message.uploadDialog.table.path"),
           width: "30%",
           sortable: this.dropFiles.length > 1,
         },
@@ -359,51 +305,6 @@ export default {
           key: "delete",
           value: null,
           sortable: false,
-        },
-      ];
-    },
-    publickeyHeaders() {
-      return [
-        {
-          key: "key",
-          value: this.$t("message.encrypt.pubkeyLabel"),
-          width: "70%",
-          sortable: this.recvHashedKeys.length > 1,
-        },
-        {
-          key: "delete",
-          value: null,
-          sortable: false,
-          children: [
-            {
-              value: this.$t("message.delete"),
-              component: {
-                tag: "c-button",
-                params: {
-                  text: true,
-                  size: "small",
-                  title: this.$t("message.delete"),
-                  path: mdiDelete,
-                  onClick: ({ index }) =>{
-                    this.recvHashedKeys.splice(index, 1);
-                    this.recvkeys.splice(index, 1);
-                  },
-                  onKeyUp: (e) => {
-                    if(e.keyCode === 13) {
-                      // Get the text value of item that is to be removed
-                      const keyText = e.target.closest("tr")?.innerText;
-                      // Find its index in key list
-                      const index = this.recvHashedKeys.indexOf(keyText);
-                      if (index !== undefined) {
-                        this.recvHashedKeys.splice(index - 2, 1);
-                        this.recvkeys.splice(index - 2, 1);
-                      }
-                    }
-                  },
-                },
-              },
-            },
-          ],
         },
       ];
     },
@@ -424,13 +325,6 @@ export default {
         });
         this.buttonAddingFiles = false;
       },
-    },
-    keyPagination() {
-      return {
-        itemCount: this.recvHashedKeys.length,
-        itemsPerPage: 5,
-        currentPage: this.currentKeyPage,
-      };
     },
     addFiles() {
       return this.$store.addUploadFiles;
@@ -454,7 +348,6 @@ export default {
         this.clearExistingFiles();
         this.objects = [];
         this.filesToOverwrite = [];
-        this.recvkeys = [];
         this.inputBucket = "";
         this.containers = await getDB().containers
           .where({ projectID: this.active.id })
@@ -520,18 +413,14 @@ export default {
   },
   methods: {
     getHumanReadableSize,
-    checkPage(event, isKey) {
+    checkPage(event) {
       const page = checkIfItemIsLastOnPage(
         {
           currentPage: event.target.pagination.currentPage ,
           itemsPerPage: event.target.pagination.itemsPerPage,
           itemCount: event.target.pagination.itemCount,
         });
-      if (isKey) {
-        this.currentKeyPage = page;
-      } else {
-        this.filesPagination.currentPage = page;
-      }
+      this.filesPagination.currentPage = page;
     },
     appendDropFiles(file, overwrite = false) {
       if (file?.size === 0) {
@@ -547,7 +436,7 @@ export default {
       ) {
         if (this.objects && !overwrite) {
           //Check if file already exists in container objects
-          const existingFile = this.objects.find(obj => obj.name === `${file.relativePath}.c4gh`);
+          const existingFile = this.objects.find(obj => obj.name === file.relativePath);
           if (existingFile) {
             this.existingFiles.push(file);
             return;
@@ -724,35 +613,12 @@ export default {
       const el = document.querySelector(".dropArea");
       el.classList.remove("over-dropArea");
     },
-    validatePubkey(key) {
-      const sshed25519 = new RegExp (
-        "^ssh-ed25519 AAAAC3NzaC1lZDI1NTE5" +
-          "[0-9A-Za-z+/]{46,48}[=]{0,2}\\s[^\\s]+$");
-      const crypt4gh = new RegExp (
-        "^-----BEGIN CRYPT4GH PUBLIC KEY-----\\s[A-Za-z0-9+/]{42,44}[=]{0,2}" +
-          "\\s-----END CRYPT4GH PUBLIC KEY-----$");
-      return (key.trim().match(sshed25519) || key.trim().match(crypt4gh));
-    },
-    appendPublicKey: async function () {
-      this.addRecvkey = this.addRecvkey.trim();
-      if (!this.recvkeys.includes(this.addRecvkey)){
-        this.recvkeys.push(this.addRecvkey);
-        this.recvHashedKeys
-          .push({key: {value: await computeSHA256(this.addRecvkey)}});
-      }
-      this.addRecvkey = "";
-    },
     cancelUpload() {
       this.$store.setFilesAdded(false);
       this.$store.eraseDropFiles();
       this.toggleUploadModal();
     },
-    resetAccordionVal() {
-      let accordion = document.getElementById("accordion");
-      accordion.value = "advancedOptions";
-    },
     toggleUploadModal() {
-      this.resetAccordionVal();
       document.querySelector("#uploadModal-toasts").removeToast("upload-toast");
       for (let i = 0; i < this.dropFileErrors.length; i++) {
         this.dropFileErrors[i].show = false;
@@ -761,8 +627,6 @@ export default {
       this.addingFiles = false;
       this.tags = [];
       this.files = [];
-      this.addRecvkey = "";
-      this.recvHashedKeys = [];
       this.validationResult = {};
       this.toastMsg = "";
       this.sortBy = "name";
@@ -775,9 +639,6 @@ export default {
     checkIfCanUpload() {
       if (this.dropFiles.length === 0) {
         return this.$t("message.upload.addFiles");
-      }
-      if (!this.pubkey.length && !this.recvkeys.length) {
-        return this.$t("message.upload.error");
       }
       return "";
     },
@@ -803,35 +664,10 @@ export default {
         return;
       }
       else {
-        this.beginEncryptedUpload();
+        this.beginUpload();
       }
     },
-    async aBeginEncryptedUpload() {
-      // We need the proper IDs for the other project for Vault access
-      let owner = "";
-      let ownerName = "";
-      if (this.pubkey.length > 0 && !(this.$route.params.owner)) {
-        this.recvkeys = this.recvkeys.concat(this.pubkey);
-      } else if (this.$route.params.owner) {
-        let ids = await this.$store.sharingClient.projectCheckIDs(
-          this.$route.params.owner,
-        );
-        owner = ids.id;
-        ownerName = ids.name;
-      }
-
-      // Also need to get the other project's key from Vault
-      if (this.$route.params.owner) {
-        let sharedKey = await signedFetch(
-          "GET",
-          this.$store.uploadEndpoint,
-          `/cryptic/${ownerName}/keys`,
-        );
-        sharedKey = await sharedKey.text();
-        sharedKey = `-----BEGIN CRYPT4GH PUBLIC KEY-----\n${sharedKey}\n-----END CRYPT4GH PUBLIC KEY-----\n`;
-        this.recvkeys = this.recvkeys.concat([sharedKey]);
-      }
-
+    async startUpload() {
       const bucketName = this.currentBucket ?
         this.currentBucket :
         this.inputBucket;
@@ -841,18 +677,15 @@ export default {
       );
       this.$store.setNewBucket(bucketName);
 
-      this.s3socket.addEncryptedUploads(
+      this.s3socket.addUploads(
         bucketName,
         this.$store.dropFiles.map(item => item),
-        this.recvkeys.map(item => item),
-        ownerName,
       );
     },
-    beginEncryptedUpload() {
-      this.aBeginEncryptedUpload().then(() => {
+    beginUpload() {
+      this.startUpload().then(() => {
         delay(() => {
-          if (this.$store.encryptedFile == ""
-            && this.dropFiles.length) {
+          if (this.$store.uploadProgress === undefined && this.dropFiles.length) {
             //upload didn't start
             this.uploadError = this.$t("message.upload.error");
             this.$store.stopUploading(true);

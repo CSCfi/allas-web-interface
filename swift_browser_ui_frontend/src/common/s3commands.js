@@ -223,12 +223,12 @@ export async function ensureCollaborateAccessPolicy(bucket) {
 
   // If the project already has the read and write policies, skip
   for (const statement of statements) {
-    if (statement["Sid"] === "GrantSDConnectPreserveOwnerAccess") return;
+    if (statement["Sid"] === "GrantAllasUIPreserveOwnerAccess") return;
   }
 
   // As the owner we want all access
   statements.push({
-    "Sid": "GrantSDConnectPreserveOwnerAccess",
+    "Sid": "GrantAllasUIPreserveOwnerAccess",
     "Effect": "Allow",
     "Principal": {
       "AWS": `arn:aws:iam::${project.id}:root`,
@@ -295,7 +295,7 @@ export async function addAccessControlBucketPolicy(
     }
 
     policy.Statement.push({
-      "Sid": "GrantSDConnectSharedAccessToProject",
+      "Sid": "GrantAllasUISharedAccessToProject",
       "Effect": "Allow",
       "Principal": {
         "AWS": `arn:aws:iam::${receiver}:root`,
