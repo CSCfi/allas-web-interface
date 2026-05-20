@@ -13,7 +13,7 @@ RUN cd /tmpsrc && pip install --break-system-packages . && pip install --break-s
 RUN apt-get -y update && apt-get -y upgrade && apt-get -y install curl ca-certificates bash
 
 RUN curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
-RUN bash -l -c "nvm install 22 && npm install --global corepack@latest && corepack enable npm"
+RUN bash -l -c "nvm install 22 && npm install --global corepack@latest && corepack enable npm && corepack prepare pnpm@9 --activate"
 
 COPY --from=ghcr.io/cscfi/docker-emscripten-crypt4gh /emsdk /emsdk
 
