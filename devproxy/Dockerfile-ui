@@ -15,9 +15,9 @@ RUN apt-get -y update && apt-get -y upgrade && apt-get -y install curl ca-certif
 RUN curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
 RUN bash -l -c "nvm install 22 && npm install --global corepack@latest && corepack enable npm && corepack prepare pnpm@9 --activate"
 
-COPY --from=ghcr.io/cscfi/docker-emscripten-crypt4gh /emsdk /emsdk
+COPY --from=emscripten/emsdk /emsdk /emsdk
 
-ENV PATH="/emsdk:/emsdk/upstream/emscripten:/emsdk/node/18.20.3_64bit/bin:${PATH}"
+ENV PATH="/emsdk:/emsdk/upstream/emscripten:${PATH}"
 
 VOLUME [ "/src" ]
 WORKDIR /src

@@ -230,11 +230,6 @@ class APITestBase(unittest.IsolatedAsyncioTestCase):
                     "Log": unittest.mock.MagicMock(logging.Logger),
                     "test-id": "placeholder",
                     "oidc_client": self.mock_oidc_client,
-                    "vault_client": types.SimpleNamespace(
-                        **{
-                            "put_header": unittest.mock.AsyncMock(),
-                        }
-                    ),
                 },
                 "url": types.SimpleNamespace(
                     **{

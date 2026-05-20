@@ -9,11 +9,7 @@ Currently developed and tested using Openstack identity API and Ceph object stor
 
 Project documentation is hosted as a part of the source code.
 
-Information on the additional APIs for bucket sharing and encryption resource management
-are in their separate files.
-
 * [Bucket sharing](README-sharing.md)
-* [Encryption resource APIs](README-runner.md)
 
 ### 💻 Development
 <details open><summary>Click to expand</summary>

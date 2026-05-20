@@ -14,7 +14,7 @@ buildWasm() {
     )
 
     if [ "$1" = "docker" ]; then
-        docker run --rm -it --mount type=bind,source="${WASM_ROOT}",target=/src/ ghcr.io/cscfi/docker-emscripten-crypt4gh all
+        docker run --rm -it --mount type=bind,source="${WASM_ROOT}",target=/src/ emscripten/emsdk all
     elif [ "$1" = "emsdk" ]; then
         bash -lc 'source /emsdk/emsdk_env.sh && cd "'"$WASM_ROOT"'" && emmake make all'
     fi
@@ -32,7 +32,7 @@ else
     [ ! -x "$(command -v docker)" ] && echo "Docker is used to build the javascript WebAssembly dependencies, but it's not installed." && exit 1
     if ! docker version > /dev/null 2>&1; then echo "Docker is installed, but it seems like there's an error."; exit 1; fi
 
-    docker run --rm -it --mount type=bind,source="${WASM_ROOT}",target=/src/ ghcr.io/cscfi/docker-emscripten-crypt4gh clean
+    docker run --rm -it --mount type=bind,source="${WASM_ROOT}",target=/src/ emscripten/emsdk clean
     buildWasm "docker"
 fi
 

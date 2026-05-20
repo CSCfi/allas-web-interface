@@ -31,7 +31,7 @@ describe("Downloads file/bucket, verifies content and checksum", function () {
 
     cy.fixture("text-files/" + fileName + ".txt", "utf-8").then(
       ($contentOnUpload) => {
-        //check file hash before upload (encryption)
+        //check file hash before upload
         const hexHashUpload = SparkMD5.hash($contentOnUpload);
         cy.log("Upload hash", hexHashUpload);
 
@@ -103,7 +103,7 @@ describe("Downloads file/bucket, verifies content and checksum", function () {
 
     cy.fixture("text-files/" + fileName + ".txt", "utf-8").then(
       ($contentOnUpload) => {
-        //check file hash before upload (encryption)
+        //check file hash before upload
         hexHashUpload = SparkMD5.hash($contentOnUpload);
 
         //open upload modal
