@@ -31,6 +31,7 @@ Parts cache schema:
 }
 */
 
+import { toRaw } from "vue";
 import { DEV, timeout } from "./globalFunctions";
 import { awsCreateBucket, awsAddBucketCors } from "./api";
 import {
@@ -105,18 +106,11 @@ export default class S3UploadSocket {
       progress: false,
     };
 
-    // Create message handlers for upload and download workers
+    // Create message handlers for upload workers.
+    // createS3Client is sent per-worker only after runtimeInitialized fires,
+    // because the WASM-based worker's message listener isn't ready until then.
     for (const worker of this.upWorkers) {
       worker.onmessage = this.getUploadWorkerHandler(worker);
-    }
-
-    for (const worker of this.upWorkers) {
-      worker.postMessage({
-        command: "createS3Client",
-        access: this.s3access,
-        secret: this.s3secret,
-        endpoint: this.s3endpoint,
-      });
     }
   }
 
@@ -174,8 +168,20 @@ export default class S3UploadSocket {
         case "filesRemoved":
           if (DEV) console.log("File handles closed in the WorkerFS");
           break;
+        case "abort":
+          if (DEV) console.log(`Upload worker aborted: ${e.data.reason}`);
+          this.$store.setUploadAbortReason(e.data.reason);
+          this.finalizeUpload();
+          break;
         case "runtimeInitialized":
           if (DEV) console.log("Worker initialized Webassembly runtime.");
+          // Worker's message listener is now ready — send S3 credentials
+          worker.postMessage({
+            command: "createS3Client",
+            access: this.s3access,
+            secret: this.s3secret,
+            endpoint: this.s3endpoint,
+          });
           // Intentionally omit break to flow to next block
         case "s3ClientCreated":
           if (DEV && e.data.eventType === "s3ClientCreated") {
@@ -292,7 +298,7 @@ export default class S3UploadSocket {
     }
     worker.postMessage({
       command: "nextPart",
-      part: nextPart,
+      part: toRaw(nextPart),
       session: this.uploads[nextPart.bucket][nextPart.key].multipartSession,
     });
   }
@@ -366,7 +372,7 @@ export default class S3UploadSocket {
         // the bucket, and fixing CORS if that doesn't help.
         try {
           let resp = await awsCreateBucket(this.active, bucket);
-          switch (resp) {
+          switch (resp.status) {
             case 400:
               if (DEV) {
                 console.log(`Couldn't create bucket ${bucket} due to a client error.`);
@@ -438,6 +444,10 @@ export default class S3UploadSocket {
     this.$store.updateProgress(0);
     this.beginUpload().then(() => {
       if (DEV) console.log("Upload started successfully.");
+    }).catch((err) => {
+      if (DEV) console.error("Upload failed to start:", err);
+      this.$store.setUploadAbortReason("error");
+      this.finalizeUpload();
     });
   }
 

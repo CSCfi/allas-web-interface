@@ -33,6 +33,8 @@ function createClient(accessKey, secretKey, endpoint) {
   return new S3Client({
     region: "us-east-1",
     endpoint: endpoint,
+    s3ForcePathStyle: true,
+    forcePathStyle: true,
     credentials: {
       accessKeyId: accessKey,
       secretAccessKey: secretKey,
