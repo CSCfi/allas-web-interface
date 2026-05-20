@@ -27,7 +27,6 @@ const useStore = defineStore("global", {
       maximized: true,
     },
     downloadAbortReason: undefined,
-    uploadEndpoint: "",
     dropFiles: [],
     openConfirmRouteModal: false,
     routeTo: {},
@@ -132,9 +131,6 @@ const useStore = defineStore("global", {
     },
     eraseDownloadProgress() {
       this.downloadProgress = undefined;
-    },
-    setUploadEndpoint(endpoint) {
-      this.uploadEndpoint = endpoint;
     },
     appendDropFiles(file) {
       this.dropFiles.push(file);

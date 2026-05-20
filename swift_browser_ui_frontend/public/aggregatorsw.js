@@ -33,7 +33,7 @@ self.addEventListener("fetch", (e) => {
     const response = new Response(stream);
     response.headers.append(
       "Content-Disposition",
-      'attachment; filename="' + fileName.replace(".c4gh", "") + '"',
+      'attachment; filename="' + fileName + '"',
     );
     e.respondWith(response);
   }

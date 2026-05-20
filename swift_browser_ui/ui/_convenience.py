@@ -157,32 +157,6 @@ async def get_tempurl_key(request: aiohttp.web.Request) -> str:
     return str(temp_url_key)
 
 
-async def open_upload_runner_session(
-    request: aiohttp.web.Request,
-    project: str = "",
-) -> str:
-    """Open an upload session to the token."""
-    session = await aiohttp_session.get_session(request)
-    if not project:
-        project = request.match_info["project"]
-    try:
-        return str(session["projects"][project]["runner"])
-    except KeyError:
-        client = request.app["api_client"]
-        path = f"{setd['upload_internal_endpoint']}/{project}"
-        signature = await sign(3600, f"/{project}")
-        async with client.post(
-            path,
-            data={"token": session["token"]},
-            params=signature,
-            ssl=ssl_context,
-        ) as resp:
-            ret = str(resp.cookies["RUNNER_SESSION_ID"].value)
-            session["projects"][project]["runner"] = ret
-            session.changed()
-        return ret
-
-
 async def get_redis_client() -> redis.Redis:
     """Initialize and return a Python Redis client."""
     sentinel_url = str(os.environ.get("SWIFT_UI_REDIS_SENTINEL_HOST", ""))

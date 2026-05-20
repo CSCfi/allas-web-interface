@@ -21,9 +21,7 @@ from swift_browser_ui.ui.api import (
     aws_create_bucket,
     aws_list_buckets,
     aws_update_bucket_cors,
-    close_upload_session,
     get_os_user,
-    get_upload_session,
     keystone_gen_ec2,
     os_list_projects,
     replicate_bucket,
@@ -248,14 +246,6 @@ async def servinit(
             aiohttp.web.get("/api/projects", os_list_projects),
             aiohttp.web.get("/api/{project}/OS-EC2", keystone_gen_ec2),
             aiohttp.web.get("/api/{project}", swift_list_containers),
-        ]
-    )
-
-    # Add upload routes
-    app.add_routes(
-        [
-            aiohttp.web.delete("/upload/{project}", close_upload_session),
-            aiohttp.web.get("/upload/{project}/{container}", get_upload_session),
         ]
     )
 

@@ -167,45 +167,6 @@ export async function removeAPIKey(
   }
 }
 
-export async function getUploadEndpoint(
-  project,
-  owner,
-  container,
-) {
-  // Fetch upload endpoint, session and signature information
-  let fetchURL = new URL("/upload/".concat(
-    encodeURI(owner),
-    "/",
-    encodeURI(container),
-  ),
-  document.location.origin,
-  );
-  fetchURL.searchParams.append("project", project);
-  let ret = await GET(fetchURL);
-
-  if (ret.status != 200) {
-    throw new Error("Failed to get upload session information.");
-  }
-
-  return ret.json();
-}
-
-export async function killUploadEndpoint(
-  project,
-  owner,
-) {
-  let fetchURL = new URL(
-    `/upload/${encodeURI(owner)}`,
-    document.location.origin,
-  );
-  fetchURL.searchParams.append("project", project);
-  let ret = await DELETE(fetchURL);
-
-  if (ret.status != 204) {
-    throw new Error("Failed to kill upload session.");
-  }
-}
-
 // Proxy ListBuckets command through the backend
 export async function awsListBuckets(
   project,

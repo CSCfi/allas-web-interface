@@ -288,9 +288,6 @@ const app = createApp({
           ),
         );
       }
-      if (discovery.upload_endpoint) {
-        this.$store.setUploadEndpoint(discovery.upload_endpoint);
-      }
       await initS3(this.active.id, this.active.name, this.$store, this.$t);
     };
     initialize().then(() => {

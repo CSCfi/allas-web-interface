@@ -15,7 +15,6 @@ import certifi
 
 from swift_browser_ui.ui._convenience import (
     ldap_get_project_titles,
-    open_upload_runner_session,
     sign,
 )
 from swift_browser_ui.ui.replicate import ObjectReplicator
@@ -545,52 +544,3 @@ async def replicate_bucket(
     return aiohttp.web.HTTPAccepted(text="Replication started")
 
 
-async def get_upload_session(
-    request: aiohttp.web.Request,
-) -> aiohttp.web.Response:
-    """Return a pre-signed upload runner session for upload target."""
-    session = await aiohttp_session.get_session(request)
-    request.app["Log"].info(
-        "API call for object upload runner info request from "
-        f"{request.remote}, sess: {session} :: {time.ctime()}"
-    )
-    project = ""
-    if "project" in request.query:
-        project = request.query["project"]
-    runner_id = await open_upload_runner_session(request, project=project)
-    path = f"/{request.match_info['project']}/{request.match_info['container']}"
-    signature = await sign(3600, path)
-    return aiohttp.web.json_response(
-        {
-            "id": runner_id,
-            "url": f"{setd['upload_external_endpoint']}{path}",
-            "host": setd["upload_external_endpoint"],
-            "signature": signature,
-        }
-    )
-
-
-async def close_upload_session(
-    request: aiohttp.web.Request,
-    project: str = "",
-) -> aiohttp.web.Response:
-    """Close the upload session opened for the token."""
-    session = await aiohttp_session.get_session(request)
-    status = 204
-    if not project:
-        project = request.match_info["project"]
-    if "runner" in session["projects"][project]:
-        runner = session["projects"][project]["runner"]
-        client = request.app["api_client"]
-        path = f"{setd['upload_internal_endpoint']}/{project}"
-        signature = await sign(3600, f"/{project}")
-        async with client.delete(
-            path,
-            cookies={"RUNNER_SESSION_ID": runner},
-            params=signature,
-            ssl=ssl_context,
-        ) as resp:
-            status = resp.status
-        session["projects"][project].pop("runner")
-        session.changed()
-    return aiohttp.web.Response(status=status)
