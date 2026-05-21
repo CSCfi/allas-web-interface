@@ -98,7 +98,15 @@ export default class S3DownloadSocket {
               );
             }
             if (DEV) console.log(downloadUrl);
-            window.open(downloadUrl, "_blank");
+            const iframe = document.createElement("iframe");
+            iframe.style.display = "none";
+            iframe.src = downloadUrl.toString();
+            document.body.appendChild(iframe);
+            setTimeout(() => {
+              if (document.body.contains(iframe)) document.body.removeChild(iframe);
+            }, 60000);
+            this.downloadFinished = true;
+            this.$store.removeDownload();
           }
           break;
         case "downloadProgressing":
@@ -116,10 +124,8 @@ export default class S3DownloadSocket {
           break;
         case "abort":
           this.$store.setDownloadAbortReason(e.data.reason);
-          if (!this.useServiceWorker) {
-            this.$store.removeDownload(true);
-            this.$store.eraseDownloadProgress();
-          }
+          this.$store.removeDownload(true);
+          this.$store.eraseDownloadProgress();
           break;
         case "progress":
           this.$store.updateDownloadProgress(e.data.progress);
@@ -271,6 +277,7 @@ export default class S3DownloadSocket {
         }
 
         if (DEV) console.log(`Posting file ${fileName} to download worker`);
+        this.$store.addDownload();
         this.downWorker.postMessage({
           command: "downloadFile",
           id: sessionId,
@@ -290,6 +297,7 @@ export default class S3DownloadSocket {
           );
         }
         navigator.serviceWorker.ready.then(reg => {
+          this.$store.addDownload();
           reg.active.postMessage({
             command: "downloadFile",
             id: sessionId,
@@ -323,6 +331,7 @@ export default class S3DownloadSocket {
             ],
           });
         }
+        this.$store.addDownload();
         this.downWorker.postMessage({
           command: "downloadFiles",
           id: sessionId,
@@ -334,6 +343,7 @@ export default class S3DownloadSocket {
         });
       } else {
         navigator.serviceWorker.ready.then(reg => {
+          this.$store.addDownload();
           reg.active.postMessage({
             command: "downloadFiles",
             id: sessionId,

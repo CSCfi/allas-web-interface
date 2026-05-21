@@ -207,6 +207,7 @@ let default_translations = {
         inProgress: "Download in progress",
         complete: "Download completed",
         gathering: "Gathering a list of files",
+        startedInBrowser: "Download started in your browser",
         warnWait: "Please wait for the download to finish.",
         warnTempFiles: "Opening temporary files or folders " +
           "(.crdownload, .crswap) may interrupt the process.",
@@ -767,6 +768,7 @@ let default_translations = {
           "yli 99 merkkiä pitkiä.",
         inProgress: "Lataus käynnissä",
         gathering: "Haetaan listaa tiedostoista",
+        startedInBrowser: "Lataus aloitettu selaimessasi",
         complete: "Lataus on valmis",
         warnWait: "Odota, kunnes lataus valmistuu. ",
         warnTempFiles: "Väliaikaisten tiedostojen tai kansioiden " +

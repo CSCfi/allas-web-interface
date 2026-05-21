@@ -10,12 +10,16 @@
             finished
               ? type === "upload"
                 ? $t("message.upload.complete")
-                : $t("message.download.complete")
+                : usingServiceWorker
+                  ? $t("message.download.startedInBrowser")
+                  : $t("message.download.complete")
               : type === "upload"
                 ? $t("message.upload.inProgress")
-                : isProgressing
-                  ? $t("message.download.inProgress")
-                  : $t("message.download.gathering")
+                : usingServiceWorker
+                  ? $t("message.download.startedInBrowser")
+                  : isProgressing
+                    ? $t("message.download.inProgress")
+                    : $t("message.download.gathering")
           }} {{
             !finished
               ? type === "upload"

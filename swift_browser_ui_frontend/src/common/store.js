@@ -120,7 +120,7 @@ const useStore = defineStore("global", {
     },
     removeDownload(all = false) {
       if (all) this.downloadCount = 0;
-      else this.downloadCount -= 1;
+      else if (this.downloadCount > 0) this.downloadCount -= 1;
     },
     updateDownloadProgress(progress) {
       this.downloadProgress = progress;

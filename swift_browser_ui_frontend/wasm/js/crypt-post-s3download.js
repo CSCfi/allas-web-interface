@@ -16,9 +16,11 @@ const DOWNLOAD_SEGMENT_SIZE = 52428800; // 50 MiB
 
 let s3client = undefined;
 
-postMessage({
-  eventType: "runtimeInitialized",
-});
+if (!inServiceWorker) {
+  postMessage({
+    eventType: "runtimeInitialized",
+  });
+}
 
 /*
 This script supports being loaded both as a ServiceWorker and an ordinary
@@ -40,9 +42,11 @@ function createS3Client(access, secret, endpoint) {
     },
   });
 
-  postMessage({
-    eventType: "s3ClientCreated",
-  });
+  if (!inServiceWorker) {
+    postMessage({
+      eventType: "s3ClientCreated",
+    });
+  }
 }
 
 // Example: https://devenv:8443/file/session-id/test-container/examplefile.txt
