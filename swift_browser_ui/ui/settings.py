@@ -58,10 +58,6 @@ setd: Dict[str, Union[str, int, bool, None]] = {
     "sharing_internal_endpoint": environ.get(
         "BROWSER_START_SHARING_INT_ENDPOINT_URL", None
     ),
-    "request_endpoint": environ.get("BROWSER_START_REQUEST_ENDPOINT_URL", None),
-    "request_internal_endpoint": environ.get(
-        "BROWSER_START_REQUEST_INT_ENDPOINT_URL", None
-    ),
     "sharing_request_token": environ.get("SWIFT_UI_SHARING_REQUEST_TOKEN", None),
     "has_trust": environ.get("BROWSER_START_HAS_TRUST", False),
     "set_origin_address": environ.get("BROWSER_START_SET_ORIGIN_ADDRESS", None),

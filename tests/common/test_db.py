@@ -104,9 +104,7 @@ class TestBaseDB(BaseDBConnTestClass):
 
     def setUp(self):
         super().setUp()
-        # Using UploadDBConn, as it's the barebones version without any
-        # additional methods
-        self.db = swift_browser_ui.common.db.UploadDBConn()
+        self.db = swift_browser_ui.common.db.SharingDBConn()
 
     def test_db_erase(self):
         """Test connection erase method."""
@@ -156,104 +154,6 @@ class TestBaseDB(BaseDBConnTestClass):
             await self.db.open()
             await self.db.close()
             self.db.pool.close.assert_awaited_once()
-
-
-class RequestDBConnTestClass(BaseDBConnTestClass):
-    """Test request database connection class code."""
-
-    def setUp(self):
-        """Set up required mocks."""
-        super().setUp()
-
-        class AsyncpgConnectionMock:
-            fetch = unittest.mock.AsyncMock(
-                return_value=[
-                    {
-                        "container": "test-container",
-                        "container_owner": "test-owner",
-                        "recipient": "test-receiver",
-                        "created": datetime.datetime(2017, 1, 1),
-                    }
-                ]
-            )
-            fetchrow = unittest.mock.AsyncMock(
-                return_value={
-                    "container": "test-container",
-                    "container_owner": "test-owner",
-                    "recipient": "test-receiver",
-                    "created": datetime.datetime(2017, 1, 1),
-                }
-            )
-            execute = unittest.mock.AsyncMock()
-            transaction = self.connection_transaction_mock
-
-            def __init__(self):
-                """."""
-
-            async def __aenter__(self, *args, **kwargs):
-                """."""
-                return self
-
-            async def __aexit__(self, *args, **kwargs):
-                """."""
-
-        self.AsyncpgConnectionMock = AsyncpgConnectionMock
-
-        self.asyncpg_pool_mock = SimpleNamespace(
-            **{
-                "fetch": unittest.mock.AsyncMock(
-                    return_value=[
-                        {
-                            "container": "test-container",
-                            "container_owner": "test-owner",
-                            "recipient": "test-receiver",
-                            "created": datetime.datetime(2017, 1, 1),
-                        }
-                    ]
-                ),
-                "fetchrow": unittest.mock.AsyncMock(
-                    return_value={
-                        "container": "test-container",
-                        "container_owner": "test-owner",
-                        "recipient": "test-receiver",
-                        "created": datetime.datetime(2017, 1, 1),
-                    }
-                ),
-                "acquire": self.AsyncpgConnectionMock,
-            }
-        )
-
-        self.db = swift_browser_ui.common.db.RequestDBConn()
-        self.db.pool = self.asyncpg_pool_mock
-
-    async def test_add_request(self):
-        """Test add_request method."""
-        await self.db.add_request("test-user", "test-container", "test-owner")
-        self.AsyncpgConnectionMock.execute.assert_awaited()
-
-    async def test_get_request_owned(self):
-        """Test get_request_owned method."""
-        await self.db.get_request_owned("test-user")
-        self.db.pool.fetch.assert_awaited()
-
-    async def test_get_request_made(self):
-        """Test get_request_made method."""
-        await self.db.get_request_made("test-user")
-        self.db.pool.fetch.assert_awaited()
-
-    async def test_get_request_container(self):
-        """Test get_request_container method."""
-        await self.db.get_request_container("test-container")
-        self.db.pool.fetch.assert_awaited()
-
-    async def test_delete_request(self):
-        """Test delete_request method."""
-        await self.db.delete_request(
-            "test-container",
-            "test-owner",
-            "test-user",
-        )
-        self.AsyncpgConnectionMock.execute.assert_awaited()
 
 
 class SharingDBConnTestClass(BaseDBConnTestClass):

@@ -15,8 +15,6 @@ class DiscoverTestClass(unittest.IsolatedAsyncioTestCase):
             "swift_browser_ui.ui.discover.setd",
             new={
                 "sharing_endpoint": "http://example",
-                "request_endpoint": "http://example",
-                "upload_external_endpoint": "http://example",
             },
         )
         with patch_setd:

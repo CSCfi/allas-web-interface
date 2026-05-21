@@ -29,7 +29,6 @@ import {
 
 // Import SharingView and Request API
 import SwiftXAccountSharing from "@/common/swift_x_account_sharing_bind";
-import SwiftSharingRequest from "@/common/swift_sharing_request_bind";
 
 // Import container ACL sync
 import { syncBucketPolicies } from "@/common/share";
@@ -278,14 +277,6 @@ const app = createApp({
         await this.$store.sharingClient.projectCacheIDs(
           this.$store.active.id,
           this.$store.active.name,
-        );
-      }
-      if (discovery.request_endpoint) {
-        this.$store.setRequestClient(
-          new SwiftSharingRequest(
-            discovery.request_endpoint,
-            document.location.origin,
-          ),
         );
       }
       await initS3(this.active.id, this.active.name, this.$store, this.$t);

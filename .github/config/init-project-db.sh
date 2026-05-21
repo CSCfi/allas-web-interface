@@ -3,12 +3,9 @@ set -e
 
 psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<-EOSQL
     CREATE USER sharing;
-    CREATE USER request;
     CREATE DATABASE swiftbrowserdb;
     GRANT ALL PRIVILEGES ON DATABASE swiftbrowserdb TO sharing;
-    GRANT ALL PRIVILEGES ON DATABASE swiftbrowserdb TO request;
     ALTER USER sharing WITH PASSWORD '$SHARING_PASSWORD';
-    ALTER USER request WITH PASSWORD '$REQUEST_PASSWORD';
 EOSQL
 
 psql -v ON_ERROR_STOP=1 --username "sharing" --dbname "swiftbrowserdb" <<-EOSQL

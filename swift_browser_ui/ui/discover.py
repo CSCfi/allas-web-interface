@@ -12,7 +12,6 @@ async def handle_discover(_: Union[aiohttp.web.Request, None]) -> aiohttp.web.Re
     return aiohttp.web.json_response(
         {
             "sharing_endpoint": setd["sharing_endpoint"],
-            "request_endpoint": setd["request_endpoint"],
         }
     )
 

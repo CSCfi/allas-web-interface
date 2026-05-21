@@ -11,7 +11,6 @@ const useStore = defineStore("global", {
       { ph: "Suomeksi", value: "fi" },
     ],
     sharingClient: undefined,
-    requestClient: undefined,
     socket: undefined,
     isUploading: false,
     isDeleting: false,
@@ -73,9 +72,6 @@ const useStore = defineStore("global", {
     },
     setSharingClient(newClient) {
       this.sharingClient = newClient;
-    },
-    setRequestClient(newClient) {
-      this.requestClient = newClient;
     },
     setUploading() {
       this.isUploading = true;

@@ -84,7 +84,6 @@ class SignatureTokenTestClass(
 
         self.setd_mock = {
             "sharing_internal_endpoint": "http://sharing-test-endpoint",
-            "request_internal_endpoint": "http://request-test-endpoint",
         }
         self.setd_patch = unittest.mock.patch(
             "swift_browser_ui.ui.signature.setd", self.setd_mock
@@ -92,7 +91,6 @@ class SignatureTokenTestClass(
 
         self.setd_mock_missing_endpoints = {
             "sharing_internal_endpoint": None,
-            "request_internal_endpoint": None,
         }
         self.setd_missing_patch = unittest.mock.patch(
             "swift_browser_ui.ui.signature.setd", self.setd_mock_missing_endpoints

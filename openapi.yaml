@@ -8,8 +8,6 @@ info:
 tags:
   - name: Frontend
     description: Endpoints for sharing request "Filtered proxied API from Openstack Swift used for a browser application"
-  - name: Sharing Request
-    description: Endpoints for sharing request "Database and API for storing / querying Openstack Swift ACL share action request information."
   - name: Sharing Account
     description: Endpoints for sharing request "Database and API for storing / querying Openstack Swift ACL information"
   - name: Upload/Download
@@ -19,7 +17,6 @@ paths:
   /health:
     get:
       tags:
-        - Sharing Request
         - Sharing Account
         - Frontend
       summary: health API
@@ -30,170 +27,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Health'
-  /request/user/{user}/{container}:
-    post:
-      tags:
-        - Sharing Request
-      summary: Publish a new request for access to a container
-      parameters:
-      - name: user
-        in: path
-        description: The user that's requesting access
-        required: true
-        schema:
-          type: string
-          example: AUTH_example
-      - name: container
-        in: path
-        description: The container that the access is requested to
-        required: true
-        schema:
-          type: string
-          example: test-container
-      - name: owner
-        in: query
-        description: The container owner that the access is requested from.
-        schema:
-          type: string
-          example: AUTH_example
-      responses:
-        200:
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/NewRequest"
-    delete:
-      tags:
-        - Sharing Request
-      summary: Delete an existing request for access
-      parameters:
-      - name: user
-        in: path
-        description: The user that originally requested access
-        required: true
-        schema:
-          type: string
-          example: AUTH_example
-      - name: container
-        in: path
-        description: The container that the access was requested to
-        required: true
-        schema:
-          type: string
-          example: test-container
-      - name: owner
-        in: query
-        description: The container owner that the access was requeted from.
-        schema:
-          type: string
-          example: AUTH_example
-      responses:
-        200:
-          description: OK
-          content:
-            text/plain:
-                schema:
-                  type: string
-                  example: OK
-    options:
-      tags:
-        - Sharing Request
-      summary: Handle preflight for existing request for access
-      parameters:
-      - name: user
-        in: path
-        description: The user that originally requested access
-        required: true
-        schema:
-          type: string
-          example: AUTH_example
-      - name: container
-        in: path
-        description: The container that the access was requested to
-        required: true
-        schema:
-          type: string
-          example: test-container
-      - name: owner
-        in: query
-        description: The container owner that the access was requeted from.
-        schema:
-          type: string
-          example: AUTH_example
-      responses:
-        200:
-          description: OK
-          headers:
-            Access-Control-Allow-Methods:
-              schema:
-                type: string
-                example: POST, OPTIONS, DELETE
-            Access-Control-Max-Age:
-              schema:
-                type: string
-                example: 84600
-  /request/user/{user}:
-    get:
-      tags:
-        - Sharing Request
-      summary: List container share requests made by a user.
-      parameters:
-      - name: user
-        in: path
-        description: The user querying
-        required: true
-        schema:
-          type: string
-          example: AUTH_example
-      responses:
-        200:
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Requests"
-  /request/owner/{user}:
-    get:
-      tags:
-        - Sharing Request
-      summary: List the requests owned by the user (made for the user).
-      parameters:
-      - name: user
-        in: path
-        description: The user querying
-        required: true
-        schema:
-          type: string
-          example: AUTH_example
-      responses:
-        200:
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Requests"
-  /request/container/{container}:
-    get:
-      tags:
-        - Sharing Request
-      summary: List share requests made for a container.
-      parameters:
-      - name: container
-        in: path
-        description: The container queried for
-        required: true
-        schema:
-          type: string
-          example: test-container
-      responses:
-        200:
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ContainerRequests"
-
   /access/{user}:
     get:
       tags:
@@ -470,7 +303,6 @@ paths:
     post:
       tags:
         - Sharing Account
-        - Sharing Request
       summary: Add a token to the user.
       parameters:
       - name: project
@@ -493,7 +325,6 @@ paths:
     delete:
       tags:
         - Sharing Account
-        - Sharing Request
       summary: Delete a token to the user.
       parameters:
       - name: project
@@ -516,7 +347,6 @@ paths:
     options:
       tags:
         - Sharing Account
-        - Sharing Request
       summary: Serve correct response headers to allowed DELETE preflight query.
       parameters:
       - name: project
@@ -549,7 +379,6 @@ paths:
     get:
       tags:
         - Sharing Account
-        - Sharing Request
       summary: Handle call for listing API tokens.
       parameters:
       - name: project
@@ -1239,56 +1068,6 @@ paths:
                 example: 84600
 components:
   schemas:
-
-    NewRequest:
-      type: object
-      properties:
-        user:
-          type: string
-          description: The user requesting access
-          example: AUTH_example
-        container:
-          type: string
-          description: The container the access is requested for
-          example: test-container
-        owner:
-          type: string
-          description: The owner that the access is requested from
-          example: AUTH_example
-        date:
-          type: string
-          description: The date the request was posted
-          example: "2012-04-23T18:25:43.511Z"
-
-    ListedRequest:
-      type: object
-      properties:
-        user:
-          type: string
-          description: The user requesting access
-          example: AUTH_example
-        container:
-          type: string
-          description: The container the access is requested for
-          example: test-container
-        owner:
-          type: string
-          description: The owner that the access is requested from
-          example: AUTH_example
-        date:
-          type: string
-          description: The date the request was posted
-          example: "2012-04-23T18:25:43.511Z"
-
-    Requests:
-      type: array
-      items:
-        $ref: "#/components/schemas/ListedRequest"
-
-    ContainerRequests:
-      type: array
-      items:
-        $ref: "#/components/schemas/ListedRequest"
 
     ListedContainer:
       type: object

@@ -69,7 +69,6 @@ dev = [
 
 [project.scripts]
 swift-browser-ui = "swift_browser_ui.launcher:run_ui"
-swift-sharing-request = "swift_browser_ui.launcher:run_request"
 swift-x-account-sharing = "swift_browser_ui.launcher:run_sharing"
 
 [project.urls]
