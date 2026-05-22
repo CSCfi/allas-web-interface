@@ -3,12 +3,12 @@ set -e
 
 psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<-EOSQL
     CREATE USER sharing;
-    CREATE DATABASE swiftbrowserdb;
-    GRANT ALL PRIVILEGES ON DATABASE swiftbrowserdb TO sharing;
+    CREATE DATABASE s3browserdb;
+    GRANT ALL PRIVILEGES ON DATABASE s3browserdb TO sharing;
     ALTER USER sharing WITH PASSWORD '$SHARING_PASSWORD';
 EOSQL
 
-psql -v ON_ERROR_STOP=1 --username "sharing" --dbname "swiftbrowserdb" <<-EOSQL
+psql -v ON_ERROR_STOP=1 --username "sharing" --dbname "s3browserdb" <<-EOSQL
     CREATE TABLE IF NOT EXISTS Shares(
         container TEXT,
         container_owner TEXT,
@@ -23,13 +23,6 @@ psql -v ON_ERROR_STOP=1 --username "sharing" --dbname "swiftbrowserdb" <<-EOSQL
         name TEXT,
         id TEXT,
         PRIMARY KEY(id)
-    );
-    CREATE TABLE IF NOT EXISTS Requests(
-        container TEXT,
-        container_owner TEXT,
-        recipient TEXT,
-        created TIMESTAMP,
-        PRIMARY KEY(container, container_owner, recipient)
     );
     CREATE TABLE IF NOT EXISTS Tokens(
         token_owner TEXT,

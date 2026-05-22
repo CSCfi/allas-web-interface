@@ -98,7 +98,7 @@ class SharingDBConn(BaseDBConn):
             host=os.environ.get("SHARING_DB_HOST", "localhost"),
             port=int(os.environ.get("SHARING_DB_PORT", 5432)),
             ssl=os.environ.get("SHARING_DB_SSL", "prefer"),
-            database=os.environ.get("SHARING_DB_NAME", "swiftbrowserdb"),
+            database=os.environ.get("SHARING_DB_NAME", "s3browserdb"),
             min_size=int(os.environ.get("SHARING_DB_MIN_CONNECTIONS", 1)),
             max_size=int(os.environ.get("SHARING_DB_MAX_CONNECTIONS", 10)),
             timeout=int(os.environ.get("SHARING_DB_TIMEOUT", 120)),
