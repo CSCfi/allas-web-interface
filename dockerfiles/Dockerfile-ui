@@ -1,4 +1,32 @@
-FROM docker.io/node:22-alpine3.22 as FRONTEND
+FROM docker.io/node:22-alpine3.22 AS WEBPACK_WASM_PREPROCESS
+
+RUN --mount=type=cache,target=/var/cache/apk/ \
+    apk add python3
+
+COPY swift_browser_ui_frontend/package.json /root/swift_ui/swift_browser_ui_frontend/package.json
+COPY swift_browser_ui_frontend/pnpm-lock.yaml /root/swift_ui/swift_browser_ui_frontend/pnpm-lock.yaml
+
+RUN --mount=type=cache,target=/root/.pnpm-store \
+    cd /root/swift_ui/swift_browser_ui_frontend \
+    && npm install -g pnpm@9 \
+    && pnpm install --prod
+
+COPY swift_browser_ui_frontend/wasm /root/swift_ui/swift_browser_ui_frontend/wasm
+
+RUN cd /root/swift_ui/swift_browser_ui_frontend \
+    && mkdir -p wasm/build \
+    && npx webpack --config wasm/wasm-webpack.config.js
+
+FROM emscripten/emsdk AS WASM
+
+COPY --from=WEBPACK_WASM_PREPROCESS /root/swift_ui/swift_browser_ui_frontend/wasm/ /src/
+
+ENV EMCC_CFLAGS="-I/emsdk/upstream/include -L/emsdk/upstream/lib -sINITIAL_MEMORY=26214400"
+ENV EMCC_FORCE_STDLIBS="libc"
+
+RUN bash -lc 'source /emsdk/emsdk_env.sh && cd /src && emmake make all'
+
+FROM docker.io/node:22-alpine3.22 AS FRONTEND
 
 ARG OIDC_ENABLED
 
@@ -12,10 +40,17 @@ RUN --mount=type=cache,target=/root/.pnpm-store \
 
 COPY swift_browser_ui_frontend /root/swift_ui/swift_browser_ui_frontend
 
-RUN cd /root/swift_ui/swift_browser_ui_frontend \
-    && OIDC_ENABLED=$OIDC_ENABLED pnpm run build
+COPY --from=WASM /src/build/s3upworker.js /root/swift_ui/swift_browser_ui_frontend/public/s3upworker.js
+COPY --from=WASM /src/build/s3upworker.wasm /root/swift_ui/swift_browser_ui_frontend/public/s3upworker.wasm
+COPY --from=WASM /src/build/s3upworker-post.js.map /root/swift_ui/swift_browser_ui_frontend/public/s3upworker-post.js.map
+COPY --from=WASM /src/build/s3downworker.js /root/swift_ui/swift_browser_ui_frontend/public/s3downworker.js
+COPY --from=WASM /src/build/s3downworker.wasm /root/swift_ui/swift_browser_ui_frontend/public/s3downworker.wasm
+COPY --from=WASM /src/build/s3downworker-post.js.map /root/swift_ui/swift_browser_ui_frontend/public/s3downworker-post.js.map
 
-FROM docker.io/python:3.12-alpine3.22 as BACKEND
+RUN cd /root/swift_ui/swift_browser_ui_frontend \
+    && OIDC_ENABLED=$OIDC_ENABLED pnpm run docker-build
+
+FROM docker.io/python:3.12-alpine3.22 AS BACKEND
 
 COPY pyproject.toml /root/swift_ui/pyproject.toml
 COPY README.md /root/swift_ui/README.md
@@ -30,12 +65,10 @@ FROM docker.io/python:3.12-alpine3.22
 
 LABEL maintainer "CSC Developers"
 LABEL org.label-schema.schema-version="1.0"
-LABEL org.label-schema.vcs-url="https://github.com/CSCFI/swift-browser-ui"
+LABEL org.label-schema.vcs-url="https://github.com/CSCfi/swift-browser-ui"
 
 COPY --from=BACKEND /usr/local/lib/python3.12/ /usr/local/lib/python3.12/
-
 COPY --from=BACKEND /usr/local/bin/gunicorn /usr/local/bin/
-
 COPY --from=BACKEND /usr/local/bin/swift-browser-ui /usr/local/bin/
 
 RUN mkdir -p /app
