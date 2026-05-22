@@ -198,12 +198,10 @@ async def get_redis_client() -> redis.Redis:
         redis_port = str(os.environ.get("SWIFT_UI_REDIS_PORT", ""))
         redis_host = str(os.environ.get("SWIFT_UI_REDIS_HOST", "localhost"))
 
-        redis_creds = ""
-        if redis_user and redis_password:
-            redis_creds = f"{redis_user}:{redis_password}@"
-
         redis_client = redis.from_url(
-            f"redis://{redis_creds}{redis_host}:{redis_port}",
+            f"redis://{redis_host}:{redis_port}",
+            username=redis_user if redis_user else None,
+            password=redis_password if redis_password else None,
             health_check_interval=5,
             retry=retry_conf,
             retry_on_error=retry_errors,
