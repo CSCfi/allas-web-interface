@@ -3,10 +3,16 @@
 # Generic imports
 import asyncio
 import logging
+import mimetypes
 import secrets
 import ssl
 import sys
 import typing
+
+# Alpine Linux's mimetypes database omits common web types
+mimetypes.add_type("application/javascript", ".js")
+mimetypes.add_type("application/javascript", ".mjs")
+mimetypes.add_type("application/wasm", ".wasm")
 
 import aiohttp.web
 import aiohttp_session

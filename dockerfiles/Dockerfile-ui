@@ -55,7 +55,7 @@ FROM docker.io/python:3.12-alpine3.22 AS BACKEND
 COPY pyproject.toml /root/swift_ui/pyproject.toml
 COPY README.md /root/swift_ui/README.md
 COPY swift_browser_ui /root/swift_ui/swift_browser_ui
-COPY --from=FRONTEND /root/swift_ui/swift_browser_ui_frontend/dist /root/swift_ui/swift_browser_ui_frontend/dist
+COPY --from=FRONTEND /root/swift_ui/swift_browser_ui_frontend/dist /root/swift_ui/swift_browser_ui/ui/static
 
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install --upgrade pip && \
