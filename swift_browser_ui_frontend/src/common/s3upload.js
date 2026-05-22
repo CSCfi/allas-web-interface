@@ -86,14 +86,7 @@ export default class S3UploadSocket {
       i < window.navigator.hardwareConcurrency && i < MAX_UPLOAD_WORKERS;
       i++
     ) {
-      if (DEV) {
-        // Load the workers from frontend work directory when in
-        // development mode
-        this.upWorkers.push(new Worker("/s3upworker.js"));
-      } else {
-        // In production workers are defined in the static folder
-        this.upWorkers.push(new Worker("/static/s3upworker.js"));
-      }
+      this.upWorkers.push(new Worker("/s3upworker.js"));
     }
     if (DEV) {
       console.log(`${this.upWorkers.length} upload worker threads were created`);
