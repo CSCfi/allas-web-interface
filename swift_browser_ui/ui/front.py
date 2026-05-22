@@ -18,6 +18,7 @@ async def up_swjs(_: aiohttp.web.Request) -> aiohttp.web.FileResponse:
             "Pragma": "no-cache",
             "Expires": "0",
             "Service-Worker-Allowed": "/",
+            "Content-Type": "application/javascript",
         },
     )
 
@@ -57,6 +58,7 @@ async def down_swjs(_: aiohttp.web.Request) -> aiohttp.web.FileResponse:
             "Pragma": "no-cache",
             "Expires": "0",
             "Service-Worker-Allowed": "/",
+            "Content-Type": "application/javascript",
         },
     )
 
