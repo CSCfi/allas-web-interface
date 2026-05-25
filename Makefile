@@ -132,7 +132,9 @@ check-deps:
 			exit 1; \
 		}; \
 	done
-	$(MAKE) -C submodules/local-single-host-ceph check-deps
+	@if [ -d submodules/local-single-host-ceph ]; then \
+		$(MAKE) -C submodules/local-single-host-ceph check-deps; \
+	fi
 
 refresh-submodules:
 	git submodule update --init --recursive
