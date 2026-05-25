@@ -57,6 +57,9 @@ export default class S3DownloadSocket {
       this.downWorker = undefined;
     } else if (window.showSaveFilePicker !== undefined) {
       this.downWorker = new Worker("/s3downworker.js");
+      this.downWorker.onerror = (e) => {
+        console.error("Download worker error:", e.message, e.filename, e.lineno);
+      };
       if (DEV) {
         console.log("Created a conventional worker for downloads.");
       }

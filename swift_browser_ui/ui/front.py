@@ -31,7 +31,7 @@ async def up_swasm(_: aiohttp.web.Request) -> aiohttp.web.FileResponse:
             "Cache-Control": "no-cache, no-store, must-revalidate",
             "Pragma": "no-cache",
             "Expires": "0",
-            "Service-Worker-Allowed": "/",
+            "Content-Type": "application/wasm",
         },
     )
 
@@ -71,7 +71,7 @@ async def down_swasm(_: aiohttp.web.Request) -> aiohttp.web.FileResponse:
             "Cache-Control": "no-cache, no-store, must-revalidate",
             "Pragma": "no-cache",
             "Expires": "0",
-            "Service-Worker-Allowed": "/",
+            "Content-Type": "application/wasm",
         },
     )
 

@@ -104,6 +104,9 @@ export default class S3UploadSocket {
     // because the WASM-based worker's message listener isn't ready until then.
     for (const worker of this.upWorkers) {
       worker.onmessage = this.getUploadWorkerHandler(worker);
+      worker.onerror = (e) => {
+        console.error("Upload worker error:", e.message, e.filename, e.lineno);
+      };
     }
   }
 
