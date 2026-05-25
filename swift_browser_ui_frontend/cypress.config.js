@@ -24,7 +24,7 @@ module.exports = defineConfig({
             the Postgresql container to run in different host and port
           */
           const client = new Client({
-            database: "swiftbrowserdb",
+            database: "s3browserdb",
             host: "localhost",
             port: 5432,
             user: "sharing",
