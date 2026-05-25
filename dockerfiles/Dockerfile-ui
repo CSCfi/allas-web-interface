@@ -69,6 +69,10 @@ LABEL org.label-schema.vcs-url="https://github.com/CSCfi/swift-browser-ui"
 
 COPY --from=BACKEND /usr/local/lib/python3.12/ /usr/local/lib/python3.12/
 COPY --from=BACKEND /root/swift_ui/swift_browser_ui/ui/static /usr/local/lib/python3.12/site-packages/swift_browser_ui/ui/static
+COPY --from=WASM /src/build/s3upworker.js /usr/local/lib/python3.12/site-packages/swift_browser_ui/ui/static/s3upworker.js
+COPY --from=WASM /src/build/s3upworker.wasm /usr/local/lib/python3.12/site-packages/swift_browser_ui/ui/static/s3upworker.wasm
+COPY --from=WASM /src/build/s3downworker.js /usr/local/lib/python3.12/site-packages/swift_browser_ui/ui/static/s3downworker.js
+COPY --from=WASM /src/build/s3downworker.wasm /usr/local/lib/python3.12/site-packages/swift_browser_ui/ui/static/s3downworker.wasm
 COPY --from=BACKEND /usr/local/bin/gunicorn /usr/local/bin/
 COPY --from=BACKEND /usr/local/bin/swift-browser-ui /usr/local/bin/
 
