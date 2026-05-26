@@ -26,7 +26,9 @@ let default_translations = {
           "Something was wrong with the request. This can " +
           "be for example due to missing password and/or " +
           "username.",
-        UIdown: "500 – Service Unavailable",
+        UIdown: "500 – Service is temporarily down. Please try again in" +
+                " a few minutes. Please contact support at servicedesk@csc.fi" +
+                " if the problem persists.",
         UIdown_text1:
           "You are seeing this page because " +
           "the service is currently unavailable. Please check back later.",
@@ -55,9 +57,10 @@ let default_translations = {
       },
       dropFiles: "Drag and drop folders here or ",
       support: "Support",
-      program_name: "Swift browser",
-      program_description:
-        "Web UI for browsing contents in Swift object " + "storage systems.",
+      program_name: "Allas",
+      program_description: "Allas Web UI provides a simple-to-use web user " +
+          "interface for CSC Object Storage service, Allas.",
+      helplink: "https://docs.csc.fi/data/Allas/",
       currentProj: "Project",
       selectProj: "Select project",
       createBucket: "Create bucket",
@@ -403,21 +406,20 @@ let default_translations = {
       },
       supportMenu: {
         userGuide: "User guide",
-        userGuideLink: "#",
+        userGuideLink: "https://docs.csc.fi/data/Allas/using_allas/allas-ui",
         projectInfo: "Project information",
-        projectInfoBaseLink: "#",
+        projectInfoBaseLink: "https://my.csc.fi/projects/",
         createAPIKeys: "Create API keys",
       },
       footerMenu: {
-        title: "Swift browser",
-        serviceProvider: "Service provider",
-        serviceProviderLink: "#",
+        title: "Allas",
+        serviceProvider: "CSC – IT Center for Science Ltd.",
+        serviceProviderLink: "https://csc.fi/",
         menuItems: [
-          { item: "Item 1", link: "#" },
-          { item: "Item 2", link: "/accessibility" },
-          { item: "Item 3", link: "#" },
-          { item: "Item 4", link: "#" },
-          { item: "Item 5", link: "#" },
+          { item: "Service Description", link: "https://research.csc.fi/-/allas" },
+          { item: "Accessibility", link: "/accessibility" },
+          { item: "Privacy", link: "https://csc.fi/en/security-privacy-data-policy-and-open-source-policy/privacy/" },
+          { item: "Docs", link: "https://docs.csc.fi/data/Allas/using_allas/allas-ui" },
         ],
       },
     },
@@ -438,8 +440,8 @@ let default_translations = {
       footer: "copyright information",
     },
     accessibilityPage: {
-      service: "Service",
-      date: "dd.mm.yy",
+      service: "Allas",
+      date: "01.01.2025",
       title: "@:accessibilityPage.service – Accessibility statement",
       intro1: "This accessibility statement applies to the" +
             " @:accessibilityPage.service service and was made on" +
@@ -518,14 +520,17 @@ let default_translations = {
         subheading: "Reporting issues",
         text1: "To report any issues, reach out to CSC's service desk:",
         text2: [
-          { list: "Email" },
-          { list: "Phone" },
+          { list: "servicedesk@csc.fi (Subject: Allas-UI)" },
+          { list: "Phone: +358 9 457 2821. Open Monday to Friday from \
+             8.30 a.m. to 4 p.m." },
         ],
       },
       part4: {
         heading: "Supervisory authority",
-        authorityLink: "#",
-        authorityName: "Authority name",
+        authorityLink:
+        "https://www.saavutettavuusvaatimukset.fi/kayttajan-oikeudet",
+        authorityName:
+        "Regional State Administrative Agency for Southern Finland",
         text: "If you notice accessibility problems on the website," +
               " start by giving feedback to us, that is, the website" +
               " administrator. Receiving a response may take 14 days. If you" +
@@ -538,11 +543,11 @@ let default_translations = {
       part5: {
         heading: "Supervisory authority's contact information",
         text: [
-          { list: "Name" },
-          { list: "Unit" },
-          { list: "Website" },
-          { list: "Email" },
-          { list: "Phone number"},
+          { list: "Regional State Administrative Agency for Southern Finland" },
+          { list: "Accessibility Monitoring Unit" },
+          { list: "www.saavutettavuusvaatimukset.fi" },
+          { list: "saavutettavuus(at)avi.fi" },
+          { list: "Tel: +358 295 016 0000"},
         ],
       },
       part6: {
@@ -587,7 +592,10 @@ let default_translations = {
         BadRequest_text:
           "Virhe sivupyynnössä. Tämä voi johtua esimerkiksi " +
           "puuttuvasta salasanasta ja/tai käyttäjänimestä ",
-        UIdown: "500 – Palvelu ei ole saatavilla",
+        UIdown: "500 – Palvelu on tilapäisesti poissa käytöstä." +
+                " Yritä uudelleen muutaman minuutin kuluttua." +
+                " Ota yhteyttä tukeen servicedesk@csc.fi, jos" +
+                " ongelma jatkuu.",
         UIdown_text1:
           "Näet tämän sivun, koska palvelu " +
           "ei ole tällä hetkellä saatavilla.",
@@ -615,10 +623,10 @@ let default_translations = {
       },
       dropFiles: "Vedä ja pudota kansiot tähän tai ",
       support: "Tuki",
-      program_name: "Swift browser",
-      program_description:
-        "Web-käyttöliittymä tallennettujen tiedostojen " +
-        "selaamiseen Swift-objektitietojärjestelmissä.",
+      program_name: "Allas",
+      program_description: "Allas Web UI tarjoaa yksinkertaisen " +
+          "web-käyttöliittymän CSC:n Object Storage -palveluun, Altaaseen.",
+      helplink: "https://docs.csc.fi/data/Allas/",
       currentProj: "Projekti",
       selectProj: "Valitse projekti",
       createBucket: "Luo ämpäri",
@@ -964,21 +972,20 @@ let default_translations = {
       },
       supportMenu: {
         userGuide: "Käyttöohje",
-        userGuideLink: "#",
+        userGuideLink: "https://docs.csc.fi/data/Allas/",
         projectInfo: "Projektin tiedot",
-        projectInfoBaseLink: "#",
+        projectInfoBaseLink: "https://my.csc.fi/projects/",
         createAPIKeys: "Luo API-avaimia",
       },
       footerMenu: {
-        title: "Swift browser",
-        serviceProvider: "Palveluntarjoaja",
-        serviceProviderLink: "#",
+        title: "Allas",
+        serviceProvider: "CSC – Tieteen tietotekniikan keskus Oy",
+        serviceProviderLink: "https://csc.fi/",
         menuItems: [
-          { item: "Menu 1", link: "#" },
-          { item: "Menu 2", link: "/accessibility" },
-          { item: "Menu 3", link: "#" },
-          { item: "Menu 4", link: "#" },
-          { item: "Menu 5", link: "#" },
+          { item: "Palvelun kuvaus", link: "https://research.csc.fi/-/allas" },
+          { item: "Saavutettavuus", link: "/accessibility" },
+          { item: "Tietosuoja", link: "https://csc.fi/tietoturva-tietosuoja-datapolitiikka-ja-avoin-lahdekoodi/tietosuoja" },
+          { item: "Asiakirjat", link: "https://docs.csc.fi/data/Allas/using_allas/allas-ui" },
         ],
       },
     },
@@ -999,8 +1006,8 @@ let default_translations = {
       footer: "tekijänoikeustiedot",
     },
     accessibilityPage: {
-      service: "Service",
-      date: "dd.mm.yy",
+      service: "Allas",
+      date: "01.01.2025",
       title: "@:accessibilityPage.service – Saavutettavuusseloste",
       intro1: "Tämä saavutettavuusseloste koskee" +
             " @:accessibilityPage.service{'-'}palvelua ja se on päivätty" +
