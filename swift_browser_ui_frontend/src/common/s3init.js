@@ -1,7 +1,7 @@
 import {
   S3Client,
 } from "@aws-sdk/client-s3";
-import { GET } from "./api";
+import { GET, awsBulkAddBucketCors } from "./api";
 import { DEV } from "./globalFunctions";
 import S3UploadSocket from "./s3upload";
 import S3DownloadSocket from "./s3download";
@@ -50,6 +50,12 @@ export async function initS3(projectID, projectName, store, t) {
     store.setS3Endpoint(s3endpoint);
 
     const ec2creds = await getEC2Credentials(projectID);
+
+    // Update CORS on all project buckets so downloads work regardless of
+    // whether the user has previously uploaded via this app.
+    awsBulkAddBucketCors(projectID).catch((err) => {
+      console.warn("Bulk CORS update failed:", err);
+    });
 
     // Initialize the frontend S3 client
     const s3client = createClient(
