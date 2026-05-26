@@ -678,7 +678,7 @@ export default {
   color: #FFF;
   font-size: 1rem;
   font-weight: 700;
-  background: var(--csc-primary);
+  background: var(--csc-dark-blue);
   align-items: center;
   & .mdi {
     font-size: 1.5rem;

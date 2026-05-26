@@ -4,6 +4,7 @@
 /* CSS file for integrating CSC brand colors */
 
 :root {
+  --csc-dark-blue: #002f5f;
   --csc-blue: #025b96;
   --csc-dark: #2E3438;
   --csc-grey: #595959;
