@@ -26,7 +26,7 @@ importers:
       '@ygoe/msgpack':
         specifier: ^1.0.3
         version: 1.0.3
-      csc-ui:
+      allas-ui:
         specifier: 0.9.5
         version: 0.9.5
       dexie:
@@ -1992,6 +1992,9 @@ packages:
   ajv@8.17.1:
     resolution: {integrity: sha512-B/gBuNg5SiMTrPkC+A2+cW0RszwxYmn6VYxB/inlBStS5nx6xHIt/ehKRhIMhqusl7a8LjQoZnjCs5vhwxOQ1g==}
 
+  allas-ui@0.9.5:
+    resolution: {integrity: sha512-hXey2hWRZoA2C1uLPHU3vV2DBTxIdpnfQKOWfjMTuZVv8RWoNFnUEb8d2coKnSyLxCS9nih1o+OQTcvG+fauqw==}
+
   ansi-colors@4.1.3:
     resolution: {integrity: sha512-/6w/C21Pm1A7aZitlI5Ni/2J6FFQN8i1Cvz3kHABAAbw93v/NlvKdVOqz7CCWz/3iv/JplRSEEZ83XION15ovw==}
     engines: {node: '>=6'}
@@ -2333,9 +2336,6 @@ packages:
   cross-spawn@7.0.6:
     resolution: {integrity: sha512-uV2QOWP2nWzsy2aMp8aRibhi9dlzF5Hgh5SHaB9OiTGEyDTiJJyx0uy51QXdyWbtAHNua4XJzUKca3OzKUd3vA==}
     engines: {node: '>= 8'}
-
-  csc-ui@0.9.5:
-    resolution: {integrity: sha512-GJsl24TWr3sA4RHqXPB6klk6L3dhx+I1cZo1NcAo6WXcdRU8Z1TaMZocsRS9mlxH5evkndf0W7PrUISRgAjmfg==}
 
   css.escape@1.5.1:
     resolution: {integrity: sha512-YUifsXXuknHlUsmlgyY0PKzgPOr7/FjCePfHNt0jxm83wHZi44VDMQ7/fGNkjY3/jV1MC+1CmZbaHzugyeRtpg==}
@@ -4277,6 +4277,7 @@ packages:
 
   uuid@9.0.1:
     resolution: {integrity: sha512-b+1eJOlsR9K8HJpow9Ok3fiWOWSIcIzXodvv0rQjVoOVNpWMpxf1wZNpt4y9h10odCNrqnYp1OBzRktckBe3sA==}
+    deprecated: uuid@10 and below is no longer supported.  For ESM codebases, update to uuid@latest.  For CommonJS codebases, use uuid@11 (but be aware this version will likely be deprecated in 2028).
     hasBin: true
 
   v8-to-istanbul@9.2.0:
@@ -6775,17 +6776,17 @@ snapshots:
       '@webassemblyjs/ast': 1.14.1
       '@xtuc/long': 4.2.2
 
-  '@webpack-cli/configtest@3.0.1(webpack-cli@6.0.1)(webpack@5.104.1)':
+  '@webpack-cli/configtest@3.0.1(webpack-cli@6.0.1(webpack@5.104.1))(webpack@5.104.1(webpack-cli@6.0.1))':
     dependencies:
       webpack: 5.104.1(webpack-cli@6.0.1)
       webpack-cli: 6.0.1(webpack@5.104.1)
 
-  '@webpack-cli/info@3.0.1(webpack-cli@6.0.1)(webpack@5.104.1)':
+  '@webpack-cli/info@3.0.1(webpack-cli@6.0.1(webpack@5.104.1))(webpack@5.104.1(webpack-cli@6.0.1))':
     dependencies:
       webpack: 5.104.1(webpack-cli@6.0.1)
       webpack-cli: 6.0.1(webpack@5.104.1)
 
-  '@webpack-cli/serve@3.0.1(webpack-cli@6.0.1)(webpack@5.104.1)':
+  '@webpack-cli/serve@3.0.1(webpack-cli@6.0.1(webpack@5.104.1))(webpack@5.104.1(webpack-cli@6.0.1))':
     dependencies:
       webpack: 5.104.1(webpack-cli@6.0.1)
       webpack-cli: 6.0.1(webpack@5.104.1)
@@ -6841,6 +6842,16 @@ snapshots:
       fast-uri: 3.0.6
       json-schema-traverse: 1.0.0
       require-from-string: 2.0.2
+
+  allas-ui@0.9.5:
+    dependencies:
+      '@mdi/js': 7.4.47
+      '@stencil/core': 4.14.0
+      '@types/node': 20.14.6
+      normalize.css: 8.0.1
+      stencil-click-outside: 1.8.0(@stencil/core@4.14.0)
+      swiper: 9.4.1
+      uuid: 9.0.1
 
   ansi-colors@4.1.3: {}
 
@@ -7180,16 +7191,6 @@ snapshots:
       path-key: 3.1.1
       shebang-command: 2.0.0
       which: 2.0.2
-
-  csc-ui@0.9.5:
-    dependencies:
-      '@mdi/js': 7.4.47
-      '@stencil/core': 4.14.0
-      '@types/node': 20.14.6
-      normalize.css: 8.0.1
-      stencil-click-outside: 1.8.0(@stencil/core@4.14.0)
-      swiper: 9.4.1
-      uuid: 9.0.1
 
   css.escape@1.5.1: {}
 
@@ -9238,7 +9239,7 @@ snapshots:
 
   tapable@2.3.0: {}
 
-  terser-webpack-plugin@5.3.16(webpack@5.104.1):
+  terser-webpack-plugin@5.3.16(webpack@5.104.1(webpack-cli@6.0.1)):
     dependencies:
       '@jridgewell/trace-mapping': 0.3.25
       jest-worker: 27.5.1
@@ -9449,9 +9450,9 @@ snapshots:
   webpack-cli@6.0.1(webpack@5.104.1):
     dependencies:
       '@discoveryjs/json-ext': 0.6.3
-      '@webpack-cli/configtest': 3.0.1(webpack-cli@6.0.1)(webpack@5.104.1)
-      '@webpack-cli/info': 3.0.1(webpack-cli@6.0.1)(webpack@5.104.1)
-      '@webpack-cli/serve': 3.0.1(webpack-cli@6.0.1)(webpack@5.104.1)
+      '@webpack-cli/configtest': 3.0.1(webpack-cli@6.0.1(webpack@5.104.1))(webpack@5.104.1(webpack-cli@6.0.1))
+      '@webpack-cli/info': 3.0.1(webpack-cli@6.0.1(webpack@5.104.1))(webpack@5.104.1(webpack-cli@6.0.1))
+      '@webpack-cli/serve': 3.0.1(webpack-cli@6.0.1(webpack@5.104.1))(webpack@5.104.1(webpack-cli@6.0.1))
       colorette: 2.0.20
       commander: 12.1.0
       cross-spawn: 7.0.6
@@ -9497,7 +9498,7 @@ snapshots:
       neo-async: 2.6.2
       schema-utils: 4.3.3
       tapable: 2.3.0
-      terser-webpack-plugin: 5.3.16(webpack@5.104.1)
+      terser-webpack-plugin: 5.3.16(webpack@5.104.1(webpack-cli@6.0.1))
       watchpack: 2.5.0
       webpack-sources: 3.3.3
     optionalDependencies:

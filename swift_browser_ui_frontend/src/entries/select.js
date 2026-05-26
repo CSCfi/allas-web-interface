@@ -1,7 +1,7 @@
 import { createApp } from "vue";
 import SelectPage from "@/pages/SelectPage.vue";
 
-import { applyPolyfills, defineCustomElements } from "csc-ui/dist/loader";
+import { applyPolyfills, defineCustomElements } from "allas-ui/dist/loader";
 import { vControl } from "@/common/csc-ui-vue-directive";
 
 import { i18n } from "@/common/i18n";
