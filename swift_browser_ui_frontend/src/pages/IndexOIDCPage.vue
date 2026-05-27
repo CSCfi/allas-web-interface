@@ -1,7 +1,7 @@
 <template>
   <c-main>
-    <CookieConsentModal />
     <MainToolbar />
+    <CookieConsentModal />
     <c-row>
       <c-flex>
         <c-container class="padding">

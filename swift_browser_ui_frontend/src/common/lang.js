@@ -13,7 +13,7 @@ let default_translations = {
         logIn: "Log in",
         loginmethods: [
           {
-            msg: "Log in with SSO",
+            msg: "Log In",
             href: "/login/oidc_front",
           },
         ],
@@ -580,7 +580,7 @@ let default_translations = {
         logIn: "Kirjaudu sisään",
         loginmethods: [
           {
-            msg: "Kirjaudu SSO:ta käyttäen",
+            msg: "Kirjaudu",
             href: "/login/oidc_front",
           },
         ],
