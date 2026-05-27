@@ -1,5 +1,6 @@
 <template>
   <c-main>
+    <CookieConsentModal />
     <MainToolbar />
     <c-row>
       <c-flex>

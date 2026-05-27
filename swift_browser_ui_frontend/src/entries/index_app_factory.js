@@ -8,6 +8,7 @@ import { applyPolyfills, defineCustomElements } from "allas-ui/dist/loader";
 import { vControl } from "@/common/csc-ui-vue-directive";
 
 import CFooter from "@/components/CFooter.vue";
+import CookieConsentModal from "@/components/CookieConsentModal.vue";
 import MainToolbar from "@/components/MainToolbar.vue";
 
 import "@/assets/main.css";
@@ -21,6 +22,7 @@ export function newApp(name, data, Component) {
     name: name,
     components: {
       CFooter,
+      CookieConsentModal,
       MainToolbar,
     },
     data: data,

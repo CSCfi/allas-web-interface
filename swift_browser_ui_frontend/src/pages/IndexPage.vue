@@ -1,5 +1,6 @@
 <template>
   <c-main>
+    <CookieConsentModal />
     <MainToolbar />
     <c-row v-if="!notindex && idb">
       <c-flex>
