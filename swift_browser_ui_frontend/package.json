@@ -10,8 +10,8 @@
     "build-devel": "./build_wasm.sh && vite build --mode development",
     "serve-prod": "./build_wasm.sh && vite serve --mode production",
     "build-wasm": "./build_wasm.sh",
-    "docker-build": "vite build --mode production",
-    "docker-build-devel": "vite build --mode development"
+    "docker-build": "vite build --mode production && cp -f public/favicon.ico dist/favicon.ico",
+    "docker-build-devel": "vite build --mode development && cp -f public/favicon.ico dist/favicon.ico"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "3.964.0",
