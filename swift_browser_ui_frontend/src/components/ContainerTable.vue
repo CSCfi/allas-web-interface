@@ -38,6 +38,7 @@ import {
   toggleCopyBucketModal,
   addErrorToastOnMain,
   checkAndAddBucketCors,
+  isS3CompatibleBucketName,
 } from "@/common/globalFunctions";
 import {
   deleteStaleShares,
@@ -154,6 +155,7 @@ export default {
       let containersPage = [];
       sortObjects(mappedContainers, this.sortBy, this.sortDirection);
 
+
       if (this.newBucket) {
         const idx = mappedContainers.findIndex(c => c.name === this.newBucket);
         if (idx > 0) {
@@ -165,40 +167,51 @@ export default {
         .slice(offset, offset + limit).map((
           item,
         ) => {
+          const isLegacy = !isS3CompatibleBucketName(item.name);
+          const nameTag = isLegacy
+            ? { value: this.$t("message.table.legacy_swift"), component: { tag: "c-tag", params: { flat: true } } }
+            : null;
+          const linkParams = {
+            href: "javascript:void(0)",
+            color: "dark-grey",
+            path: mdiPail,
+            iconFill: "primary",
+            iconStyle: {
+              marginRight: "1rem",
+              flexShrink: "0",
+            },
+            onClick: () => {
+              if(item.owner) {
+                this.$router.push({
+                  name: "SharedObjects",
+                  params: {
+                    container: item.name,
+                    owner: item.owner,
+                  },
+                });
+              } else {
+                this.$router.push({
+                  name: "ObjectsView",
+                  params: {
+                    container: item.name,
+                  },
+                });
+              }
+            },
+          };
           containersPage.push({
-            name: {
-              value: truncate(item.name),
-              component: {
-                tag: "c-link",
-                params: {
-                  href: "javascript:void(0)",
-                  color: "dark-grey",
-                  path: mdiPail,
-                  iconFill: "primary",
-                  iconStyle: {
-                    marginRight: "1rem",
-                    flexShrink: "0",
-                  },
-                  onClick: () => {
-                    if(item.owner) {
-                      this.$router.push({
-                        name: "SharedObjects",
-                        params: {
-                          container: item.name,
-                          owner: item.owner,
-                        },
-                      });
-                    } else {
-                      this.$router.push({
-                        name: "ObjectsView",
-                        params: {
-                          container: item.name,
-                        },
-                      });
-                    }
-                  },
+            name: nameTag ? {
+              value: null,
+              children: [
+                {
+                  value: truncate(item.name),
+                  component: { tag: "c-link", params: linkParams },
                 },
-              },
+                nameTag,
+              ],
+            } : {
+              value: truncate(item.name),
+              component: { tag: "c-link", params: linkParams },
             },
             sharing: {
               value: getSharedStatus(item.sharing),
@@ -225,7 +238,7 @@ export default {
                       },
                       target: "_blank",
                       path: mdiTrayArrowDown,
-                      disabled: (
+                      disabled: isLegacy || (
                         item.owner && item.accessRights?.length === 0
                       ),
                     },

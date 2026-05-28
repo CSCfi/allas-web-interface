@@ -216,3 +216,10 @@ export function toggleDeleteModal(objects, containerName) {
   }
   store.toggleDeleteModal(true);
 }
+
+export function isS3CompatibleBucketName(name) {
+  // S3 requires: 3-63 chars, lowercase letters/numbers/hyphens only,
+  // must start and end with a letter or number (no underscores, uppercase, etc.)
+  if (name.length < 3 || name.length > 63) return false;
+  return /^[a-z0-9][a-z0-9-]*[a-z0-9]$/.test(name);
+}

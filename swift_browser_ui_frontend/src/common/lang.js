@@ -117,6 +117,7 @@ let default_translations = {
         back_to_all_buckets: "Back to all buckets",
         back_to_sharing_buckets: "Back to buckets you have shared",
         back_to_shared_buckets: "Back to buckets shared with you",
+        legacy_swift: "Legacy Swift",
       },
       tableOptions: {
         displayOptions: "Display options",
@@ -688,6 +689,7 @@ let default_translations = {
         back_to_all_buckets: "Takaisin",
         back_to_sharing_buckets: "Takaisin",
         back_to_shared_buckets: "Takaisin",
+        legacy_swift: "Vanha Swift",
       },
       tableOptions: {
         displayOptions: "Näyttöasetukset",
