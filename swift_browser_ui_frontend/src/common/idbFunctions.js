@@ -64,43 +64,33 @@ export async function updateContainers(projectID, signal) {
     signal = controller.signal;
   }
 
-  let buckets = [];
   let newBucketsPage = [];
+  const batchSize = 100;
+  let continuationToken = undefined;
 
-  const maxBuckets = 100;
+  do {
+    const page = await awsListBuckets(projectID, continuationToken);
+    continuationToken = page.NextContinuationToken;
 
-  // Get a list of buckets
-  buckets = await awsListBuckets(projectID);
-
-  if (buckets?.Buckets?.length > 0) {
-    for (const bucket of buckets.Buckets) {
-      // If bucket doesn't exist in IDB, add
+    for (const bucket of page.Buckets ?? []) {
       const bucketExists = idbBucketsByName.get(bucket.Name);
-
       if (!bucketExists) {
-        // Bucket not in IDB, prepare new entry
         // bytes, count, last_modified are updated in objects view
-        let newBucket = {
+        newBucketsPage.push({
           name: bucket.Name,
           bytes: 0,
           count: 0,
           created: bucket.CreationDate.toISOString(),
           last_modified: bucket.CreationDate.toISOString(),
           projectID: projectID,
-          cors_added: false, // added later
-        };
-        newBucketsPage.push(newBucket);
+          cors_added: false,
+        });
       }
-      // Track all existing buckets
       existingBucketNames.add(bucket.Name);
-
-      if (newBucketsPage.length >= maxBuckets) {
-        await processBatch();
-      }
+      if (newBucketsPage.length >= batchSize) await processBatch();
     }
-    // Process any remaining buckets after loop
     await processBatch();
-  }
+  } while (continuationToken);
 
   async function processBatch() {
     if (newBucketsPage.length) {
