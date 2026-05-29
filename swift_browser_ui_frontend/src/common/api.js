@@ -116,56 +116,6 @@ export async function copyBucket(
   return ret;
 }
 
-export async function createAPIKey(
-  project,
-  id,
-) {
-  // Tell backend to create a new project scoped API key
-  let fetchURL = new URL("/token/".concat(
-    encodeURI(project), "/",
-    encodeURI(id),
-  ), document.location.origin);
-
-  let ret = await GET(fetchURL);
-
-  if (ret.status != 201) {
-    throw new Error("API key creation failed");
-  }
-
-  return ret.json();
-}
-
-export async function listAPIKeys(project) {
-  // Get all API keys created for the project by id
-  let fetchURL = new URL(
-    "/token/".concat(encodeURI(project)), document.location.origin,
-  );
-
-  let ret = await GET(fetchURL);
-
-  if (ret.status != 200) {
-    throw new Error("API key listing fetch failed");
-  }
-
-  return ret.json();
-}
-
-export async function removeAPIKey(
-  project,
-  id,
-) {
-  // Tell backend to delete API keys matching the ID
-  let fetchURL = new URL("/token/".concat(
-    encodeURI(project), "/",
-    encodeURI(id),
-  ), document.location.origin);
-
-  let ret = await DELETE(fetchURL);
-
-  if (ret.status != 204) {
-    throw new Error("API key deletion failed");
-  }
-}
 
 // Proxy ListBuckets command through the backend
 export async function awsListBuckets(

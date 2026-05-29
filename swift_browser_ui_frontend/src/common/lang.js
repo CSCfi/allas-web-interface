@@ -313,29 +313,6 @@ let default_translations = {
         copy: "Copy bucket: ",
         name: "Name new bucket",
       },
-      apiKeys: {
-        empty: "There are no API keys in this project.",
-        title: "Create API keys",
-        identifier: "Active keys for this project",
-        identLabel: "Key name",
-        identHint:
-          "Give a name to your API key. Name needs to be unique.",
-        create: "Create key",
-        latest: "Latest key: ",
-        copy: "Copy key",
-        copyWarning:
-          "API key will be displayed just this once " +
-          "and recovering it is not be possible. " +
-          "Please store the key somewhere " +
-          "safe before closing this modal. " +
-          "The key will be valid for seven days, and " +
-          "will be deleted after this time period.",
-        copied: "API key copied.",
-        removed: "API key removed.",
-        inUse: "API key name already in use",
-        required: "API key name is required",
-        creationFailed: "API key creation failed.",
-      },
       uploadDialog: {
         uploadFiles: "Upload files",
         uploadDestination: "Destination bucket: ",
@@ -410,7 +387,6 @@ let default_translations = {
         userGuideLink: "https://docs.csc.fi/data/Allas/using_allas/allas-ui",
         projectInfo: "Project information",
         projectInfoBaseLink: "https://my.csc.fi/projects/",
-        createAPIKeys: "Create API keys",
       },
       footerMenu: {
         title: "Allas",
@@ -882,29 +858,6 @@ let default_translations = {
         copy: "Kopioi ämpäri: ",
         name: "Nimeä uusi ämpäri",
       },
-      apiKeys: {
-        empty: "Tälle projektille ei ole luotu API-avaimia",
-        title: "Luo API-avaimia",
-        identifier: "Tämän projektin aktiiviset API-avaimet",
-        identLabel: "Avaimen nimi",
-        identHint:
-          "Anna avaimelle nimi. Avaimen nimen on oltava yksilöllinen.",
-        create: "Luo avain",
-        latest: "Viimeisin avain: ",
-        copy: "Kopioi avain",
-        copyWarning:
-          "Avain näytetään vain tämän kerran, " +
-          "eikä sen kopiointi tai palautus ole mahdollista jälkeenpäin. " +
-          "Tallenna avain turvalliseen paikkaan " +
-          "ennen kuin suljet tämän ikkunan. " +
-          "Avain on luomisen jälkeen voimassa seitsemän päivää, jonka jälkeen " +
-          "se poistetaan automaattisesti.",
-        copied: "Avain kopioitu.",
-        removed: "Avain poistettu.",
-        creationFailed: "Avaimen luonti epäonnistui.",
-        inUse: "Avaimen nimi on jo käytössä",
-        required: "Avaimen nimi on pakollinen",
-      },
       uploadDialog: {
         uploadFiles: "Lataa tiedostoja",
         uploadDestination: "Kohdeämpäri: ",
@@ -977,7 +930,6 @@ let default_translations = {
         userGuideLink: "https://docs.csc.fi/data/Allas/",
         projectInfo: "Projektin tiedot",
         projectInfoBaseLink: "https://my.csc.fi/projects/",
-        createAPIKeys: "Luo API-avaimia",
       },
       footerMenu: {
         title: "Allas",

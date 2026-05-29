@@ -14,7 +14,6 @@ import EditTagsModal from "@/components/EditTagsModal.vue";
 import ShareModal from "@/components/ShareModal.vue";
 import CopyBucketModal from "@/components/CopyBucketModal.vue";
 import DeleteModal from "@/components/DeleteModal.vue";
-import APIKeyModal from "@/components/APIKeyModal.vue";
 
 // CSC UI things
 import { applyPolyfills, defineCustomElements } from "allas-ui/dist/loader";
@@ -91,7 +90,6 @@ const app = createApp({
     ShareModal,
     CopyBucketModal,
     DeleteModal,
-    APIKeyModal,
   },
   data: function () {
     return {
@@ -174,12 +172,6 @@ const app = createApp({
     openShareModal: {
       get() {
         return this.$store.openShareModal;
-      },
-      set() { },
-    },
-    openAPIKeyModal: {
-      get() {
-        return this.$store.openAPIKeyModal;
       },
       set() { },
     },

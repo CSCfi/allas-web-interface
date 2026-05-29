@@ -85,10 +85,6 @@
 
 <script>
 import { getProjectNumber } from "@/common/globalFunctions";
-import {
-  setPrevActiveElement,
-  disableFocusOutsideModal,
-} from "@/common/keyboardNavigation";
 import { mdiOpenInNew } from "@mdi/js";
 
 export default {
@@ -167,10 +163,6 @@ export default {
               title: this.$t("message.supportMenu.projectInfo"),
               href: this.projectInfoLink,
             },
-            {
-              title: this.$t("message.supportMenu.createAPIKeys"),
-              action: () => this.openAPIKeyModal(),
-            },
           ],
         },
         {
@@ -207,20 +199,6 @@ export default {
       } else if (item.href) {
         window.open(item.href, "_blank");
       }
-    },
-    openAPIKeyModal() {
-      this.$store.toggleAPIKeyModal(true);
-      setPrevActiveElement();
-
-      const apiKeyModal = document.getElementById("api-key-modal");
-      disableFocusOutsideModal(apiKeyModal);
-
-      // Focus on API key input field first when opening the modal
-      setTimeout(() => {
-        const apiKeyInput = document.getElementById("api-key-input")
-          .getElementsByTagName("input")[0];
-        apiKeyInput.focus();
-      }, 300);
     },
   },
 };

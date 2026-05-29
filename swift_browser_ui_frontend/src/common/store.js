@@ -38,7 +38,6 @@ const useStore = defineStore("global", {
     selectedObjectName: "",
     openCopyBucketModal: false,
     openDeleteModal: false,
-    openAPIKeyModal: false,
     deletableObjects: [],
     sourceProjectId: "",
     uploadAbortReason: undefined,
@@ -185,9 +184,6 @@ const useStore = defineStore("global", {
     },
     toggleDeleteModal(payload) {
       this.openDeleteModal = payload;
-    },
-    toggleAPIKeyModal(payload) {
-      this.openAPIKeyModal = payload;
     },
     setDeletableObjects(payload) {
       this.deletableObjects = payload;

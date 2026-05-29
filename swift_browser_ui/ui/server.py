@@ -69,9 +69,6 @@ from swift_browser_ui.ui.login import (
 from swift_browser_ui.ui.misc_handlers import handle_bounce_direct_access_request
 from swift_browser_ui.ui.settings import setd
 from swift_browser_ui.ui.signature import (
-    handle_ext_token_create,
-    handle_ext_token_list,
-    handle_ext_token_remove,
     handle_signature_request,
 )
 
@@ -222,15 +219,6 @@ async def servinit(
     app.add_routes(
         [
             aiohttp.web.get("/sign/{valid}", handle_signature_request),
-        ]
-    )
-
-    # Add token functionality
-    app.add_routes(
-        [
-            aiohttp.web.get("/token/{project}/{id}", handle_ext_token_create),
-            aiohttp.web.delete("/token/{project}/{id}", handle_ext_token_remove),
-            aiohttp.web.get("/token/{project}", handle_ext_token_list),
         ]
     )
 

@@ -69,15 +69,6 @@
       >
         <DeleteModal />
       </c-modal>
-      <c-modal
-        id="api-key-modal"
-        v-model="openAPIKeyModal"
-        v-csc-control
-        disable-backdrop-blur
-        width="64vw"
-      >
-        <APIKeyModal />
-      </c-modal>
       <ProgressNotification
         v-if="displayUploadNotification"
         type="upload"
