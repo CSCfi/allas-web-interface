@@ -179,9 +179,12 @@ export default {
           item,
         ) => {
           const isLegacy = !isS3CompatibleBucketName(item.name);
-          const nameTag = isLegacy
-            ? { value: this.$t("message.table.legacy_swift"), component: { tag: "c-tag", params: { flat: true } } }
-            : null;
+          const tags = [];
+          if (isLegacy) {
+            tags.push({ value: this.$t("message.table.legacy_swift"), component: { tag: "c-tag", params: { flat: true, style: { "--csc-primary": "#b71c1c" } } } });
+          } else if (item.hasSegments) {
+            tags.push({ value: this.$t("message.table.swift"), component: { tag: "c-tag", params: { flat: true } } });
+          }
           const linkParams = {
             href: "javascript:void(0)",
             color: "dark-grey",
@@ -211,14 +214,14 @@ export default {
             },
           };
           containersPage.push({
-            name: nameTag ? {
+            name: tags.length ? {
               value: null,
               children: [
                 {
                   value: truncate(item.name),
                   component: { tag: "c-link", params: linkParams },
                 },
-                nameTag,
+                ...tags,
               ],
             } : {
               value: truncate(item.name),

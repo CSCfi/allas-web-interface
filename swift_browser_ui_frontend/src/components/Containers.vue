@@ -123,9 +123,15 @@ export default {
       this.abortRenderingController = new AbortController();
       const { signal } = this.abortRenderingController;
 
-      // Segment buckets are never displayed
-      const bucketsNoSegments =  this.containers.filter(bucket =>
-        !bucket.name.endsWith("_segments"));
+      // Segment buckets are never displayed; mark their parents with hasSegments
+      const segmentNames = new Set(
+        this.containers
+          .filter(b => b.name.endsWith("_segments"))
+          .map(b => b.name.slice(0, -"_segments".length))
+      );
+      const bucketsNoSegments = this.containers
+        .filter(bucket => !bucket.name.endsWith("_segments"))
+        .map(bucket => ({ ...bucket, hasSegments: segmentNames.has(bucket.name) }));
 
       let finalBuckets = [];
 
