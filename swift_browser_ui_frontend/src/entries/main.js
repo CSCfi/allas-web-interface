@@ -41,6 +41,7 @@ import "@/assets/main.css";
 
 // Upload and direct download notification handler
 import ProgressNotification from "@/components/ProgressNotification.vue";
+import CopyProgressToast from "@/components/CopyProgressToast.vue";
 
 //Custom footer element
 import CFooter from "@/components/CFooter.vue";
@@ -86,6 +87,7 @@ const app = createApp({
     CreateBucketModal,
     UploadModal,
     ProgressNotification,
+    CopyProgressToast,
     EditTagsModal,
     ShareModal,
     CopyBucketModal,

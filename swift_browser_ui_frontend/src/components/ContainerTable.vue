@@ -34,6 +34,7 @@ import {
   mdiShareVariantOutline,
   mdiDotsHorizontal,
   mdiPail,
+  mdiPailPlus,
 } from "@mdi/js";
 import {
   DEV,
@@ -280,7 +281,26 @@ export default {
                         if(event.keyCode === 13)
                           this.onOpenShareModal(item.name, true);
                       },
-                      disabled: item.owner,
+                      disabled: item.owner || isLegacy,
+                    },
+                  },
+                },
+                {
+                  value: this.$t("message.copy"),
+                  component: {
+                    tag: "c-button",
+                    params: {
+                      testid: "copy-container",
+                      text: true,
+                      size: "small",
+                      title: this.$t("message.copy"),
+                      path: mdiPailPlus,
+                      onClick: () => this.handleCopyClick(item.name, item.owner),
+                      onKeyUp: (event) => {
+                        if (event.keyCode === 13)
+                          this.handleCopyClick(item.name, item.owner, true);
+                      },
+                      disabled: !item.bytes,
                     },
                   },
                 },
@@ -291,24 +311,9 @@ export default {
                     params: {
                       items: [
                         {
-                          name: this.$t("message.copy"),
-                          action: () => {
-                            this.handleCopyClick(item.name, item.owner);
-                            const menuItems = document
-                              .querySelector("c-menu-items");
-                            menuItems.addEventListener("keydown", (e) =>{
-                              if (e.keyCode === 13) {
-                                this.handleCopyClick(
-                                  item.name, item.owner, true,
-                                );
-                              }
-                            });
-                          },
-                        },
-                        {
                           name: this.$t("message.delete"),
                           action: () => this.handleDeleteClick(item.name),
-                          disabled: item.owner,
+                          disabled: item.owner || isLegacy,
                         },
                       ],
                       customTrigger: {

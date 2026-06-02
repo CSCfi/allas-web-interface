@@ -79,6 +79,7 @@
         type="download"
         @cancel-download="cancelDownload"
       />
+      <CopyProgressToast />
       <router-view class="content-wrapper" />
       <c-toasts
         id="copyBucket-toasts"

@@ -65,7 +65,7 @@
 import { debounce } from "lodash";
 import { copyBucket } from "@/common/api";
 import { getDB } from "@/common/idb";
-import { updateContainers } from "@/common/idbFunctions";
+import { updateContainers, updateBucketStats } from "@/common/idbFunctions";
 import {
   addNewTag,
   deleteTag,
@@ -211,15 +211,6 @@ export default {
     },
     a_replicate_container: async function (keypress) {
       this.$store.toggleCopyBucketModal(false);
-      document.querySelector("#copyBucket-toasts").addToast(
-        {
-          id: "copy-in-progress",
-          type: "success",
-          indeterminate: true,
-          message: "",
-          custom: true,
-        },
-      );
       try {
         // Fetch the source project id if it exists
         let sourceProjectName = "";
@@ -248,13 +239,38 @@ export default {
         const sleep =
           time => new Promise(resolve => setTimeout(resolve, time));
 
+        this.$store.setCopyProgress({
+          label: `${this.selectedBucketName} → ${this.bucketName}`,
+          done: 0,
+          total: objects.length,
+          state: "running",
+        });
+
         let copiedObjects;
         while (
           copiedObjects === undefined
           || copiedObjects.length < objects.length
         ) {
           copiedObjects = await awsListObjects(this.bucketName);
+          if (this.$store.copyProgress !== null) {
+            this.$store.setCopyProgress({
+              label: `${this.selectedBucketName} → ${this.bucketName}`,
+              done: copiedObjects.length,
+              total: objects.length,
+              state: "running",
+            });
+          }
           await sleep(2000);
+        }
+        const bytes = copiedObjects.reduce((sum, obj) => sum + (obj.bytes || 0), 0);
+        await updateBucketStats(this.active.id, this.bucketName, copiedObjects.length, bytes);
+        if (this.$store.copyProgress !== null) {
+          this.$store.setCopyProgress({
+            label: `${this.selectedBucketName} → ${this.bucketName}`,
+            done: copiedObjects.length,
+            total: objects.length,
+            state: "finished",
+          });
         }
       } catch {
         document.querySelector("#copyBucket-toasts").addToast(
@@ -267,8 +283,13 @@ export default {
             message: this.$t("message.copyfail"),
           },
         );
+        this.$store.setCopyProgress({
+          label: `${this.selectedBucketName} → ${this.bucketName}`,
+          done: 0,
+          total: 0,
+          state: "failed",
+        });
       } finally {
-        document.querySelector("#copyBucket-toasts").removeToast("copy-in-progress");
         this.cancelCopy(keypress);
       }
     },

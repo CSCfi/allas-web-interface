@@ -37,6 +37,7 @@ const useStore = defineStore("global", {
     openEditTagsModal: false,
     selectedObjectName: "",
     openCopyBucketModal: false,
+    copyProgress: null,
     openDeleteModal: false,
     deletableObjects: [],
     sourceProjectId: "",
@@ -181,6 +182,12 @@ const useStore = defineStore("global", {
     },
     toggleCopyBucketModal(payload) {
       this.openCopyBucketModal = payload;
+    },
+    setCopyProgress(payload) {
+      this.copyProgress = payload;
+    },
+    clearCopyProgress() {
+      this.copyProgress = null;
     },
     toggleDeleteModal(payload) {
       this.openDeleteModal = payload;
