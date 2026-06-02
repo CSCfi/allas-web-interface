@@ -73,6 +73,43 @@ export async function checkBucketExists(bucket) {
   }
 }
 
+export async function getBucketStats(bucket) {
+  // Returns Ceph-specific { count, bytes } from x-rgw-* response headers,
+  // or null if headers are absent (non-Ceph S3) or the call fails.
+  const store = useStore();
+  await initS3(store.active.id, store.active.name, store, i18n.global.t);
+
+  let capturedHeaders = null;
+
+  const command = new HeadBucketCommand({ Bucket: bucket });
+  // Intercept the raw HTTP response before the SDK deserializer discards
+  // non-standard headers. Priority "low" = innermost deserialize middleware,
+  // so next() returns the raw { response } from the HTTP handler.
+  command.middlewareStack.add(
+    (next) => async (args) => {
+      const result = await next(args);
+      capturedHeaders = result.response?.headers ?? null;
+      return result;
+    },
+    { step: "deserialize", name: "captureRgwStats", priority: "low" },
+  );
+
+  try {
+    await store.s3client.send(command);
+  } catch {
+    return null;
+  }
+
+  if (!capturedHeaders) return null;
+
+  const count = parseInt(capturedHeaders["x-rgw-object-count"]);
+  const bytes = parseInt(capturedHeaders["x-rgw-bytes-used"]);
+
+  if (isNaN(count) || isNaN(bytes)) return null;
+
+  return { count, bytes };
+}
+
 /** OBJECTS */
 
 export async function awsDeleteObjects(bucket, objects) {

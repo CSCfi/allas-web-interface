@@ -58,6 +58,7 @@
 
 <script>
 import { getDB } from "@/common/idb";
+import { updateBucketStats } from "@/common/idbFunctions";
 import { isFile } from "@/common/globalFunctions";
 import {
   getFocusableElements,
@@ -195,6 +196,9 @@ export default {
         }
       }
       this.bucketObjects = this.bucketObjects.filter(item => !to_remove.includes(item.name));
+      if (to_remove.length) {
+        await updateBucketStats(this.projectID, this.container, null, null);
+      }
       this.getDeleteMessage(to_remove, selectedFolder);
       this.clearDelete();
     },

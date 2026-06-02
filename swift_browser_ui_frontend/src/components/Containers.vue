@@ -34,6 +34,7 @@
         :show-timestamp="showTimestamp"
         :disable-pagination="hidePagination"
         :hide-tags="true"
+        :stats-available="statsAvailable"
         @delete-container="(cont) => removeContainer(cont)"
       />
       <c-loader v-show="contsLoading" />
@@ -48,8 +49,9 @@
 <script>
 import { liveQuery } from "dexie";
 import { getDB } from "@/common/idb";
-import { updateContainers } from "@/common/idbFunctions";
+import { updateContainers, updateBucketStats } from "@/common/idbFunctions";
 import { useObservable } from "@vueuse/rxjs";
+import { getBucketStats } from "@/common/s3commands";
 import { mdiPlus } from "@mdi/js";
 import { toggleCreateBucketModal } from "@/common/globalFunctions";
 import { getAccessDetails, getSharingContainers } from "@/common/share";
@@ -77,6 +79,7 @@ export default {
       containers: [], // idb bucket data
       renderingContainers: [], // enriched and filtered data for table
       contsLoading: false,
+      statsAvailable: false,
     };
   },
   computed: {
@@ -190,6 +193,12 @@ export default {
           this.fetchContainers();
           this.contsLoading = false;
         }, 3000);
+        this.loadBucketStats();
+      }
+    },
+    $route(to, from) {
+      if (!to.params.container && from.params.container) {
+        this.loadBucketStats();
       }
     },
     sharingUpdated(newValue) {
@@ -320,6 +329,15 @@ export default {
       }
       if (withLoader) this.contsLoading = true;
 
+      // Show stat columns immediately if cached stats exist in IDB (repeat visit)
+      if (!this.statsAvailable) {
+        const cached = await getDB().containers
+          .where({ projectID: this.active.id })
+          .filter(b => b.count != null)
+          .first();
+        if (cached) this.statsAvailable = true;
+      }
+
       this.containers = useObservable(
         liveQuery(() =>
           getDB().containers
@@ -329,6 +347,49 @@ export default {
       );
 
       await updateContainers(this.active.id, this.abortController.signal);
+      this.loadBucketStats();
+    },
+    loadBucketStats: async function () {
+      const projectID = this.active.id;
+      const signal = this.abortController.signal;
+
+      const allBuckets = await getDB().containers
+        .where({ projectID })
+        .toArray();
+
+      // Only owned buckets — shared buckets can't be HEAD-ed by this project
+      const ownedBuckets = allBuckets.filter(b => !b.owner);
+
+      const CONCURRENCY = 5;
+      const statsMap = new Map();
+
+      // Phase 1: fetch HeadBucket stats for all owned buckets
+      for (let i = 0; i < ownedBuckets.length; i += CONCURRENCY) {
+        if (signal?.aborted) return;
+        const batch = ownedBuckets.slice(i, i + CONCURRENCY);
+        await Promise.all(batch.map(async (bucket) => {
+          if (signal?.aborted) return;
+          const stats = await getBucketStats(bucket.name);
+          if (stats) {
+            statsMap.set(bucket.name, stats);
+            // Show stat columns as soon as first result arrives (Ceph confirmed)
+            this.statsAvailable = true;
+          }
+        }));
+      }
+
+      // Phase 2: roll up _segments bytes into parent, write to IDB
+      // If no _segments buckets exist (Swift deprecated) this is a no-op.
+      for (const bucket of ownedBuckets) {
+        if (bucket.name.endsWith("_segments")) continue;
+        const stats = statsMap.get(bucket.name);
+        if (!stats) continue;
+
+        const segStats = statsMap.get(`${bucket.name}_segments`);
+        if (segStats) stats.bytes += segStats.bytes;
+
+        await updateBucketStats(projectID, bucket.name, stats.count, stats.bytes);
+      }
     },
     removeContainer: async function(container) {
       await getDB().containers.where({

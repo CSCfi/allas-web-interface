@@ -22,7 +22,10 @@
 <script>
 import {
   checkIfItemIsLastOnPage,
+  getHumanReadableSize,
   getPaginationOptions,
+  parseDateTime,
+  parseDateFromNow,
   sortObjects,
   truncate,
 } from "@/common/tableFunctions";
@@ -73,6 +76,10 @@ export default {
       type: Boolean,
       default: false,
     },
+    statsAvailable: {
+      type: Boolean,
+      default: false,
+    },
   },
   data() {
     return {
@@ -108,6 +115,10 @@ export default {
       this.getPage();
     },
     showTimestamp() {
+      this.getPage();
+    },
+    statsAvailable() {
+      this.setHeaders();
       this.getPage();
     },
     locale() {
@@ -213,8 +224,21 @@ export default {
               value: truncate(item.name),
               component: { tag: "c-link", params: linkParams },
             },
+            items: {
+              value: item.count != null && (item.count > 0 || isS3CompatibleBucketName(item.name))
+                ? item.count.toLocaleString(this.locale) : "—",
+            },
+            size: {
+              value: item.bytes != null && (item.bytes > 0 || isS3CompatibleBucketName(item.name))
+                ? getHumanReadableSize(item.bytes, this.locale) : "—",
+            },
             sharing: {
               value: getSharedStatus(item.sharing),
+            },
+            last_activity: {
+              value: this.showTimestamp
+                ? parseDateTime(this.locale, item.last_modified, this.$t, false)
+                : parseDateFromNow(this.locale, item.last_modified, this.$t),
             },
             actions: {
               value: null,
@@ -336,12 +360,28 @@ export default {
           key: "name",
           value: this.$t("message.table.name"),
           sortable: true,
-          width: "50%",
         },
+        ...(this.statsAvailable ? [
+          {
+            key: "items",
+            value: this.$t("message.table.items"),
+            sortable: true,
+          },
+          {
+            key: "size",
+            value: this.$t("message.table.size"),
+            sortable: true,
+          },
+        ] : []),
         {
           key: "sharing",
           value: this.$t("message.table.shared_status"),
-          sortable: false,
+          sortable: true,
+        },
+        {
+          key: "last_activity",
+          value: this.$t("message.table.activity"),
+          sortable: true,
         },
         {
           key: "actions",

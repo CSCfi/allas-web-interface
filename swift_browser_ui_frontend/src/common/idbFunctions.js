@@ -75,11 +75,11 @@ export async function updateContainers(projectID, signal) {
     for (const bucket of page.Buckets ?? []) {
       const bucketExists = idbBucketsByName.get(bucket.Name);
       if (!bucketExists) {
-        // bytes, count, last_modified are updated in objects view
+        // bytes/count start null; populated by HeadBucket stats pass or objects view
         newBucketsPage.push({
           name: bucket.Name,
-          bytes: 0,
-          count: 0,
+          bytes: null,
+          count: null,
           created: bucket.CreationDate.toISOString(),
           last_modified: bucket.CreationDate.toISOString(),
           projectID: projectID,
@@ -117,8 +117,8 @@ export async function updateContainers(projectID, signal) {
       if (!sharedBucketExists) {
         const newSharedBucket = {
           name: bucket.container,
-          bytes: 0,
-          count: 0,
+          bytes: null,
+          count: null,
           last_modified: bucket.sharingdate,
           projectID: projectID,
           owner: bucket.owner,
@@ -214,4 +214,10 @@ export async function updateCorsFlag(projectID, buckets, corsAdded) {
   } catch {
     if (DEV) console.log("Error updating IDB bucket CORS flag");
   }
+}
+
+export async function updateBucketStats(projectID, bucketName, count, bytes) {
+  await getDB().containers
+    .where({ projectID, name: bucketName })
+    .modify({ count, bytes });
 }
