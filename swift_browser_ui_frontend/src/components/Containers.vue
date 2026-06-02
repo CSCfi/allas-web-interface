@@ -79,7 +79,6 @@ export default {
       containers: [], // idb bucket data
       renderingContainers: [], // enriched and filtered data for table
       contsLoading: false,
-      statsAvailable: false,
     };
   },
   computed: {
@@ -94,6 +93,9 @@ export default {
     },
     sharingUpdated() {
       return this.$store.sharingUpdated;
+    },
+    statsAvailable() {
+      return this.renderingContainers.some(b => b.count != null || b.bytes != null);
     },
     locale() {
       return this.$i18n.locale;
@@ -335,15 +337,6 @@ export default {
       }
       if (withLoader) this.contsLoading = true;
 
-      // Show stat columns immediately if cached stats exist in IDB (repeat visit)
-      if (!this.statsAvailable) {
-        const cached = await getDB().containers
-          .where({ projectID: this.active.id })
-          .filter(b => b.count != null)
-          .first();
-        if (cached) this.statsAvailable = true;
-      }
-
       this.containers = useObservable(
         liveQuery(() =>
           getDB().containers
@@ -376,11 +369,7 @@ export default {
         await Promise.all(batch.map(async (bucket) => {
           if (signal?.aborted) return;
           const stats = await getBucketStats(bucket.name);
-          if (stats) {
-            statsMap.set(bucket.name, stats);
-            // Show stat columns as soon as first result arrives (Ceph confirmed)
-            this.statsAvailable = true;
-          }
+          if (stats) statsMap.set(bucket.name, stats);
         }));
       }
 
