@@ -34,7 +34,6 @@
         :show-timestamp="showTimestamp"
         :disable-pagination="hidePagination"
         :hide-tags="true"
-        :stats-available="statsAvailable"
         @delete-container="(cont) => removeContainer(cont)"
       />
       <c-loader v-show="contsLoading" />
@@ -93,9 +92,6 @@ export default {
     },
     sharingUpdated() {
       return this.$store.sharingUpdated;
-    },
-    statsAvailable() {
-      return this.renderingContainers.some(b => b.count != null || b.bytes != null);
     },
     locale() {
       return this.$i18n.locale;

@@ -76,10 +76,6 @@ export default {
       type: Boolean,
       default: false,
     },
-    statsAvailable: {
-      type: Boolean,
-      default: false,
-    },
   },
   data() {
     return {
@@ -115,10 +111,6 @@ export default {
       this.getPage();
     },
     showTimestamp() {
-      this.getPage();
-    },
-    statsAvailable() {
-      this.setHeaders();
       this.getPage();
     },
     locale() {
@@ -364,18 +356,16 @@ export default {
           value: this.$t("message.table.name"),
           sortable: true,
         },
-        ...(this.statsAvailable ? [
-          {
-            key: "items",
-            value: this.$t("message.table.items"),
-            sortable: true,
-          },
-          {
-            key: "size",
-            value: this.$t("message.table.size"),
-            sortable: true,
-          },
-        ] : []),
+        {
+          key: "items",
+          value: this.$t("message.table.items"),
+          sortable: true,
+        },
+        {
+          key: "size",
+          value: this.$t("message.table.size"),
+          sortable: true,
+        },
         {
           key: "sharing",
           value: this.$t("message.table.shared_status"),
