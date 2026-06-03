@@ -393,12 +393,9 @@ export default {
       this.$store.setBucketName(this.containerName);
     },
     confirmDelete: function(item, keypress) {
-      if (isFile(item.name, this.$route) || !this.renderFolders) {
-        toggleDeleteModal([item]);
-        if (keypress) this.moveFocusToDeleteModal();
-      } else {
-        addErrorToastOnMain(this.$t("message.folders.deleteNote"));
-      }
+      const isFolder = !isFile(item.name, this.$route) && this.renderFolders;
+      toggleDeleteModal([{ ...item, isFolder }]);
+      if (keypress) this.moveFocusToDeleteModal();
     },
     getCurrentContainer: function () {
       return getDB().containers
@@ -607,23 +604,16 @@ export default {
           icon: "mdi-trash-can-outline",
           testid: "delete-checked-files",
           action: () => {
-            // If only folders checked, don't show Delete modal
-            if (this.renderFolders) {
-              const foldersOnly = this.checkedRows.every((item) =>
-                !isFile(item.name, this.$route));
-              if (foldersOnly) {
-                addErrorToastOnMain(this.$t("message.folders.deleteNote"));
-                this.clearSelections();
-                return;
-              }
-            }
-            // Otherwise get user confirmation from modal
-            this.onOpenDeleteModal(this.checkedRows);
+            const rows = this.checkedRows.map(item => ({
+              ...item,
+              isFolder: !isFile(item.name, this.$route) && this.renderFolders,
+            }));
+            this.onOpenDeleteModal(rows);
             const deleteSelectionsBtn = document
               .querySelector("#delete-selections");
             deleteSelectionsBtn.addEventListener("keydown", (e) =>{
               if (e.keyCode === 13) {
-                this.onOpenDeleteModal(this.checkedRows, true);
+                this.onOpenDeleteModal(rows, true);
               }
             });
           },

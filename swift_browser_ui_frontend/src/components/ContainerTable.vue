@@ -406,64 +406,11 @@ export default {
       addErrorToastOnMain(errorMsg);
       return false;
     },
-    handleDeleteClick: async function (bucket) {
-      // Show error if attempting to delete a non-empty bucket
-      const bucketEmpty = await this.ensureBucketState(
-        bucket, true, this.$t("message.container_ops.deleteEmpty"));
-      if (!bucketEmpty) return;
-      else { // Delete empty bucket without confirmation
-        awsDeleteBucket(bucket).then(async() => {
-          // In case the bucket has a legacy segments bucket still in
-          // existence we should take care of that as well
-          const segmentsBucket = `${bucket}_segments`;
-
-          // List and delete all segment objects matching the deleted bucket.
-          try {
-            const segmentObjList = await awsListObjects(segmentsBucket);
-            if (segmentObjList?.length) {
-              await awsDeleteObjects(segmentsBucket, segmentObjList);
-            }
-            // Finally delete the segments bucket
-            await awsDeleteBucket(segmentsBucket);
-          } catch (e) {
-            if (DEV) {
-              console.log(
-                `Failed to delete ${segmentsBucket}: `,
-                e,
-              );
-            }
-          }
-
-          document.querySelector("#container-toasts").addToast(
-            { progress: false,
-              type: "success",
-              message: this.$t("message.container_ops.deleteSuccess")},
-          );
-          this.$emit("delete-container", bucket);
-          // Delete stale shares if the deleted bucket
-          // was shared with other projects
-          const sharedDetails = await this.$store.sharingClient.getShareDetails(
-            this.$route.params.project,
-            bucket,
-          );
-          if (sharedDetails.length) await deleteStaleShares(this.active.id, bucket);
-        }).catch(() => {
-          document.querySelector("#container-toasts").addToast(
-            { progress: false,
-              type: "error",
-              message: this.$t("message.container_ops.deleteFail")},
-          );
-        });
-      }
-      this.paginationOptions.currentPage =
-        checkIfItemIsLastOnPage({
-          currentPage:
-            this.paginationOptions.currentPage,
-          itemsPerPage:
-            this.paginationOptions.itemsPerPage,
-          itemCount:
-            this.paginationOptions.itemCount - 1,
-        });
+    handleDeleteClick: function (bucket) {
+      this.$store.toggleDeleteModal(true);
+      this.$store.setDeletableObjects([
+        { name: bucket, isContainer: true },
+      ]);
     },
     handleDownloadClick: async function(container, owner, eventTrusted) {
       // Don't attempt to download an empty bucket
