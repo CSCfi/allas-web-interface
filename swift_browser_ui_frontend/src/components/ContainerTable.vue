@@ -300,7 +300,7 @@ export default {
                         if (event.keyCode === 13)
                           this.handleCopyClick(item.name, item.owner, true);
                       },
-                      disabled: !item.bytes,
+                      disabled: !item.bytes || item.hasSegments,
                     },
                   },
                 },
