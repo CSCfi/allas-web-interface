@@ -115,7 +115,7 @@ export default {
         this.contsLocal = (newVal || []).map(c => ({ ...c }));
         Promise.all([this.getSharingContainers(), this.getSharedContainers()])
           .then(() => this.getPage());
-      }
+      },
     },
     disablePagination() {
       this.getPage();
@@ -707,6 +707,10 @@ export default {
       });
     },
     getEmptyText() {
+      if (this.$store.state.projectSuspended) {
+        return this.$t("message.emptyProject.suspended");
+      }
+
       if (this.$route.name == "SharedFrom") {
         return this.$t("message.emptyProject.sharedFrom");
       }

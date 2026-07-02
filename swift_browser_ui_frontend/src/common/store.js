@@ -85,6 +85,7 @@ const store = createStore({
     selectedObjectInfo: null,
     previewOpenedToastVisible: false,
     publicBase: "",
+    projectSuspended: false,
   },
   mutations: {
     setProjects(state, newProjects) {
@@ -280,6 +281,9 @@ const store = createStore({
     },
     setPublicBase(state, payload) {
       state.publicBase = payload || "";
+    },
+    setProjectSuspended(state, suspended) {
+      state.projectSuspended = suspended;
     },
   },
   actions: {
@@ -748,7 +752,7 @@ const store = createStore({
       const { base } = await getPublicBaseAddress(projectID, signal);
       commit("setPublicBase", base);
       return base;
-   },
+    },
   },
 });
 

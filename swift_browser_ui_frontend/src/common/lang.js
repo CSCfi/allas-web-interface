@@ -217,6 +217,8 @@ let default_translations = {
         all: "There are no buckets in this project.",
         sharedFrom: "You haven't shared any buckets.",
         sharedTo: "No buckets have been shared with you.",
+        suspended: "This project is currently closed or suspended. " +
+          "Please contact servicedesk@csc.fi.",
       },
       sharing: "Sharing - ",
       containers: "Buckets - ",
@@ -807,6 +809,8 @@ let default_translations = {
         all: "Tässä projektissa ei ole ämpäreitä.",
         sharedFrom: "Et ole jakanut yhtään ämpäriä.",
         sharedTo: "Sinulle ei ole jaettu ämpäreitä.",
+        suspended: "Tämä projekti on tällä hetkellä suljettu. " +
+          "Ota yhteyttä osoitteeseen servicedesk@csc.fi.",
       },
       sharing: "Jako - ",
       containers: "Ämpärit - ",
