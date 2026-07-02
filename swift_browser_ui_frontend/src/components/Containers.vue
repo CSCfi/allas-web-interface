@@ -34,6 +34,7 @@
         :show-timestamp="showTimestamp"
         :disable-pagination="hidePagination"
         :hide-tags="true"
+        :project-inaccessible="projectInaccessible"
         @delete-container="(cont) => removeContainer(cont)"
       />
       <c-loader v-show="contsLoading" />
@@ -78,6 +79,7 @@ export default {
       containers: [], // idb bucket data
       renderingContainers: [], // enriched and filtered data for table
       contsLoading: false,
+      projectInaccessible: false,
     };
   },
   computed: {
@@ -341,8 +343,12 @@ export default {
         ),
       );
 
-      await updateContainers(this.active.id, this.abortController.signal);
-      this.loadBucketStats();
+      const result = await updateContainers(this.active.id, this.abortController.signal);
+      this.projectInaccessible = !!result?.inaccessible;
+      this.contsLoading = false;
+      if (!this.projectInaccessible) {
+        this.loadBucketStats();
+      }
     },
     loadBucketStats: async function () {
       const projectID = this.active.id;

@@ -2,7 +2,7 @@
 
 import { DEV } from "@/common/globalFunctions";
 
-async function fetchWithCookie({method, url, body, signal}) {
+async function fetchWithCookie({method, url, body, signal, suppressAuthRedirect = false}) {
   return fetch(url, {
     method,
     body,
@@ -12,7 +12,7 @@ async function fetchWithCookie({method, url, body, signal}) {
     .then(response => {
       switch (response.status) {
         case 401:
-          if (window.location.pathname !== "/accessibility") {
+          if (!suppressAuthRedirect && window.location.pathname !== "/accessibility") {
             window.location.pathname = "/unauth";
           }
           break;
@@ -35,11 +35,12 @@ async function fetchWithCookie({method, url, body, signal}) {
       }
     });
 }
-export async function GET(url, signal) {
+export async function GET(url, signal, suppressAuthRedirect = false) {
   return fetchWithCookie({
     url,
     signal,
     method: "GET",
+    suppressAuthRedirect,
   });
 }
 export async function POST(url, body) {
@@ -132,7 +133,13 @@ export async function awsListBuckets(
     fetchURL.searchParams.append("max_buckets", max_buckets);
   }
 
-  let resp = await GET(fetchURL);
+  // Suppress the global auth redirect here: a 401 on this endpoint means
+  // this specific project is inaccessible (e.g. suspended in Ceph while
+  // still listed by Keystone), not that the user's session is invalid.
+  let resp = await GET(fetchURL, undefined, true);
+  if (resp.status === 401) {
+    return { Buckets: [], inaccessible: true };
+  }
   if (resp.status != 200) {
     throw new Error("Failed to retrieve the bucket page.");
   }

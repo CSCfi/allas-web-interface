@@ -70,6 +70,12 @@ export async function updateContainers(projectID, signal) {
 
   do {
     const page = await awsListBuckets(projectID, continuationToken);
+    if (page.inaccessible) {
+      // Project is currently inaccessible (e.g. suspended in Ceph) — leave
+      // any cached buckets in IDB untouched instead of wiping them via the
+      // stale-bucket cleanup below.
+      return { inaccessible: true };
+    }
     continuationToken = page.NextContinuationToken;
 
     for (const bucket of page.Buckets ?? []) {
@@ -153,6 +159,8 @@ export async function updateContainers(projectID, signal) {
       if (DEV) console.log(err);
     }
   }
+
+  return { inaccessible: false };
 }
 
 export async function updateContainerLastmodified(
