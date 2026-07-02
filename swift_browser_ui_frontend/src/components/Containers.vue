@@ -30,7 +30,7 @@
     </c-row>
     <div id="cont-table-wrapper">
       <ContainerTable
-        :conts="renderingContainers"
+        :conts="projectInaccessible ? [] : renderingContainers"
         :show-timestamp="showTimestamp"
         :disable-pagination="hidePagination"
         :hide-tags="true"
