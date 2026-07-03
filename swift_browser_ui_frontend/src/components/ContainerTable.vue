@@ -114,6 +114,7 @@ export default {
       handler(newVal) {
         this.contsLocal = (newVal || []).map(c => ({ ...c }));
         Promise.all([this.getSharingContainers(), this.getSharedContainers()])
+          .catch(() => {})
           .then(() => this.getPage());
       },
     },
@@ -245,7 +246,7 @@ export default {
               this.$route.params.project,
               cont.name,
               cont.owner,
-              this.abortController.signal) : null;
+              this.abortController.signal).catch(() => null) : null;
             const accessRights = sharedDetails ? sharedDetails.access : null;
             return sharedDetails && accessRights
               ? {...cont, accessRights} : {...cont};

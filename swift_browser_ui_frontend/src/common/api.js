@@ -148,7 +148,7 @@ export async function getContainerMeta(
   }
 
   let ret = await GET(url, signal);
-  if (signal?.aborted) {
+  if (signal?.aborted || ret.status !== 200) {
     return ["", {}];
   }
   return await ret.json();

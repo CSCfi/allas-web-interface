@@ -322,7 +322,8 @@ const store = createStore({
         }
       } while (containers?.length > 0);
 
-      const sharedContainers = await getSharedContainers(projectID, signal);
+      const sharedContainers = await getSharedContainers(projectID, signal)
+        .catch(() => []);
 
       if (sharedContainers.length > 0) {
         for (let i in sharedContainers) {

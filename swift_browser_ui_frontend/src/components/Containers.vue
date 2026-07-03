@@ -37,6 +37,14 @@
       </div>
     </div>
 
+    <div
+      v-if="projectSuspended"
+      class="suspended-banner"
+      role="alert"
+    >
+      {{ $t("message.emptyProject.suspended") }}
+    </div>
+
     <div id="cont-table-wrapper">
       <ContainerTable
         ref="containerTable"
@@ -114,6 +122,9 @@ export default {
     displayedCount() {
       const list = Array.isArray(this.renderingContainers) ? this.renderingContainers : [];
       return list.filter(c => c && typeof c.name === "string" && !c.name.endsWith("_segments")).length;
+    },
+    projectSuspended() {
+      return this.$store.state.projectSuspended;
     },
   },
   watch: {
@@ -315,10 +326,14 @@ export default {
 
       this.currentProject = await getDB().projects.get({ id: this.active.id });
 
-      this.containersToUpdateObjs = await this.$store.dispatch("updateContainers", {
-        projectID: this.active.id,
-        signal: this.abortController.signal,
-      });
+      try {
+        this.containersToUpdateObjs = await this.$store.dispatch("updateContainers", {
+          projectID: this.active.id,
+          signal: this.abortController.signal,
+        });
+      } catch (error) {
+        this.containersToUpdateObjs = [];
+      }
 
       this.containers = useObservable(
         liveQuery(() => getDB().containers.where({ projectID: this.active.id }).toArray()),
@@ -393,6 +408,14 @@ export default {
 
 #cont-table-wrapper {
   position: relative;
+}
+
+.suspended-banner {
+  padding: 1rem;
+  margin-bottom: 1rem;
+  border: 1px solid var(--csc-warning, #ff5800);
+  border-radius: 4px;
+  background-color: #fff4e5;
 }
 
 #cont-table-wrapper :deep(c-loader) {
