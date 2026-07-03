@@ -38,13 +38,14 @@
       </div>
     </div>
 
-    <div
+    <c-alert
       v-if="projectSuspended"
-      class="suspended-banner"
-      role="alert"
+      class="suspended-alert"
+      type="warning"
+      data-testid="suspended-alert"
     >
       {{ $t("message.emptyProject.suspended") }}
-    </div>
+    </c-alert>
 
     <div id="cont-table-wrapper">
       <ContainerTable
@@ -411,12 +412,8 @@ export default {
   position: relative;
 }
 
-.suspended-banner {
-  padding: 1rem;
+.suspended-alert {
   margin-bottom: 1rem;
-  border: 1px solid var(--csc-warning, #ff5800);
-  border-radius: 4px;
-  background-color: #fff4e5;
 }
 
 #cont-table-wrapper :deep(c-loader) {

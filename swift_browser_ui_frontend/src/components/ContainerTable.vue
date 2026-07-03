@@ -708,10 +708,6 @@ export default {
       });
     },
     getEmptyText() {
-      if (this.$store.state.projectSuspended) {
-        return this.$t("message.emptyProject.suspended");
-      }
-
       if (this.$route.name == "SharedFrom") {
         return this.$t("message.emptyProject.sharedFrom");
       }
