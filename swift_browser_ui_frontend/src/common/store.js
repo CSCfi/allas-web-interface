@@ -288,7 +288,7 @@ const store = createStore({
   },
   actions: {
     updateContainers: async function (
-      { dispatch },
+      { dispatch, state },
       { projectID, signal, routeContainer = undefined },
     ) {
       const existingContainers = await getDB()
@@ -322,8 +322,11 @@ const store = createStore({
         }
       } while (containers?.length > 0);
 
-      const sharedContainers = await getSharedContainers(projectID, signal)
-        .catch(() => []);
+      // A suspended project cannot operate on shared buckets either,
+      // so leave them out and let the cache cleanup below clear them
+      const sharedContainers = state.projectSuspended
+        ? []
+        : await getSharedContainers(projectID, signal).catch(() => []);
 
       if (sharedContainers.length > 0) {
         for (let i in sharedContainers) {

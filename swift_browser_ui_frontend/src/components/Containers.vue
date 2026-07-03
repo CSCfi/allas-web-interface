@@ -26,6 +26,7 @@
           <c-button
             size="small"
             outlined
+            :disabled="projectSuspended"
             data-testid="create-bucket"
             @click="toggleCreateBucketModal(false)"
             @keyup.enter="toggleCreateBucketModal(true)"
@@ -255,7 +256,7 @@ export default {
         matchTags(c) &&
         matchPublic(c) &&
         matchMinItems(c) &&
-        matchMinSize(c)
+        matchMinSize(c),
       );
 
       if (wantAll && !wantFrom && !wantTo) {
