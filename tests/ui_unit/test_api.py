@@ -5,6 +5,7 @@ import unittest
 import types
 
 import aiohttp.web
+import botocore.exceptions
 
 import tests.common.mockups
 import swift_browser_ui.ui.api
@@ -643,3 +644,72 @@ class APITestClass(tests.common.mockups.APITestBase):
                 "X-Container-Write": "test-project-0:*,test-project-1:*",
             },
         )
+
+    def _aws_list_buckets_mocks(self, error_response):
+        """Build mocks for aws_list_buckets with a failing S3 client."""
+        self.setd_mock["s3api_endpoint"] = "https://test-s3-endpoint"
+        self.setd_mock["check_certificate"] = False
+
+        mock_creds = unittest.mock.AsyncMock(
+            return_value={"access": "test-access", "secret": "test-secret"}
+        )
+        p_creds = unittest.mock.patch(
+            "swift_browser_ui.ui.api._get_ec2_credentials", mock_creds
+        )
+
+        mock_s3_client = unittest.mock.AsyncMock()
+        mock_s3_client.list_buckets.side_effect = botocore.exceptions.ClientError(
+            error_response,
+            "ListBuckets",
+        )
+        mock_client_ctx = unittest.mock.MagicMock()
+        mock_client_ctx.__aenter__ = unittest.mock.AsyncMock(
+            return_value=mock_s3_client
+        )
+        mock_client_ctx.__aexit__ = unittest.mock.AsyncMock(return_value=False)
+        mock_session = unittest.mock.MagicMock()
+        mock_session.client.return_value = mock_client_ctx
+        p_session = unittest.mock.patch(
+            "swift_browser_ui.ui.api.aioboto3.Session", return_value=mock_session
+        )
+        return p_creds, p_session
+
+    async def test_aws_list_buckets_inaccessible_project_maps_to_401(self):
+        """Suspended/inaccessible project errors must map to 401, not 500.
+
+        Ceph RGW rejects a suspended tenant with a symbolic error code
+        (e.g. AccessDenied or UserSuspended) and HTTP 403 — never the
+        literal string "401".
+        """
+        for code, status in [
+            ("AccessDenied", 403),
+            ("UserSuspended", 403),
+            ("InvalidAccessKeyId", 403),
+            ("SignatureDoesNotMatch", 403),
+        ]:
+            p_creds, p_session = self._aws_list_buckets_mocks(
+                {
+                    "Error": {"Code": code, "Message": code},
+                    "ResponseMetadata": {"HTTPStatusCode": status},
+                }
+            )
+            with self.p_get_sess, self.patch_setd, p_creds, p_session:
+                with self.assertRaises(
+                    aiohttp.web.HTTPUnauthorized,
+                    msg=f"error code {code} should map to 401",
+                ):
+                    await swift_browser_ui.ui.api.aws_list_buckets(
+                        self.mock_request
+                    )
+
+    async def test_aws_list_buckets_unknown_error_maps_to_500(self):
+        """Unrelated S3 errors should still map to 500."""
+        p_creds, p_session = self._aws_list_buckets_mocks(
+            {
+                "Error": {"Code": "SlowDown", "Message": "Please slow down"},
+                "ResponseMetadata": {"HTTPStatusCode": 503},
+            }
+        )
+        with self.p_get_sess, self.patch_setd, p_creds, p_session:
+            with self.assertRaises(aiohttp.web.HTTPInternalServerError):
+                await swift_browser_ui.ui.api.aws_list_buckets(self.mock_request)

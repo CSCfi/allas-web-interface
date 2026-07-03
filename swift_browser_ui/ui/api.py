@@ -139,13 +139,27 @@ async def aws_list_buckets(
             )
         except botocore.exceptions.ClientError as e:
             error_code = e.response["Error"]["Code"]
-            if error_code == "404":
+            http_status = e.response.get("ResponseMetadata", {}).get("HTTPStatusCode")
+            logger.info(
+                f"ListBuckets failed for {project} with error code "
+                f"{error_code} (HTTP {http_status})."
+            )
+            if error_code == "404" or http_status == 404:
                 raise aiohttp.web.HTTPNotFound(
                     text="Project doesn't have any buckets or storage access."
                 )
-            if error_code == "401":
+            # RGW rejects a suspended or otherwise inaccessible tenant with a
+            # symbolic error code and HTTP 401/403 — not a literal "401".
+            if error_code in {
+                "401",
+                "AccessDenied",
+                "UserSuspended",
+                "InvalidAccessKeyId",
+                "SignatureDoesNotMatch",
+            } or http_status in {401, 403}:
                 raise aiohttp.web.HTTPUnauthorized(
-                    text="Unauthorized. Credentials might be stale."
+                    text="Unauthorized. Project storage might be suspended "
+                    "or credentials stale."
                 )
             raise aiohttp.web.HTTPInternalServerError(
                 text="Couldn't retrieve the bucket page from storage."

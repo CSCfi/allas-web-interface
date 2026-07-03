@@ -53,7 +53,7 @@ import { updateContainers, updateBucketStats } from "@/common/idbFunctions";
 import { useObservable } from "@vueuse/rxjs";
 import { getBucketStats } from "@/common/s3commands";
 import { mdiPlus } from "@mdi/js";
-import { toggleCreateBucketModal } from "@/common/globalFunctions";
+import { toggleCreateBucketModal, DEV } from "@/common/globalFunctions";
 import { getAccessDetails, getSharingContainers } from "@/common/share";
 import ContainerTable from "@/components/ContainerTable.vue";
 //import SearchBox from "@/components/SearchBox.vue";
@@ -343,11 +343,16 @@ export default {
         ),
       );
 
-      const result = await updateContainers(this.active.id, this.abortController.signal);
-      this.projectInaccessible = !!result?.inaccessible;
-      this.contsLoading = false;
-      if (!this.projectInaccessible) {
-        this.loadBucketStats();
+      try {
+        const result = await updateContainers(this.active.id, this.abortController.signal);
+        this.projectInaccessible = !!result?.inaccessible;
+        if (!this.projectInaccessible) {
+          this.loadBucketStats();
+        }
+      } catch (err) {
+        if (DEV) console.log("Failed to update the bucket listing", err);
+      } finally {
+        this.contsLoading = false;
       }
     },
     loadBucketStats: async function () {
