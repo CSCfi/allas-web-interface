@@ -7,6 +7,7 @@ import {
   DEV,
 } from "@/common/globalFunctions";
 import { getSharedContainers } from "@/common/share";
+import useStore from "@/common/store";
 
 // Find the segments container matching a container (if it exists) and
 // correctly update the container size using the size of the segments
@@ -70,12 +71,6 @@ export async function updateContainers(projectID, signal) {
 
   do {
     const page = await awsListBuckets(projectID, continuationToken);
-    if (page.inaccessible) {
-      // Project is currently inaccessible (e.g. suspended in Ceph) — leave
-      // any cached buckets in IDB untouched instead of wiping them via the
-      // stale-bucket cleanup below.
-      return { inaccessible: true };
-    }
     continuationToken = page.NextContinuationToken;
 
     for (const bucket of page.Buckets ?? []) {
@@ -111,7 +106,11 @@ export async function updateContainers(projectID, signal) {
   }
 
   // STEP 2. Process buckets your project has access to.
-  const sharedBuckets = await getSharedContainers(projectID, signal);
+  // A suspended project cannot operate on shared buckets either,
+  // so leave them out and let the cache cleanup below clear them
+  const sharedBuckets = useStore().projectSuspended
+    ? []
+    : await getSharedContainers(projectID, signal).catch(() => []);
 
   let newSharedBuckets = [];
 
@@ -159,8 +158,6 @@ export async function updateContainers(projectID, signal) {
       if (DEV) console.log(err);
     }
   }
-
-  return { inaccessible: false };
 }
 
 export async function updateContainerLastmodified(

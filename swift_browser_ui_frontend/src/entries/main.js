@@ -24,6 +24,7 @@ import { i18n } from "@/common/i18n";
 import {
   getUser,
   getProjects,
+  setProjectSuspendedHandler,
 } from "@/common/api";
 
 // Import SharingView and Request API
@@ -205,6 +206,10 @@ const app = createApp({
   },
   created() {
     document.title = this.$t("message.program_name");
+
+    setProjectSuspendedHandler(suspended => {
+      this.$store.setProjectSuspended(suspended);
+    });
 
     let initialize = async () => {
       let active;

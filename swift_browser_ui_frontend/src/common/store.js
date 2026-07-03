@@ -53,6 +53,7 @@ const useStore = defineStore("global", {
     s3upload: undefined,
     s3download: undefined,
     workersInitializing: true,
+    projectSuspended: false,
   }),
   getters: {
     multipleProjects: (state) => state.projects.length > 1,
@@ -72,6 +73,9 @@ const useStore = defineStore("global", {
     },
     setSharingClient(newClient) {
       this.sharingClient = newClient;
+    },
+    setProjectSuspended(suspended) {
+      this.projectSuspended = suspended;
     },
     setUploading() {
       this.isUploading = true;

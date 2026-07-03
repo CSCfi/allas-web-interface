@@ -9,6 +9,7 @@
         <c-button
           size="small"
           outlined
+          :disabled="projectSuspended"
           data-testid="create-bucket"
           @click="toggleCreateBucketModal(false)"
           @keyup.enter="toggleCreateBucketModal(true)"
@@ -28,13 +29,21 @@
         </c-menu>
       </div>
     </c-row>
+    <c-alert
+      v-if="projectSuspended"
+      class="suspended-alert"
+      type="warning"
+      data-testid="suspended-alert"
+    >
+      {{ $t("message.emptyProject.suspended") }}
+    </c-alert>
+
     <div id="cont-table-wrapper">
       <ContainerTable
-        :conts="projectInaccessible ? [] : renderingContainers"
+        :conts="renderingContainers"
         :show-timestamp="showTimestamp"
         :disable-pagination="hidePagination"
         :hide-tags="true"
-        :project-inaccessible="projectInaccessible"
         @delete-container="(cont) => removeContainer(cont)"
       />
       <c-loader v-show="contsLoading" />
@@ -79,7 +88,6 @@ export default {
       containers: [], // idb bucket data
       renderingContainers: [], // enriched and filtered data for table
       contsLoading: false,
-      projectInaccessible: false,
     };
   },
   computed: {
@@ -97,6 +105,9 @@ export default {
     },
     locale() {
       return this.$i18n.locale;
+    },
+    projectSuspended() {
+      return this.$store.projectSuspended;
     },
   },
   watch: {
@@ -344,9 +355,8 @@ export default {
       );
 
       try {
-        const result = await updateContainers(this.active.id, this.abortController.signal);
-        this.projectInaccessible = !!result?.inaccessible;
-        if (!this.projectInaccessible) {
+        await updateContainers(this.active.id, this.abortController.signal);
+        if (!this.projectSuspended) {
           this.loadBucketStats();
         }
       } catch (err) {
@@ -429,6 +439,10 @@ export default {
 
 #cont-table-wrapper {
   position: relative;
+}
+
+.suspended-alert {
+  margin-bottom: 1rem;
 }
 
 .row-end {

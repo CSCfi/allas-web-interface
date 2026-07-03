@@ -2,17 +2,39 @@
 
 import { DEV } from "@/common/globalFunctions";
 
-async function fetchWithCookie({method, url, body, signal, suppressAuthRedirect = false}) {
+// A suspended/closed project makes storage-backed calls return 401 even
+// though the login session is still valid. The handler lets the app flag
+// this state instead of treating the user as logged out.
+let projectSuspendedHandler = null;
+export function setProjectSuspendedHandler(handler) {
+  projectSuspendedHandler = handler;
+}
+
+let sessionCheck = null;
+async function sessionStillValid() {
+  if (!sessionCheck) {
+    sessionCheck = fetch("/api/username", { credentials: "same-origin" })
+      .then(resp => resp.ok)
+      .catch(() => false);
+    sessionCheck.finally(() => { sessionCheck = null; });
+  }
+  return sessionCheck;
+}
+
+async function fetchWithCookie({method, url, body, signal}) {
   return fetch(url, {
     method,
     body,
     signal,
     credentials: "same-origin",
   })
-    .then(response => {
+    .then(async response => {
       switch (response.status) {
         case 401:
-          if (!suppressAuthRedirect && window.location.pathname !== "/accessibility") {
+          if (await sessionStillValid()) {
+            projectSuspendedHandler?.(true);
+          }
+          else if (window.location.pathname !== "/accessibility") {
             window.location.pathname = "/unauth";
           }
           break;
@@ -35,12 +57,11 @@ async function fetchWithCookie({method, url, body, signal, suppressAuthRedirect 
       }
     });
 }
-export async function GET(url, signal, suppressAuthRedirect = false) {
+export async function GET(url, signal) {
   return fetchWithCookie({
     url,
     signal,
     method: "GET",
-    suppressAuthRedirect,
   });
 }
 export async function POST(url, body) {
@@ -133,16 +154,16 @@ export async function awsListBuckets(
     fetchURL.searchParams.append("max_buckets", max_buckets);
   }
 
-  // Suppress the global auth redirect here: a 401 on this endpoint means
-  // this specific project is inaccessible (e.g. suspended in Ceph while
-  // still listed by Keystone), not that the user's session is invalid.
-  let resp = await GET(fetchURL, undefined, true);
+  let resp = await GET(fetchURL);
   if (resp.status === 401) {
-    return { Buckets: [], inaccessible: true };
+    // Suspended/closed project — the global 401 handler has already
+    // flagged the state; end the listing gracefully.
+    return { Buckets: [] };
   }
   if (resp.status != 200) {
     throw new Error("Failed to retrieve the bucket page.");
   }
+  projectSuspendedHandler?.(false);
 
   let ret = await resp.json();
   for (const bucket of ret.Buckets) {

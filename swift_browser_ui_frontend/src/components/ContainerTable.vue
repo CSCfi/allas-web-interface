@@ -77,10 +77,6 @@ export default {
       type: Boolean,
       default: false,
     },
-    projectInaccessible: {
-      type: Boolean,
-      default: false,
-    },
   },
   data() {
     return {
@@ -439,10 +435,6 @@ export default {
       });
     },
     getEmptyText() {
-      if (this.projectInaccessible) {
-        return this.$t("message.emptyProject.inaccessible");
-      }
-
       if (this.$route.name == "SharedFrom") {
         return this.$t("message.emptyProject.sharedFrom");
       }
