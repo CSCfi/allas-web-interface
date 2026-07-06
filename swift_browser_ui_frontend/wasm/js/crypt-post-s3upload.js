@@ -90,12 +90,24 @@ async function uploadSegment(e) {
     };
     command = new UploadPartCommand(input);
   } else {
+    // Single-put objects get creation time and content checksum as
+    // user metadata; multipart objects can't (metadata is fixed at
+    // CreateMultipartUpload, before the full content hash is known)
+    const digest = await crypto.subtle.digest("SHA-256", body);
+    const sha256 = Array.from(new Uint8Array(digest))
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
+
     const input = {
       Body: body,
       Bucket: part.bucket,
       ContentLength: body.length,
       ContentType: getContentType(file, part.key),
       Key: part.key,
+      Metadata: {
+        created: `${Math.floor(Date.now() / 1000)}`,
+        sha256: sha256,
+      },
     };
     command = new PutObjectCommand(input);
   }

@@ -195,7 +195,7 @@ export async function checkBucketEmpty(bucket) {
 /**UPLOAD */
 
 export async function awsCreateMultipartUpload(
-  bucket, key, acl = undefined, contentType = undefined,
+  bucket, key, acl = undefined, contentType = undefined, metadata = undefined,
 ) {
   const input = {
     Bucket: bucket,
@@ -203,6 +203,7 @@ export async function awsCreateMultipartUpload(
   };
   if (acl) input.ACL = acl;
   if (contentType) input.ContentType = contentType;
+  if (metadata) input.Metadata = metadata;
 
   const command = new CreateMultipartUploadCommand(input);
   const response = await sendS3Command(command);

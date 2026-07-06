@@ -40,6 +40,8 @@ const useStore = defineStore("global", {
     copyProgress: null,
     openDeleteModal: false,
     deletableObjects: [],
+    openObjectInfoModal: false,
+    selectedObjectInfo: null,
     sourceProjectId: "",
     uploadAbortReason: undefined,
     renderedFolders: true,
@@ -198,6 +200,12 @@ const useStore = defineStore("global", {
     },
     setDeletableObjects(payload) {
       this.deletableObjects = payload;
+    },
+    toggleObjectInfoModal(payload) {
+      this.openObjectInfoModal = payload;
+    },
+    setSelectedObjectInfo(payload) {
+      this.selectedObjectInfo = payload;
     },
     setSourceProjectId(payload) {
       this.sourceProjectId = payload;

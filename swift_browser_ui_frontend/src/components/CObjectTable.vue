@@ -40,11 +40,14 @@ import {
 import {
   DEV,
   toggleEditTagsModal,
+  toggleObjectInfoModal,
   isFile,
   getFolderName,
   getPrefix,
   addErrorToastOnMain,
 } from "@/common/globalFunctions";
+import { awsHeadObject } from "@/common/s3commands";
+import { DateTime } from "luxon";
 import {
   setPrevActiveElement,
   disableFocusOutsideModal,
@@ -54,6 +57,7 @@ import {
   //mdiPencilOutline,
   mdiDeleteOutline,
   mdiFolder ,
+  mdiInformationOutline,
 } from "@mdi/js";
 
 export default {
@@ -157,6 +161,67 @@ export default {
       checkIfItemIsLastOnPage(this.paginationOptions);
   },
   methods: {
+    async buildInfoForItem(item) {
+      const isFolder = !!item?.folder;
+
+      const base = {
+        name: this.renderFolders
+          ? getFolderName(item.name, this.$route)
+          : item.name,
+        fullPath: `${this.container}/${item.name}`,
+        sizeHuman: getHumanReadableSize(Number(item.bytes) || 0, this.locale),
+        itemCount: isFolder
+          ? this.objs.filter(
+            obj => obj.name.startsWith(item.name) && obj.name !== item.name,
+          ).length
+          : undefined,
+        lastModified: item.last_modified
+          ? parseDateTime(this.locale, item.last_modified, this.$t, false)
+          : "-",
+        contentType: isFolder ? "application/x-directory" : "-",
+        etag: undefined,
+        created: "-",
+        checksum: "-",
+        isFolder,
+      };
+
+      if (isFolder) return base;
+
+      const head = await awsHeadObject(this.container, item.name);
+      const meta = head.Metadata || {};
+
+      // "created" and "sha256" are user metadata stamped by this UI's
+      // upload workers; objects uploaded elsewhere won't have them
+      let created = "-";
+      const createdSec = Number.parseInt(meta.created ?? "", 10);
+      if (Number.isFinite(createdSec) && createdSec > 0) {
+        const iso = DateTime.fromSeconds(createdSec).toUTC().toISO();
+        if (iso) created = parseDateTime(this.locale, iso, this.$t, false);
+      }
+
+      return {
+        ...base,
+        contentType: head.ContentType || "-",
+        etag: (head.ETag || "").replaceAll("\"", "") || "-",
+        created,
+        checksum: meta.sha256 || "-",
+      };
+    },
+    async onOpenInfoModal(item, keypress) {
+      try {
+        const info = await this.buildInfoForItem(item);
+        toggleObjectInfoModal(info, this.container);
+
+        if (keypress) {
+          setPrevActiveElement();
+          const modal = document.getElementById("object-info-modal");
+          disableFocusOutsideModal(modal);
+        }
+      } catch (e) {
+        if (DEV) console.error("Info modal failed:", e);
+        addErrorToastOnMain(this.$t("message.objects.noInfo"));
+      }
+    },
     handlePopState(event) {
       // reset page to 1 after reversing a page
       if (event.type === "popstate") {
@@ -237,6 +302,25 @@ export default {
                   path: mdiTrayArrowDown,
                   onClick: ({ event }) => {
                     this.beginDownload(item, event.isTrusted);
+                  },
+                  disabled: this.owner != undefined &&
+                    this.accessRights.length === 0,
+                },
+              },
+            },
+            {
+              value: this.$t("message.objects.info"),
+              component: {
+                tag: "c-button",
+                params: {
+                  testid: "object-info",
+                  text: true,
+                  size: "small",
+                  title: "Info",
+                  path: mdiInformationOutline,
+                  onClick: () => this.onOpenInfoModal(item),
+                  onKeyUp: (event) => {
+                    if (event.keyCode === 13) this.onOpenInfoModal(item, true);
                   },
                   disabled: this.owner != undefined &&
                     this.accessRights.length === 0,

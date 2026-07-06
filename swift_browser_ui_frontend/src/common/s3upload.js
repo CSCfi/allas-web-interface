@@ -289,6 +289,7 @@ export default class S3UploadSocket {
           toRaw(this.uploads[nextPart.bucket][nextPart.key].f),
           nextPart.key,
         ),
+        { created: `${Math.floor(Date.now() / 1000)}` },
       );
 
       this.uploads[nextPart.bucket][nextPart.key].multipartSession = response.UploadId;

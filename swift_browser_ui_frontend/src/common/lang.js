@@ -322,6 +322,16 @@ let default_translations = {
         folderName: "Folder name",
         upOneLevel: "back to parent folder",
         backToBuckets: "back to all buckets",
+        info: "Info",
+        noInfo: "No information available",
+        fullPath: "Full path",
+        contentType: "Content type",
+        items: "Items",
+        created: "Created",
+        checksum: "Checksum",
+        createdChecksumNote: "*Creation time and checksum are available"
+          + " only for objects uploaded via this UI. Checksum is not"
+          + " available for objects larger than 100 MB.",
       },
       replicate: {
         copy: "Copy bucket: ",
@@ -882,6 +892,16 @@ let default_translations = {
         folderName: "Kansion nimi",
         upOneLevel: "takaisin ylempään kansioon",
         backToBuckets: "takaisin kaikkiin ämpäreihin",
+        info: "Tiedot",
+        noInfo: "Ei tietoja saatavilla",
+        fullPath: "Koko polku",
+        contentType: "Sisältötyyppi",
+        items: "Kohteet",
+        created: "Luotu",
+        checksum: "Tarkistussumma",
+        createdChecksumNote: "*Luontiaika ja tarkistussumma ovat saatavilla"
+          + " vain käyttöliittymän kautta ladatuissa objekteissa."
+          + " Tarkistussumma ei ole saatavilla yli 100 MB:n objekteille.",
       },
       replicate: {
         copy: "Kopioi ämpäri: ",
