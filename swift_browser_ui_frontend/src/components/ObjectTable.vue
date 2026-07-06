@@ -44,7 +44,7 @@
 
     <c-row
       id="optionsbar"
-      justify="end"
+      justify="space-between"
     >
       <!--<c-text-field
         id="search"
@@ -60,29 +60,47 @@
         />
       </c-text-field>-->
       <c-button
-        id="create-folder-btn"
+        v-if="showGoUp"
+        id="go-up-btn"
         size="small"
-        outlined
-        data-testid="create-folder"
-        @click="openFolderModal(false)"
-        @keyup.enter="openFolderModal(true)"
+        text
+        @click="goUpOneLevel"
+        @keyup.enter="goUpOneLevel"
       >
         <i
           slot="icon"
-          class="mdi mdi-folder-plus-outline"
+          class="mdi mdi-arrow-up-left"
         />
-        {{ $t("message.objects.createFolder") }}
+        {{ atBucketRoot
+          ? $t("message.objects.backToBuckets")
+          : $t("message.objects.upOneLevel") }}
       </c-button>
-      <c-menu
-        :key="optionsKey"
-        :items.prop="tableOptions"
-        options-testid="table-options-selector"
-      >
-        <span class="menu-active display-options-menu">
-          <i class="mdi mdi-tune" />
-          {{ $t("message.tableOptions.displayOptions") }}
-        </span>
-      </c-menu>
+      <div class="row-end">
+        <c-button
+          id="create-folder-btn"
+          size="small"
+          outlined
+          data-testid="create-folder"
+          @click="openFolderModal(false)"
+          @keyup.enter="openFolderModal(true)"
+        >
+          <i
+            slot="icon"
+            class="mdi mdi-folder-plus-outline"
+          />
+          {{ $t("message.objects.createFolder") }}
+        </c-button>
+        <c-menu
+          :key="optionsKey"
+          :items.prop="tableOptions"
+          options-testid="table-options-selector"
+        >
+          <span class="menu-active display-options-menu">
+            <i class="mdi mdi-tune" />
+            {{ $t("message.tableOptions.displayOptions") }}
+          </span>
+        </c-menu>
+      </div>
     </c-row>
     <div
       v-if="checkedRows.length"
@@ -216,6 +234,13 @@ export default {
     },
     prefix () {
       return this.$route.query.prefix || "";
+    },
+    atBucketRoot() {
+      return !this.prefix;
+    },
+    showGoUp() {
+      return this.$route.name === "ObjectsView"
+        || this.$route.name === "SharedObjects";
     },
     project () {
       return this.$route.params.project;
@@ -364,6 +389,35 @@ export default {
     },
     breadcrumbClickHandler(value) {
       this.breadcrumbClicked = value;
+    },
+    goUpOneLevel() {
+      const current = this.prefix;
+
+      // Reset table pagination the same way a breadcrumb click does
+      this.breadcrumbClicked = true;
+
+      if (current) {
+        // go up one pseudofolder level
+        const trimmed = current.replace(/\/+$/, "");
+        const parent = trimmed.includes("/")
+          ? trimmed.slice(0, trimmed.lastIndexOf("/") + 1)
+          : "";
+
+        const query = { ...this.$route.query };
+        delete query.file;
+        if (parent) query.prefix = parent;
+        else delete query.prefix;
+
+        this.$router.push({
+          name: this.$route.name,
+          params: this.$route.params,
+          query,
+        });
+        return;
+      }
+
+      // at bucket root, go back to the bucket listing
+      this.$router.push({ name: "AllBuckets" });
     },
     openFolderModal(keypress) {
       toggleCreateBucketModal();
@@ -705,6 +759,12 @@ export default {
 
 #search {
   flex: 0.4;
+}
+
+.row-end {
+  display: flex;
+  gap: 1.5rem;
+  align-items: baseline;
 }
 
 .bucket-info {

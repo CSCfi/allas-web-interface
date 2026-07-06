@@ -320,6 +320,8 @@ let default_translations = {
         createFolder: "Create folder",
         folder: "Folder",
         folderName: "Folder name",
+        upOneLevel: "back to parent folder",
+        backToBuckets: "back to all buckets",
       },
       replicate: {
         copy: "Copy bucket: ",
@@ -878,6 +880,8 @@ let default_translations = {
         createFolder: "Luo kansio",
         folder: "Kansio",
         folderName: "Kansion nimi",
+        upOneLevel: "takaisin ylempään kansioon",
+        backToBuckets: "takaisin kaikkiin ämpäreihin",
       },
       replicate: {
         copy: "Kopioi ämpäri: ",
