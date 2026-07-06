@@ -12,6 +12,7 @@ import {
   HeadObjectCommand,
   ListObjectsV2Command,
   PutBucketPolicyCommand,
+  PutObjectCommand,
 } from "@aws-sdk/client-s3";
 import { i18n } from "./i18n";
 import { initS3 } from "./s3init";
@@ -111,6 +112,18 @@ export async function getBucketStats(bucket) {
 }
 
 /** OBJECTS */
+
+// Create a zero-byte object. Used for empty-folder markers
+// (keys ending with "/").
+export async function awsPutObject(bucket, key) {
+  const command = new PutObjectCommand({
+    Bucket: bucket,
+    Key: key,
+    Body: new Uint8Array(0),
+  });
+  const response = await sendS3Command(command);
+  return response;
+}
 
 export async function awsDeleteObjects(bucket, objects) {
   const keys = objects.map(obj => ({ Key: obj }));

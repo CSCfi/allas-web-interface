@@ -24,7 +24,8 @@
         disable-backdrop-blur
         width="64vw"
       >
-        <CreateBucketModal />
+        <FolderModal v-if="$route.params.container" />
+        <CreateBucketModal v-else />
       </c-modal>
       <c-modal
         v-model="openUploadModal"

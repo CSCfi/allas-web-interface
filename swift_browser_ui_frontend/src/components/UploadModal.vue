@@ -137,7 +137,7 @@
         <!-- Footer options needs to be in CamelCase,
         because csc-ui wont recognise it otherwise. -->
         <c-data-table
-          v-if="dropFiles.length > 0"
+          v-if="dropFiles.length > 0 || emptyFolders.length > 0"
           class="files-table"
           :data.prop="paginatedDropFiles"
           :headers.prop="fileHeaders"
@@ -194,6 +194,7 @@
 import { getDB } from "@/common/idb";
 
 import {
+  DEV,
   getProjectNumber,
   validateBucketName,
   addErrorToastOnMain,
@@ -211,7 +212,12 @@ import {
 } from "@/common/keyboardNavigation";
 import CUploadButton from "@/components/CUploadButton.vue";
 import BucketNameValidation from "./BucketNameValidation.vue";
-import { awsListObjects } from "@/common/s3commands";
+import {
+  awsListObjects,
+  awsPutObject,
+  checkBucketAccessible,
+} from "@/common/s3commands";
+import { awsAddBucketCors, awsCreateBucket } from "@/common/api";
 
 import { debounce, delay } from "lodash";
 import { mdiDelete } from "@mdi/js";
@@ -243,6 +249,7 @@ export default {
         {id: "sizeZero", show: false},
       ],
       paginatedDropFiles: [],
+      emptyFolders: [],
       sortBy: "name",
       sortDirection: "asc",
       filesPagination: {
@@ -428,25 +435,78 @@ export default {
         setTimeout(() => this.dropFileErrors[1].show = false, 6000);
         return;
       }
+
+      // Destination key is the current folder prefix + relative path.
+      // prefixApplied guards against prepending twice when a file
+      // re-enters via the overwrite confirmation.
+      const rp = file.relativePath || file.name;
+      const effectivePath = file.prefixApplied
+        ? rp
+        : `${this.getCurrentPrefix()}${rp}`;
+
       //Check if file path already exists in dropFiles
       if (
         this.dropFiles.find(
-          ({ relativePath }) => relativePath === file.relativePath,
+          ({ relativePath }) => relativePath === effectivePath,
         ) === undefined
       ) {
         if (this.objects && !overwrite) {
           //Check if file already exists in container objects
-          const existingFile = this.objects.find(obj => obj.name === file.relativePath);
+          const existingFile = this.objects.find(obj => obj.name === effectivePath);
           if (existingFile) {
+            file.relativePath = effectivePath;
+            file.prefixApplied = true;
             this.existingFiles.push(file);
             return;
           }
         }
+        file.relativePath = effectivePath;
+        file.prefixApplied = true;
         this.$store.appendDropFiles(file);
       } else {
         this.dropFileErrors[0].show = true;
         setTimeout(() => this.dropFileErrors[0].show = false, 6000);
       }
+    },
+    // Get the current folder prefix from the route query
+    getCurrentPrefix() {
+      const raw = (this.$route.query.prefix || "").replace(/^\/+/, "");
+      return raw && !raw.endsWith("/") ? `${raw}/` : raw;
+    },
+    // Create marker objects for any empty folders that were dropped
+    async createEmptyFolders() {
+      if (this.emptyFolders.length === 0) return;
+
+      const container = this.currentBucket || (this.inputBucket || "").trim();
+      if (!container) return;
+
+      // Ensure the bucket exists and has CORS when uploading to a new one
+      if (!this.currentBucket) {
+        const accessible = await checkBucketAccessible(container);
+        if (!accessible) {
+          try {
+            await awsCreateBucket(this.active.id, container);
+            await awsAddBucketCors(this.active.id, container);
+          } catch (e) {
+            if (DEV) console.log(`Couldn't create bucket ${container}`, e);
+            this.uploadError = this.$t("message.container_ops.folderCreateFail");
+            return;
+          }
+        }
+      }
+
+      const prefix = this.getCurrentPrefix();
+      const folders = Array.from(new Set(this.emptyFolders)).sort();
+
+      for (const p of folders) {
+        const path = `${prefix}${p.endsWith("/") ? p : p + "/"}`;
+        try {
+          await awsPutObject(container, path);
+        } catch {
+          this.uploadError = this.$t("message.container_ops.folderCreateFail");
+        }
+      }
+      this.emptyFolders = [];
     },
     getDropTablePage() {
       const offset =
@@ -455,10 +515,9 @@ export default {
         - this.filesPagination.itemsPerPage;
 
       const limit = this.filesPagination.itemsPerPage;
-      this.paginatedDropFiles = this.dropFiles
+      const fileRows = this.dropFiles
         .sort((a, b) => sortItems(
           a, b, this.sortBy, this.sortDirection))
-        .slice(offset, offset + limit)
         .map(file => {
           return {
             name: { value: file.name || truncate(100) },
@@ -494,9 +553,44 @@ export default {
           };
         });
 
+      // Empty folders dropped for creation as marker objects
+      const folderRows = Array.from(new Set(this.emptyFolders))
+        .sort()
+        .map(p => ({
+          name: { value: p.replace(/\/$/, "") },
+          type: { value: this.$t("message.objects.folder") },
+          size: { value: "-" },
+          relativePath: { value: `${this.getCurrentPrefix()}${p}` },
+          delete: {
+            children: [
+              {
+                value: this.$t("message.upload.remove"),
+                component: {
+                  tag: "c-button",
+                  params: {
+                    text: true,
+                    size: "small",
+                    title: this.$t("message.upload.remove"),
+                    path: mdiDelete,
+                    onClick: () => {
+                      this.emptyFolders =
+                        this.emptyFolders.filter(x => x !== p);
+                      this.getDropTablePage();
+                    },
+                  },
+                },
+              },
+            ],
+          },
+        }));
+
+      this.paginatedDropFiles = [...fileRows, ...folderRows]
+        .slice(offset, offset + limit);
+
       this.filesPagination = {
         ...this.filesPagination,
-        itemCount: this.dropFiles.length,
+        itemCount: this.dropFiles.length
+          + new Set(this.emptyFolders).size,
       };
     },
     onSort(event) {
@@ -557,6 +651,11 @@ export default {
               if (entries.length) {
                 allEntries = allEntries.concat(entries);
                 return readEntries();
+              }
+              // No entries at all — an empty folder was dropped
+              if (allEntries.length === 0) {
+                this.emptyFolders.push(newPath);
+                this.getDropTablePage();
               }
               for (let item of allEntries) {
                 if (this.addFiles) {
@@ -627,6 +726,7 @@ export default {
       this.addingFiles = false;
       this.tags = [];
       this.files = [];
+      this.emptyFolders = [];
       this.validationResult = {};
       this.toastMsg = "";
       this.sortBy = "name";
@@ -637,7 +737,7 @@ export default {
       moveFocusOutOfModal(this.prevActiveEl);
     },
     checkIfCanUpload() {
-      if (this.dropFiles.length === 0) {
+      if (this.dropFiles.length === 0 && this.emptyFolders.length === 0) {
         return this.$t("message.upload.addFiles");
       }
       return "";
@@ -663,9 +763,16 @@ export default {
         );
         return;
       }
-      else {
-        this.beginUpload();
+      // Only empty folders, no files: create the markers and close
+      if (this.dropFiles.length === 0) {
+        await this.createEmptyFolders();
+        this.toggleUploadModal();
+        return;
       }
+      if (this.emptyFolders.length > 0) {
+        await this.createEmptyFolders();
+      }
+      this.beginUpload();
     },
     async startUpload() {
       const bucketName = this.currentBucket ?

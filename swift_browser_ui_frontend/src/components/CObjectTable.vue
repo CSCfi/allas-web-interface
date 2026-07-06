@@ -305,16 +305,25 @@ export default {
         limit = this.paginationOptions.itemsPerPage;
       }
 
-      // Filtered objects based on prefix
+      // Filtered objects based on prefix; the current folder's own
+      // marker object (zero-byte key equal to the prefix) is hidden
       const filteredObjs = this
         .objs
         .filter((obj) => {
           return obj.name.startsWith(getPrefix(this.$route));
-        });
+        })
+        .filter((obj) => obj.name !== getPrefix(this.$route));
 
-      if (this.objs.length > 0 && filteredObjs.length == 0 &&
-        !this.$store.openDeleteModal) {
-        window.location.pathname = "/notfound";
+      // If the prefix no longer matches anything (e.g. the folder was
+      // deleted in another tab), navigate up one level instead of erroring
+      const p = this.$route.query.prefix || "";
+      if (p && !this.$store.openDeleteModal &&
+        !this.objs.some(o => o.name === p || o.name.startsWith(getPrefix(this.$route)))) {
+        let up = p.replace(/[^/]+\/?$/, "");
+        if (up && !up.endsWith("/")) up += "/";
+        this.$router.replace({
+          query: { ...this.$route.query, prefix: up || undefined },
+        });
       }
 
       let pagedLength = 0;

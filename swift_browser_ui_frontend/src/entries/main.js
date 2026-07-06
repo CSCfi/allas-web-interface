@@ -9,6 +9,7 @@ import BrowserMainNavbar from "@/components/BrowserMainNavbar.vue";
 import BrowserSecondaryNavbar from "@/components/BrowserSecondaryNavbar.vue";
 import ConfirmRouteModal from "@/components/ConfirmRouteModal.vue";
 import CreateBucketModal from "@/components/CreateBucketModal.vue";
+import FolderModal from "@/components/FolderModal.vue";
 import UploadModal from "@/components/UploadModal.vue";
 import EditTagsModal from "@/components/EditTagsModal.vue";
 import ShareModal from "@/components/ShareModal.vue";
@@ -86,6 +87,7 @@ const app = createApp({
     BrowserSecondaryNavbar,
     ConfirmRouteModal,
     CreateBucketModal,
+    FolderModal,
     UploadModal,
     ProgressNotification,
     CopyProgressToast,

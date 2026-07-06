@@ -67,7 +67,12 @@ import {
   removeFocusClass,
   moveFocusOutOfModal,
 } from "@/common/keyboardNavigation";
-import { awsDeleteBucket, awsDeleteObjects, awsListObjects } from "@/common/s3commands";
+import {
+  awsDeleteBucket,
+  awsDeleteObjects,
+  awsListObjects,
+  awsPutObject,
+} from "@/common/s3commands";
 import { deleteStaleShares } from "@/common/share";
 
 export default {
@@ -302,6 +307,30 @@ export default {
       }
 
       this.bucketObjects = this.bucketObjects.filter(item => !to_remove.includes(item.name));
+
+      // If the folder we're currently inside became empty (and the user
+      // didn't explicitly delete the folder itself), recreate its marker
+      // object so it survives as an empty folder
+      const rawPrefix = (this.$route.query.prefix || "").replace(/^\/+/, "");
+      const markerName = rawPrefix
+        ? (rawPrefix.endsWith("/") ? rawPrefix : `${rawPrefix}/`)
+        : "";
+      const explicitlyDeletedCurrent = !!markerName &&
+        this.selectedObjects.some(o => o?.name === markerName);
+      if (!isSegmentsContainer && this.renderedFolders && markerName &&
+        !explicitlyDeletedCurrent) {
+        const remaining = this.bucketObjects
+          .filter(o => o.name.startsWith(markerName)).length;
+        if (remaining === 0) {
+          try {
+            await awsPutObject(this.container, markerName);
+            this.bucketObjects.push({ name: markerName, bytes: 0 });
+          } catch {
+            // folder simply disappears if the marker can't be created
+          }
+        }
+      }
+
       if (to_remove.length) {
         await updateBucketStats(this.projectID, this.container, null, null);
       }

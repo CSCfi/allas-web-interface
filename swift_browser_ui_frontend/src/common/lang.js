@@ -270,6 +270,9 @@ let default_translations = {
         deleteSuccess: "Bucket was deleted.",
         deleteFail: "Bucket deletion failed.",
         bucketName: "Bucket name",
+        foldername: "Please note that folder names cannot be modified " +
+          "after creating a folder.",
+        folderCreateFail: "Folder creation failed.",
       },
       nameValidation: {
         lowerCaseOrNum:
@@ -314,6 +317,9 @@ let default_translations = {
         deleteObjectsMessage:
           "Items can't be restored after being deleted. " +
           "Are you sure you want to proceed?",
+        createFolder: "Create folder",
+        folder: "Folder",
+        folderName: "Folder name",
       },
       replicate: {
         copy: "Copy bucket: ",
@@ -822,6 +828,9 @@ let default_translations = {
         deleteSuccess: "Ämpäri poistettu.",
         deleteFail: "Ämpärin poistaminen epäonnistui.",
         bucketName: "Ämpärin nimi",
+        foldername: "Huomioithan, että kansion nimeä ei voi muuttaa " +
+          "kansion luomisen jälkeen.",
+        folderCreateFail: "Kansion luonti epäonnistui.",
       },
       nameValidation: {
         lowerCaseOrNum:
@@ -866,6 +875,9 @@ let default_translations = {
         deleteObjectsMessage:
           "Tiedostoja ei voi palauttaa poistamisen jälkeen. " +
           "Haluatko varmasti poistaa nämä tiedostot?",
+        createFolder: "Luo kansio",
+        folder: "Kansio",
+        folderName: "Kansion nimi",
       },
       replicate: {
         copy: "Kopioi ämpäri: ",

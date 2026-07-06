@@ -59,6 +59,20 @@
           class="mdi mdi-filter-variant mdi-24px"
         />
       </c-text-field>-->
+      <c-button
+        id="create-folder-btn"
+        size="small"
+        outlined
+        data-testid="create-folder"
+        @click="openFolderModal(false)"
+        @keyup.enter="openFolderModal(true)"
+      >
+        <i
+          slot="icon"
+          class="mdi mdi-folder-plus-outline"
+        />
+        {{ $t("message.objects.createFolder") }}
+      </c-button>
       <c-menu
         :key="optionsKey"
         :items.prop="tableOptions"
@@ -130,6 +144,7 @@
 import {
   DEV,
   toggleDeleteModal,
+  toggleCreateBucketModal,
   isFile,
   addErrorToastOnMain,
   checkAndAddBucketCors,
@@ -226,6 +241,12 @@ export default {
     isDeletingObjects() {
       return this.$store.isDeleting;
     },
+    createModalOpen() {
+      return this.$store.openCreateBucketModal;
+    },
+    uploadModalOpen() {
+      return this.$store.openUploadModal;
+    },
     owner() {
       return this.$route.params.owner;
     },
@@ -285,6 +306,20 @@ export default {
         }, 1000);
       }
     },
+    createModalOpen: function () {
+      // Refresh the object list after the create-folder modal closes
+      // so a newly created folder appears immediately
+      if (!this.createModalOpen) {
+        this.updateObjectsAndMetadata();
+      }
+    },
+    uploadModalOpen: function () {
+      // Refresh after the upload modal closes; covers empty folders
+      // created without any file upload (no isUploading toggle)
+      if (!this.uploadModalOpen) {
+        this.updateObjectsAndMetadata();
+      }
+    },
     shareModal: async function(){
       if (!this.shareModal) await this.getBucketSharedStatus();
     },
@@ -329,6 +364,19 @@ export default {
     },
     breadcrumbClickHandler(value) {
       this.breadcrumbClicked = value;
+    },
+    openFolderModal(keypress) {
+      toggleCreateBucketModal();
+      if (keypress) setPrevActiveElement();
+      this.$nextTick(() => {
+        setTimeout(() => {
+          const input = document.querySelector("#newFolder-input input");
+          if (input) {
+            input.tabIndex = "0";
+            input.focus();
+          }
+        }, 300);
+      });
     },
     getSharedContainers: async function () {
       this.sharedContainers =
