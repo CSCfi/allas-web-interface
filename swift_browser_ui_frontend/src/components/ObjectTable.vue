@@ -397,10 +397,11 @@ export default {
       this.breadcrumbClicked = true;
 
       if (current) {
-        // go up one pseudofolder level
+        // go up one pseudofolder level; unlike master, prefixes on
+        // this branch carry no trailing slash ("Demo/web", not "Demo/web/")
         const trimmed = current.replace(/\/+$/, "");
         const parent = trimmed.includes("/")
-          ? trimmed.slice(0, trimmed.lastIndexOf("/") + 1)
+          ? trimmed.slice(0, trimmed.lastIndexOf("/"))
           : "";
 
         const query = { ...this.$route.query };
