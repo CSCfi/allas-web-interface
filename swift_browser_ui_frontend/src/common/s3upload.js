@@ -40,7 +40,7 @@ import {
   awsCompleteMultipartUpload,
   awsAbortMultipartUpload,
 } from "./s3commands";
-import { getContentType } from "./mimeTypes";
+import { getContentType } from "../../wasm/js/mimeTypes";
 
 const MAX_UPLOAD_WORKERS = 8;
 const FILE_PART_SIZE = 52428800;

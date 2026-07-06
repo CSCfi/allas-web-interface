@@ -3,7 +3,7 @@
 
 import { PutObjectCommand, S3Client, UploadPartCommand } from "@aws-sdk/client-s3";
 import { checkPollutingName } from "./nameCheck";
-import { getContentType } from "../../src/common/mimeTypes";
+import { getContentType } from "./mimeTypes";
 
 let s3client = undefined;
 
