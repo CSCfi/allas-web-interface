@@ -27,7 +27,7 @@ let default_translations = {
           "be for example due to missing password and/or " +
           "username.",
         UIdown: "500 – Service is temporarily down. Please try again in" +
-                " a few minutes. Please contact support at servicedesk@csc.fi" +
+                " a few minutes. Please contact support at servicedesk{'@'}csc.fi" +
                 " if the problem persists.",
         UIdown_text1:
           "You are seeing this page because " +
@@ -203,7 +203,7 @@ let default_translations = {
         sharedFrom: "You haven't shared any buckets.",
         sharedTo: "No buckets have been shared with you.",
         suspended: "This project is currently closed or suspended. " +
-          "Please contact servicedesk@csc.fi.",
+          "Please contact servicedesk{'@'}csc.fi.",
       },
       sharing: "Sharing - ",
       containers: "Buckets - ",
@@ -220,7 +220,7 @@ let default_translations = {
         warnTempFiles: "Opening temporary files or folders " +
           "(.crdownload, .crswap) may interrupt the process.",
         error: "Download has failed. Please try again.",
-        noRetain: "Error establishing bucket ownership. Please contact servicedesk@csc.fi " +
+        noRetain: "Error establishing bucket ownership. Please contact servicedesk{'@'}csc.fi " +
           "(subject: Sensitive data).",
         cancel: "Download cancelled",
       },
@@ -577,7 +577,7 @@ let default_translations = {
           "puuttuvasta salasanasta ja/tai käyttäjänimestä ",
         UIdown: "500 – Palvelu on tilapäisesti poissa käytöstä." +
                 " Yritä uudelleen muutaman minuutin kuluttua." +
-                " Ota yhteyttä tukeen servicedesk@csc.fi, jos" +
+                " Ota yhteyttä tukeen servicedesk{'@'}csc.fi, jos" +
                 " ongelma jatkuu.",
         UIdown_text1:
           "Näet tämän sivun, koska palvelu " +
@@ -754,7 +754,7 @@ let default_translations = {
         sharedTo: "Sinulle ei ole jaettu ämpäreitä.",
         suspended:
           "Tämä projekti on tällä hetkellä suljettu. " +
-          "Ota yhteyttä osoitteeseen servicedesk@csc.fi.",
+          "Ota yhteyttä osoitteeseen servicedesk{'@'}csc.fi.",
       },
       sharing: "Jako - ",
       containers: "Ämpärit - ",
@@ -772,7 +772,7 @@ let default_translations = {
         "(.crdownload, .crswap) avaaminen voi keskeyttää latauksen.",
         error: "Lataus epäonnistui. Yritä uudelleen.",
         noRetain: "Ämpärin omistusoikeuden varmennus epäonnistui. Ota yhteyttä " +
-          "servicedesk@csc.fi (aihe: sensitive data).",
+          "servicedesk{'@'}csc.fi (aihe: sensitive data).",
         cancel: "Lataus peruutettu",
       },
       upload: {
