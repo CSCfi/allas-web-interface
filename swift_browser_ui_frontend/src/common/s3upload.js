@@ -40,6 +40,7 @@ import {
   awsCompleteMultipartUpload,
   awsAbortMultipartUpload,
 } from "./s3commands";
+import { getContentType } from "./mimeTypes";
 
 const MAX_UPLOAD_WORKERS = 8;
 const FILE_PART_SIZE = 52428800;
@@ -284,6 +285,10 @@ export default class S3UploadSocket {
         nextPart.bucket,
         nextPart.key,
         "bucket-owner-full-control",
+        getContentType(
+          toRaw(this.uploads[nextPart.bucket][nextPart.key].f),
+          nextPart.key,
+        ),
       );
 
       this.uploads[nextPart.bucket][nextPart.key].multipartSession = response.UploadId;

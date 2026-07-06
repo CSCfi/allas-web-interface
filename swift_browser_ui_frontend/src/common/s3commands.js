@@ -120,6 +120,7 @@ export async function awsPutObject(bucket, key) {
     Bucket: bucket,
     Key: key,
     Body: new Uint8Array(0),
+    ContentType: "application/x-directory",
   });
   const response = await sendS3Command(command);
   return response;
@@ -193,12 +194,15 @@ export async function checkBucketEmpty(bucket) {
 
 /**UPLOAD */
 
-export async function awsCreateMultipartUpload(bucket, key, acl = undefined) {
+export async function awsCreateMultipartUpload(
+  bucket, key, acl = undefined, contentType = undefined,
+) {
   const input = {
     Bucket: bucket,
     Key: key,
   };
   if (acl) input.ACL = acl;
+  if (contentType) input.ContentType = contentType;
 
   const command = new CreateMultipartUploadCommand(input);
   const response = await sendS3Command(command);

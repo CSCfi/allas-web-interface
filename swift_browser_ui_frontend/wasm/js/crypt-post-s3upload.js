@@ -3,6 +3,7 @@
 
 import { PutObjectCommand, S3Client, UploadPartCommand } from "@aws-sdk/client-s3";
 import { checkPollutingName } from "./nameCheck";
+import { getContentType } from "../../src/common/mimeTypes";
 
 let s3client = undefined;
 
@@ -93,6 +94,7 @@ async function uploadSegment(e) {
       Body: body,
       Bucket: part.bucket,
       ContentLength: body.length,
+      ContentType: getContentType(file, part.key),
       Key: part.key,
     };
     command = new PutObjectCommand(input);
