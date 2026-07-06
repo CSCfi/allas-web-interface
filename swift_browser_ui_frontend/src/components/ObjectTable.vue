@@ -545,14 +545,18 @@ export default {
         item => selection.indexOf(item.name) > -1,
       );
 
-      /* Folders should also be selected and then filtered out from
-        deletableObjects later
+      /* Selections that don't match a real object are folder rows:
+        the table only carries the folder's display name, so rebuild
+        the folder key (trailing slash) and let DeleteModal expand it
       */
       if (this.checkedRows.length < selection.length) {
         for (let i = 0; i < selection.length; i++) {
           if(!this.checkedRows.some(row => row && row.name === selection[i])) {
-            const obj = objects.find(obj => !this.checkedRows.some(row => row.name === selection[i]) && obj.name.includes(`${selection[i]}/`));
-            this.checkedRows.push(obj);
+            this.checkedRows.push({
+              name: `${selection[i]}/`,
+              container: this.containerName,
+              isFolder: true,
+            });
           }
         }
       }
@@ -654,7 +658,8 @@ export default {
           action: () => {
             const rows = this.checkedRows.map(item => ({
               ...item,
-              isFolder: !isFile(item.name, this.$route) && this.renderFolders,
+              isFolder: item.isFolder === true ||
+                (!isFile(item.name, this.$route) && this.renderFolders),
             }));
             this.onOpenDeleteModal(rows);
             const deleteSelectionsBtn = document
