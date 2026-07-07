@@ -187,6 +187,7 @@ c-card-content {
 .inline-copy {
   display: flex;
   gap: 0.4rem;
+  margin-bottom: -25px;
 }
 .info-note {
   margin-top: 1.8rem;
