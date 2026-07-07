@@ -18,6 +18,10 @@ let default_translations = {
           },
         ],
       },
+      preview: {
+        openedInNewTab: "Opening file in a new tab. Preview depends on the "
+          + "content type, unsupported types may download instead.",
+      },
       error: {
         prevPage: "Go to previous page",
         login: "Go to login",
@@ -585,6 +589,11 @@ let default_translations = {
             href: "/login/oidc_front",
           },
         ],
+      },
+      preview: {
+        openedInNewTab: "Tiedosto avautuu uuteen välilehteen. Esikatselu " +
+          "riippuu sisällön tyypistä, ja tukemattomat tyypit saattavat " +
+          "ladata tiedoston sen sijaan.",
       },
       error: {
         prevPage: "Siirry edelliselle sivulle",

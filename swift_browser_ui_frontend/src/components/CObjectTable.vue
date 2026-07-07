@@ -47,6 +47,7 @@ import {
   addErrorToastOnMain,
 } from "@/common/globalFunctions";
 import { awsHeadObject } from "@/common/s3commands";
+import { getPreviewUrl } from "@/common/api";
 import { DateTime } from "luxon";
 import {
   setPrevActiveElement,
@@ -57,6 +58,7 @@ import {
   //mdiPencilOutline,
   mdiDeleteOutline,
   mdiFolder ,
+  mdiFileOutline,
   mdiInformationOutline,
 } from "@mdi/js";
 
@@ -234,6 +236,16 @@ export default {
         `${window.location.pathname}?prefix=${getPrefix(this.$route)}${folder}`,
       );
     },
+    openPreview: function (item) {
+      const projectID = this.active?.id;
+      if (!projectID) {
+        addErrorToastOnMain("No active project selected.");
+        return;
+      }
+      const url = getPreviewUrl(projectID, this.container, item.name);
+      window.open(url, "_blank");
+      this.$store.togglePreviewOpenedToast(true);
+    },
     formatItem: function (item) {
       const name = this.renderFolders ?
         getFolderName(item.name, this.$route)
@@ -242,22 +254,22 @@ export default {
       return {
         name: {
           value: name,
-          ...(item?.folder ? {
-            component: {
-              tag: "c-link",
-              params: {
-                href: "javascript:void(0)",
-                color: "dark-grey",
-                path: mdiFolder,
-                iconFill: "primary",
-                iconStyle: {
-                  marginRight: "1rem",
-                  flexShrink: "0",
-                },
-                onClick: () => this.changeFolder(name),
+          component: {
+            tag: "c-link",
+            params: {
+              href: "javascript:void(0)",
+              color: "dark-grey",
+              path: item?.folder ? mdiFolder : mdiFileOutline,
+              iconFill: "primary",
+              iconStyle: {
+                marginRight: "1rem",
+                flexShrink: "0",
               },
+              onClick: item?.folder
+                ? () => this.changeFolder(name)
+                : () => this.openPreview(item),
             },
-          } : {}),
+          },
         },
         size: {
           value: getHumanReadableSize(item.bytes, this.locale),

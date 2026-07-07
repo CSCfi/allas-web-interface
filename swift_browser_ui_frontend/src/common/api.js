@@ -225,3 +225,14 @@ export async function awsAddBucketCors(
     throw new Error("Failed to fix the bucket cors.");
   }
 }
+
+export function getPreviewUrl(project, bucket, objectName) {
+  // Session-authenticated backend proxy: the URL only works for
+  // logged-in members of the project, it is not a shareable link
+  return new URL(
+    `/preview/${encodeURIComponent(project)}`
+    + `/${encodeURIComponent(bucket)}`
+    + `/${encodeURIComponent(objectName)}`,
+    document.location.origin,
+  ).toString();
+}

@@ -42,6 +42,7 @@ const useStore = defineStore("global", {
     deletableObjects: [],
     openObjectInfoModal: false,
     selectedObjectInfo: null,
+    previewOpenedToastVisible: false,
     sourceProjectId: "",
     uploadAbortReason: undefined,
     renderedFolders: true,
@@ -206,6 +207,9 @@ const useStore = defineStore("global", {
     },
     setSelectedObjectInfo(payload) {
       this.selectedObjectInfo = payload;
+    },
+    togglePreviewOpenedToast(payload) {
+      this.previewOpenedToastVisible = payload;
     },
     setSourceProjectId(payload) {
       this.sourceProjectId = payload;

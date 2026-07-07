@@ -16,6 +16,7 @@ import ShareModal from "@/components/ShareModal.vue";
 import CopyBucketModal from "@/components/CopyBucketModal.vue";
 import DeleteModal from "@/components/DeleteModal.vue";
 import ObjectInfoModal from "@/components/ObjectInfoModal.vue";
+import PreviewOpenedToast from "@/components/PreviewOpenedToast.vue";
 
 // CSC UI things
 import { applyPolyfills, defineCustomElements } from "allas-ui/dist/loader";
@@ -97,6 +98,7 @@ const app = createApp({
     CopyBucketModal,
     DeleteModal,
     ObjectInfoModal,
+    PreviewOpenedToast,
   },
   data: function () {
     return {

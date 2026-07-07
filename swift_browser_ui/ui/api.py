@@ -5,6 +5,7 @@ import json
 import ssl
 import time
 import typing
+import urllib.parse
 from datetime import datetime
 
 import aioboto3
@@ -174,6 +175,96 @@ async def aws_list_buckets(
     ]
 
     return aiohttp.web.json_response(bucket_page)
+
+
+async def aws_preview_object(
+    request: aiohttp.web.Request,
+) -> aiohttp.web.StreamResponse:
+    """Stream an object inline for in-browser preview.
+
+    Session-authenticated: the URL only works for logged-in members of
+    the project, it is not a public link.
+    """
+    session = await aiohttp_session.get_session(request)
+    client = request.app["api_client"]
+    logger = request.app["Log"]
+    project = request.match_info["project"]
+    bucket = request.match_info["bucket"]
+    object_name = urllib.parse.unquote(request.match_info["object"])
+
+    logger.info(
+        f"API call to preview object in bucket {bucket} in {project} from "
+        f"{request.remote}, sess: {session} :: {time.ctime()}"
+    )
+
+    creds = await _get_ec2_credentials(session, client, project)
+    s3session = aioboto3.Session(
+        aws_access_key_id=creds["access"],
+        aws_secret_access_key=creds["secret"],
+    )
+
+    async with s3session.client(
+        "s3",
+        region_name="us-east-1",
+        endpoint_url=setd["s3api_endpoint"],
+        verify=setd["check_certificate"],
+    ) as s3_client:
+        get_kwargs = {"Bucket": bucket, "Key": object_name}
+        # Forward Range for PDF/video seeking if present
+        range_hdr = request.headers.get("Range")
+        if range_hdr:
+            get_kwargs["Range"] = range_hdr
+
+        try:
+            obj = await s3_client.get_object(**get_kwargs)
+        except botocore.exceptions.ClientError as e:
+            error_code = e.response["Error"]["Code"]
+            http_status = e.response.get("ResponseMetadata", {}).get("HTTPStatusCode")
+            if error_code in {"NoSuchKey", "NoSuchBucket", "404"} or http_status == 404:
+                raise aiohttp.web.HTTPNotFound(text="Object not found.")
+            if error_code in {
+                "AccessDenied",
+                "401",
+                "InvalidAccessKeyId",
+                "SignatureDoesNotMatch",
+            } or http_status in {401, 403}:
+                raise aiohttp.web.HTTPUnauthorized(text="No access to the object.")
+            raise aiohttp.web.HTTPInternalServerError(
+                text="Could not fetch the object for preview."
+            )
+
+        resp = aiohttp.web.StreamResponse(
+            status=206 if "ContentRange" in obj else 200,
+        )
+
+        ctype = obj.get("ContentType") or "application/octet-stream"
+        # Ensure text/* types have charset
+        if ctype.startswith("text/") and "charset=" not in ctype.lower():
+            ctype = f"{ctype}; charset=utf-8"
+        resp.headers["Content-Type"] = ctype
+
+        # Force inline preview
+        filename = object_name.split("/")[-1].replace('"', "")
+        resp.headers["Content-Disposition"] = f'inline; filename="{filename}"'
+
+        if "ContentLength" in obj:
+            resp.headers["Content-Length"] = str(obj["ContentLength"])
+        if "ContentRange" in obj:
+            resp.headers["Content-Range"] = obj["ContentRange"]
+        if "AcceptRanges" in obj:
+            resp.headers["Accept-Ranges"] = obj["AcceptRanges"]
+        if "ETag" in obj:
+            resp.headers["ETag"] = obj["ETag"]
+
+        await resp.prepare(request)
+        body = obj["Body"]
+        while True:
+            chunk = await body.read(65536)
+            if not chunk:
+                break
+            await resp.write(chunk)
+        await resp.write_eof()
+        return resp
 
 
 async def aws_create_bucket(

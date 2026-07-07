@@ -25,6 +25,7 @@ from swift_browser_ui.ui.api import (
     aws_bulk_update_bucket_cors,
     aws_create_bucket,
     aws_list_buckets,
+    aws_preview_object,
     aws_update_bucket_cors,
     get_os_user,
     keystone_gen_ec2,
@@ -229,6 +230,9 @@ async def servinit(
             aiohttp.web.post("/api/s3/{project}/cors", aws_bulk_update_bucket_cors),
             aiohttp.web.put("/api/s3/{project}/{bucket}", aws_create_bucket),
             aiohttp.web.post("/api/s3/{project}/{bucket}/cors", aws_update_bucket_cors),
+            aiohttp.web.get(
+                "/preview/{project}/{bucket}/{object:.*}", aws_preview_object
+            ),
         ]
     )
 

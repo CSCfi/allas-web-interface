@@ -90,6 +90,7 @@
         @cancel-download="cancelDownload"
       />
       <CopyProgressToast />
+      <PreviewOpenedToast v-if="$store.previewOpenedToastVisible" />
       <router-view class="content-wrapper" />
       <c-toasts
         id="copyBucket-toasts"
