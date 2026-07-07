@@ -378,15 +378,19 @@ export async function removeAccessControlBucketPolicy(
     "Statement": statements,
   };
 
-  // Filter out the old policy entries
+  // Filter out the old policy entries. Statements not shaped like the
+  // ones this UI writes (e.g. Principal "*" or externally attached
+  // rules) are kept untouched.
   for (const receiver of receivers) {
     policy.Statement = policy.Statement.filter((statement) => {
+      const principal = statement?.Principal?.AWS;
+      if (typeof principal !== "string") return true;
       if (DEV) {
         console.log(statement);
         console.log(receiver);
-        console.log(statement.Principal.AWS.match(receiver) == null);
+        console.log(principal.match(receiver) == null);
       }
-      return statement.Principal.AWS.match(receiver) == null;
+      return principal.match(receiver) == null;
     });
   }
 

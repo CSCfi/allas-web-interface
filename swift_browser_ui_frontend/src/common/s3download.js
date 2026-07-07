@@ -212,23 +212,19 @@ export default class S3DownloadSocket {
     owner = "",
     test = false,
   ) {
-    // Before adding the download, ensure that we have retained access as the owner
+    // Before adding the download, try to retain owner access via the
+    // preserve-owner policy statement. This is defensive only — owner
+    // access doesn't depend on it in RGW — so a failure (e.g. buckets
+    // made public via the Swift API) must not block the download.
     if (!owner) {
       if (DEV) console.log("Not downloading from shared bucket, ensure access is retained.");
       try {
         await ensureCollaborateAccessPolicy(bucket);
-      } catch {
-        if (DEV) console.log(`Could not retain access in bucket ${bucket}`);
-
-        document.querySelector("#download-error-toasts").addToast(
-          {
-            ...this.toastMessage,
-            type: "error",
-            message: this.$t("message.download.noRetain"),
-          },
+      } catch (e) {
+        console.warn(
+          `Could not write preserve-owner policy for bucket ${bucket}, `
+          + "continuing with download:", e,
         );
-
-        return;
       }
     }
 
