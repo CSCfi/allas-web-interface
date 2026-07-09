@@ -7,10 +7,12 @@ import {
   DeleteBucketCommand,
   DeleteBucketPolicyCommand,
   DeleteObjectsCommand,
+  GetBucketAclCommand,
   GetBucketPolicyCommand,
   HeadBucketCommand,
   HeadObjectCommand,
   ListObjectsV2Command,
+  PutBucketAclCommand,
   PutBucketPolicyCommand,
   PutObjectCommand,
 } from "@aws-sdk/client-s3";
@@ -238,6 +240,55 @@ export async function awsAbortMultipartUpload(bucket, key, uploadID) {
 }
 
 /** POLICIES */
+
+// Public read access is stored on the bucket ACL as an AllUsers READ
+// grant. On Ceph RGW this is the same underlying ACL that the Swift
+// API exposes as "X-Container-Read: .r:*,.rlistings", so toggling it
+// here stays in sync with buckets made public via the Swift UI and
+// vice versa.
+const ALL_USERS_URI = "http://acs.amazonaws.com/groups/global/AllUsers";
+
+export async function getBucketPublicStatus(bucket) {
+  const command = new GetBucketAclCommand({ Bucket: bucket });
+  const response = await sendS3Command(command);
+  return (response.Grants || []).some(
+    (grant) => grant?.Grantee?.URI === ALL_USERS_URI
+      && ["READ", "FULL_CONTROL"].includes(grant?.Permission),
+  );
+}
+
+export async function setBucketPublic(bucket, enabled) {
+  const applyAcl = async (name) => {
+    const current = await sendS3Command(
+      new GetBucketAclCommand({ Bucket: name }),
+    );
+    const grants = (current.Grants || []).filter(
+      (grant) => grant?.Grantee?.URI !== ALL_USERS_URI,
+    );
+    if (enabled) {
+      grants.push({
+        Grantee: { Type: "Group", URI: ALL_USERS_URI },
+        Permission: "READ",
+      });
+    }
+    await sendS3Command(new PutBucketAclCommand({
+      Bucket: name,
+      AccessControlPolicy: {
+        Owner: current.Owner,
+        Grants: grants,
+      },
+    }));
+  };
+
+  await applyAcl(bucket);
+  // Legacy Swift large objects keep their data in a twin segments
+  // bucket; mirror the ACL there like the Swift UI does
+  try {
+    await applyAcl(`${bucket}_segments`);
+  } catch {
+    // no segments bucket
+  }
+}
 
 export async function getBucketPolicyStatements(bucket) {
   // Get a list of bucket policy statements from S3

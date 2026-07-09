@@ -18,6 +18,14 @@ let default_translations = {
           },
         ],
       },
+      public: {
+        public: "Public Access",
+        updateFail: "Failed to update public access",
+        link: "Link",
+        disabled: "Disabled",
+        yes: "Public. Anyone with the link can access objects.",
+        no: "Private. Access restricted to this project and shared projects.",
+      },
       preview: {
         openedInNewTab: "Opening file in a new tab. Preview depends on the "
           + "content type, unsupported types may download instead.",
@@ -589,6 +597,14 @@ let default_translations = {
             href: "/login/oidc_front",
           },
         ],
+      },
+      public: {
+        public: "Julkinen pääsy",
+        updateFail: "Julkisen pääsyn päivittäminen epäonnistui",
+        link: "Linkki",
+        disabled: "Pois käytöstä",
+        yes: "Julkinen. Kuka tahansa linkin saava voi käyttää kohteita.",
+        no: "Yksityinen. Pääsy rajoitettu tähän projektiin ja jaettuihin projekteihin.",
       },
       preview: {
         openedInNewTab: "Tiedosto avautuu uuteen välilehteen. Esikatselu " +

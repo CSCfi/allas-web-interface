@@ -56,6 +56,8 @@ import {
   awsDeleteObjects,
   awsListObjects,
   checkBucketEmpty,
+  getBucketPublicStatus,
+  setBucketPublic,
 } from "@/common/s3commands";
 
 export default {
@@ -88,6 +90,8 @@ export default {
       paginationOptions: {},
       sortBy: "name",
       sortDirection: "asc",
+      publicStatus: {},
+      publicBusy: {},
     };
   },
   computed: {
@@ -167,176 +171,239 @@ export default {
         }
       }
 
-      mappedContainers
-        .slice(offset, offset + limit).map((
-          item,
-        ) => {
-          const isLegacy = !isS3CompatibleBucketName(item.name);
-          const tags = [];
-          if (isLegacy) {
-            tags.push({ value: this.$t("message.table.legacy_swift"), component: { tag: "c-tag", params: { flat: true, style: { "--csc-primary": "#b71c1c" } } } });
-          } else if (item.hasSegments) {
-            tags.push({ value: this.$t("message.table.swift"), component: { tag: "c-tag", params: { flat: true } } });
-          }
-          const linkParams = {
-            href: "javascript:void(0)",
-            color: "dark-grey",
-            path: mdiPail,
-            iconFill: "primary",
-            iconStyle: {
-              marginRight: "1rem",
-              flexShrink: "0",
-            },
-            onClick: () => {
-              if(item.owner) {
-                this.$router.push({
-                  name: "SharedObjects",
-                  params: {
-                    container: item.name,
-                    owner: item.owner,
-                  },
-                });
-              } else {
-                this.$router.push({
-                  name: "ObjectsView",
-                  params: {
-                    container: item.name,
-                  },
-                });
-              }
-            },
-          };
-          containersPage.push({
-            name: tags.length ? {
-              value: null,
-              children: [
-                {
-                  value: truncate(item.name),
-                  component: { tag: "c-link", params: linkParams },
-                },
-                ...tags,
-              ],
-            } : {
-              value: truncate(item.name),
-              component: { tag: "c-link", params: linkParams },
-            },
-            items: {
-              value: item.count != null && (item.count > 0 || isS3CompatibleBucketName(item.name))
-                ? item.count.toLocaleString(this.locale) : "—",
-            },
-            size: {
-              value: item.bytes != null && (item.bytes > 0 || isS3CompatibleBucketName(item.name))
-                ? getHumanReadableSize(item.bytes, this.locale) : "—",
-            },
-            sharing: {
-              value: getSharedStatus(item.sharing),
-            },
-            last_activity: {
-              value: this.showTimestamp
-                ? parseDateTime(this.locale, item.last_modified, this.$t, false)
-                : parseDateFromNow(this.locale, item.last_modified, this.$t),
-            },
-            actions: {
-              value: null,
-              sortable: null,
-              children: [
-                {
-                  value: this.$t("message.download.download"),
-                  component: {
-                    tag: "c-button",
-                    params: {
-                      testid: "download-container",
-                      text: true,
-                      size: "small",
-                      title: this.$t("message.download.download"),
-                      onClick: ({ event }) => {
-                        this.handleDownloadClick(
-                          item.name,
-                          item.owner ? item.owner : "",
-                          event.isTrusted,
-                        );
-                      },
-                      target: "_blank",
-                      path: mdiTrayArrowDown,
-                      disabled: isLegacy || (
-                        item.owner && item.accessRights?.length === 0
-                      ),
-                    },
-                  },
-                },
-                // Share button is disabled for Shared (with you) buckets
-                {
-                  value: this.$t("message.share.share"),
-                  component: {
-                    tag: "c-button",
-                    params: {
-                      testid: "share-container",
-                      text: true,
-                      size: "small",
-                      title: this.$t("message.share.share"),
-                      path: mdiShareVariantOutline,
-                      onClick: () =>
-                        this.onOpenShareModal(item.name),
-                      onKeyUp: (event) => {
-                        if(event.keyCode === 13)
-                          this.onOpenShareModal(item.name, true);
-                      },
-                      disabled: item.owner || isLegacy,
-                    },
-                  },
-                },
-                {
-                  value: this.$t("message.copy"),
-                  component: {
-                    tag: "c-button",
-                    params: {
-                      testid: "copy-container",
-                      text: true,
-                      size: "small",
-                      title: this.$t("message.copy"),
-                      path: mdiPailPlus,
-                      onClick: () => this.handleCopyClick(item.name, item.owner),
-                      onKeyUp: (event) => {
-                        if (event.keyCode === 13)
-                          this.handleCopyClick(item.name, item.owner, true);
-                      },
-                      disabled: !item.bytes || item.hasSegments,
-                    },
-                  },
-                },
-                {
-                  value: null,
-                  component: {
-                    tag: "c-menu",
-                    params: {
-                      items: [
-                        {
-                          name: this.$t("message.delete"),
-                          action: () => this.handleDeleteClick(item.name),
-                          disabled: item.owner || isLegacy,
-                        },
-                      ],
-                      customTrigger: {
-                        value: this.$t("message.options"),
-                        component: {
-                          tag: "c-button",
-                          params: {
-                            text: true,
-                            path: mdiDotsHorizontal,
-                            title: this.$t("message.options"),
-                            size: "small",
-                            disabled: (item.owner &&
-                              item.accessRights?.length === 0),
-                          },
-                        },
-                      },
-                    },
-                  },
-                },
-              ],
+      const pageItems = mappedContainers.slice(offset, offset + limit);
+      this.fetchPublicStatus(pageItems);
+
+      pageItems.map((
+        item,
+      ) => {
+        const isLegacy = !isS3CompatibleBucketName(item.name);
+        const tags = [];
+        if (isLegacy) {
+          tags.push({
+            value: this.$t("message.table.legacy_swift"),
+            component: {
+              tag: "c-tag",
+              params: { flat: true, style: { "--csc-primary": "#b71c1c" } },
             },
           });
+        } else if (item.hasSegments) {
+          tags.push({
+            value: this.$t("message.table.swift"),
+            component: { tag: "c-tag", params: { flat: true } },
+          });
+        }
+        const linkParams = {
+          href: "javascript:void(0)",
+          color: "dark-grey",
+          path: mdiPail,
+          iconFill: "primary",
+          iconStyle: {
+            marginRight: "1rem",
+            flexShrink: "0",
+          },
+          onClick: () => {
+            if(item.owner) {
+              this.$router.push({
+                name: "SharedObjects",
+                params: {
+                  container: item.name,
+                  owner: item.owner,
+                },
+              });
+            } else {
+              this.$router.push({
+                name: "ObjectsView",
+                params: {
+                  container: item.name,
+                },
+              });
+            }
+          },
+        };
+        containersPage.push({
+          name: tags.length ? {
+            value: null,
+            children: [
+              {
+                value: truncate(item.name),
+                component: { tag: "c-link", params: linkParams },
+              },
+              ...tags,
+            ],
+          } : {
+            value: truncate(item.name),
+            component: { tag: "c-link", params: linkParams },
+          },
+          items: {
+            value: item.count != null && (item.count > 0 || isS3CompatibleBucketName(item.name))
+              ? item.count.toLocaleString(this.locale) : "—",
+          },
+          size: {
+            value: item.bytes != null && (item.bytes > 0 || isS3CompatibleBucketName(item.name))
+              ? getHumanReadableSize(item.bytes, this.locale) : "—",
+          },
+          sharing: {
+            value: getSharedStatus(item.sharing),
+          },
+          public: {
+            value: null,
+            children: [
+              {
+                key: `pub_toggle_${item.name}_${this.publicStatus[item.name] ? "on" : "off"}`,
+                value: null,
+                component: {
+                  tag: "input",
+                  params: {
+                    type: "checkbox",
+                    class: "public-switch-input",
+                    checked: this.publicStatus[item.name] === true,
+                    disabled: !!item.owner
+                      || !!this.publicBusy[item.name]
+                      || this.publicStatus[item.name] == null,
+                    onChange: (ev) => {
+                      const host = ev?.currentTarget || ev?.target;
+                      this.togglePublic(item.name, !!host?.checked);
+                    },
+                    onInput: (ev) => {
+                      const host = ev?.currentTarget || ev?.target;
+                      this.togglePublic(item.name, !!host?.checked);
+                    },
+                  },
+                },
+              },
+              ...(this.publicStatus[item.name] !== true ? [{
+                key: `pub_disabled_${item.name}`,
+                value: this.$t("message.public.disabled"),
+                component: {
+                  tag: "span",
+                  params: {
+                    class: "public-status",
+                  },
+                },
+              }] : []),
+              ...(this.publicStatus[item.name] === true && this.$store.s3endpoint ? [{
+                key: `pub_link_${item.name}`,
+                value: this.$t("message.public.link"),
+                component: {
+                  tag: "c-link",
+                  params: {
+                    class: "public-link",
+                    href: `${this.$store.s3endpoint}/${encodeURIComponent(item.name)}/`,
+                    target: "_blank",
+                    rel: "noopener noreferrer",
+                    color: "primary",
+                  },
+                },
+              }] : []),
+            ],
+          },
+          last_activity: {
+            value: this.showTimestamp
+              ? parseDateTime(this.locale, item.last_modified, this.$t, false)
+              : parseDateFromNow(this.locale, item.last_modified, this.$t),
+          },
+          actions: {
+            value: null,
+            sortable: null,
+            children: [
+              {
+                value: this.$t("message.download.download"),
+                component: {
+                  tag: "c-button",
+                  params: {
+                    testid: "download-container",
+                    text: true,
+                    size: "small",
+                    title: this.$t("message.download.download"),
+                    onClick: ({ event }) => {
+                      this.handleDownloadClick(
+                        item.name,
+                        item.owner ? item.owner : "",
+                        event.isTrusted,
+                      );
+                    },
+                    target: "_blank",
+                    path: mdiTrayArrowDown,
+                    disabled: isLegacy || (
+                      item.owner && item.accessRights?.length === 0
+                    ),
+                  },
+                },
+              },
+              // Share button is disabled for Shared (with you) buckets
+              {
+                value: this.$t("message.share.share"),
+                component: {
+                  tag: "c-button",
+                  params: {
+                    testid: "share-container",
+                    text: true,
+                    size: "small",
+                    title: this.$t("message.share.share"),
+                    path: mdiShareVariantOutline,
+                    onClick: () =>
+                      this.onOpenShareModal(item.name),
+                    onKeyUp: (event) => {
+                      if(event.keyCode === 13)
+                        this.onOpenShareModal(item.name, true);
+                    },
+                    disabled: item.owner || isLegacy,
+                  },
+                },
+              },
+              {
+                value: this.$t("message.copy"),
+                component: {
+                  tag: "c-button",
+                  params: {
+                    testid: "copy-container",
+                    text: true,
+                    size: "small",
+                    title: this.$t("message.copy"),
+                    path: mdiPailPlus,
+                    onClick: () => this.handleCopyClick(item.name, item.owner),
+                    onKeyUp: (event) => {
+                      if (event.keyCode === 13)
+                        this.handleCopyClick(item.name, item.owner, true);
+                    },
+                    disabled: !item.bytes || item.hasSegments,
+                  },
+                },
+              },
+              {
+                value: null,
+                component: {
+                  tag: "c-menu",
+                  params: {
+                    items: [
+                      {
+                        name: this.$t("message.delete"),
+                        action: () => this.handleDeleteClick(item.name),
+                        disabled: item.owner || isLegacy,
+                      },
+                    ],
+                    customTrigger: {
+                      value: this.$t("message.options"),
+                      component: {
+                        tag: "c-button",
+                        params: {
+                          text: true,
+                          path: mdiDotsHorizontal,
+                          title: this.$t("message.options"),
+                          size: "small",
+                          disabled: (item.owner &&
+                            item.accessRights?.length === 0),
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            ],
+          },
         });
+      });
 
       this.containers = containersPage;
 
@@ -352,6 +419,48 @@ export default {
       this.sortDirection = event.detail.direction;
 
       this.getPage();
+    },
+    async fetchPublicStatus(items) {
+      // Lazily resolve the public flag for own buckets on the current
+      // page only; results are cached for the component's lifetime
+      const missing = (items || []).filter(
+        (item) => !item.owner && !(item.name in this.publicStatus),
+      );
+      if (!missing.length) return;
+
+      // Mark as pending so concurrent getPage calls don't refetch
+      for (const item of missing) {
+        this.publicStatus[item.name] = null;
+      }
+      await Promise.all(missing.map(async (item) => {
+        try {
+          this.publicStatus[item.name] = await getBucketPublicStatus(item.name);
+        } catch {
+          this.publicStatus[item.name] = false;
+        }
+      }));
+      this.getPage();
+    },
+    async togglePublic(containerName, nextEnabled) {
+      if (!containerName || this.publicBusy[containerName]) return;
+      this.publicBusy = { ...this.publicBusy, [containerName]: true };
+
+      const prev = this.publicStatus[containerName] === true;
+      this.publicStatus[containerName] = nextEnabled;
+      this.getPage();
+
+      try {
+        await setBucketPublic(containerName, nextEnabled);
+      } catch (e) {
+        if (DEV) console.log(e);
+        this.publicStatus[containerName] = prev;
+        addErrorToastOnMain(this.$t("message.public.updateFail"));
+      } finally {
+        const rest = { ...this.publicBusy };
+        delete rest[containerName];
+        this.publicBusy = rest;
+        this.getPage();
+      }
     },
     setHeaders() {
       this.headers = [
@@ -375,6 +484,11 @@ export default {
           key: "sharing",
           value: this.$t("message.table.shared_status"),
           sortable: true,
+        },
+        {
+          key: "public",
+          value: this.$t("message.public.public"),
+          sortable: false,
         },
         {
           key: "last_activity",

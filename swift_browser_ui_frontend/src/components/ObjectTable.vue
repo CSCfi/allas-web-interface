@@ -35,6 +35,12 @@
           <b>{{ $t("message.table.date_of_sharing") }}: </b>
           {{ dateOfSharing }}
         </li>
+        <li v-show="!owner && bucketIsPublic !== null">
+          <b>{{ $t("message.public.public") }}: </b>
+          {{ bucketIsPublic
+            ? $t("message.public.yes")
+            : $t("message.public.no") }}
+        </li>
         <li v-show="!owner">
           <b>{{ $t("message.bucketDetails.created") }}: </b>{{ bucketCreated }}
         </li>
@@ -187,7 +193,7 @@ import CObjectTable from "@/components/CObjectTable.vue";
 import { debounce, escapeRegExp } from "lodash";
 import BreadcrumbNav from "@/components/BreadcrumbNav.vue";
 import { toRaw } from "vue";
-import { awsListObjects } from "@/common/s3commands";
+import { awsListObjects, getBucketPublicStatus } from "@/common/s3commands";
 
 export default {
   name: "ObjectTable",
@@ -217,6 +223,7 @@ export default {
       filteredObjects: [],
       tableOptions: [],
       currentContainer: {},
+      bucketIsPublic: null,
       breadcrumbClicked: false,
       objsLoading: false,
       filtering: false,
@@ -383,6 +390,13 @@ export default {
       // First look for bucket metadata in idb; it is updated after objects are fetched
       const idbMetadata = await getBucketMetadata(this.active.id, this.containerName);
       if (idbMetadata) this.metadata = {...idbMetadata};
+      if (!this.owner) {
+        try {
+          this.bucketIsPublic = await getBucketPublicStatus(this.containerName);
+        } catch {
+          this.bucketIsPublic = null;
+        }
+      }
       await this.getSharedContainers();
       await this.getBucketSharedStatus();
       await this.updateObjectsAndMetadata();
