@@ -248,43 +248,106 @@ export async function awsAbortMultipartUpload(bucket, key, uploadID) {
 // vice versa.
 const ALL_USERS_URI = "http://acs.amazonaws.com/groups/global/AllUsers";
 
+// The same public state is also mirrored into a bucket-policy
+// statement as a future-proof backup: policies are S3-only (invisible
+// to Swift), but they will keep public buckets working if the Swift
+// API — or ACL support — is ever retired.
+const PUBLIC_READ_SID = "GrantAllasUIPublicRead";
+
 export async function getBucketPublicStatus(bucket) {
-  const command = new GetBucketAclCommand({ Bucket: bucket });
-  const response = await sendS3Command(command);
-  return (response.Grants || []).some(
+  const response = await sendS3Command(
+    new GetBucketAclCommand({ Bucket: bucket }),
+  );
+  const aclPublic = (response.Grants || []).some(
     (grant) => grant?.Grantee?.URI === ALL_USERS_URI
       && ["READ", "FULL_CONTROL"].includes(grant?.Permission),
   );
+
+  // While the Swift API exists the ACL is the source of truth (the
+  // Swift UI can only edit the ACL), so lazily reconcile the policy
+  // backup to match: add it after a Swift-side enable, remove it
+  // after a Swift-side disable. NOTE: if ACLs are ever retired, flip
+  // the source of truth to the policy before touching this — as
+  // written, a dead ACL API would make this strip every backup.
+  try {
+    const statements = (await getBucketPolicyStatements(bucket)) || [];
+    const policyPublic = statements.some((s) => s?.Sid === PUBLIC_READ_SID);
+    if (policyPublic !== aclPublic) {
+      await applyPublicPolicy(bucket, aclPublic);
+    }
+  } catch (e) {
+    console.warn(`Could not reconcile public policy for ${bucket}:`, e);
+  }
+
+  return aclPublic;
+}
+
+async function applyPublicAcl(bucket, enabled) {
+  const current = await sendS3Command(
+    new GetBucketAclCommand({ Bucket: bucket }),
+  );
+  const grants = (current.Grants || []).filter(
+    (grant) => grant?.Grantee?.URI !== ALL_USERS_URI,
+  );
+  if (enabled) {
+    grants.push({
+      Grantee: { Type: "Group", URI: ALL_USERS_URI },
+      Permission: "READ",
+    });
+  }
+  await sendS3Command(new PutBucketAclCommand({
+    Bucket: bucket,
+    AccessControlPolicy: {
+      Owner: current.Owner,
+      Grants: grants,
+    },
+  }));
+}
+
+async function applyPublicPolicy(bucket, enabled) {
+  let statements = (await getBucketPolicyStatements(bucket)) || [];
+  statements = statements.filter((s) => s?.Sid !== PUBLIC_READ_SID);
+  if (enabled) {
+    statements.push({
+      "Sid": PUBLIC_READ_SID,
+      "Effect": "Allow",
+      "Principal": "*",
+      "Action": ["s3:GetObject", "s3:ListBucket"],
+      "Resource": [`arn:aws:s3:::${bucket}`, `arn:aws:s3:::${bucket}/*`],
+    });
+  }
+  if (statements.length) {
+    await putBucketPolicy(bucket, {
+      "Version": "2012-10-17",
+      "Statement": statements,
+    });
+  } else {
+    await sendS3Command(new DeleteBucketPolicyCommand({ Bucket: bucket }));
+  }
 }
 
 export async function setBucketPublic(bucket, enabled) {
-  const applyAcl = async (name) => {
-    const current = await sendS3Command(
-      new GetBucketAclCommand({ Bucket: name }),
-    );
-    const grants = (current.Grants || []).filter(
-      (grant) => grant?.Grantee?.URI !== ALL_USERS_URI,
-    );
-    if (enabled) {
-      grants.push({
-        Grantee: { Type: "Group", URI: ALL_USERS_URI },
-        Permission: "READ",
-      });
-    }
-    await sendS3Command(new PutBucketAclCommand({
-      Bucket: name,
-      AccessControlPolicy: {
-        Owner: current.Owner,
-        Grants: grants,
-      },
-    }));
-  };
+  // The ACL is the operative mechanism (shared with the Swift API)
+  await applyPublicAcl(bucket, enabled);
 
-  await applyAcl(bucket);
-  // Legacy Swift large objects keep their data in a twin segments
-  // bucket; mirror the ACL there like the Swift UI does
   try {
-    await applyAcl(`${bucket}_segments`);
+    await applyPublicPolicy(bucket, enabled);
+  } catch (e) {
+    if (enabled) {
+      // Backup statement missing but the bucket IS public via the ACL
+      console.warn(`Could not write public policy backup for ${bucket}:`, e);
+    } else {
+      // Failing to remove the policy would leave the bucket public
+      // while the UI claims private — surface the error
+      throw e;
+    }
+  }
+
+  // Legacy Swift large objects keep their data in a twin segments
+  // bucket; mirror the state there like the Swift UI does
+  try {
+    await applyPublicAcl(`${bucket}_segments`, enabled);
+    await applyPublicPolicy(`${bucket}_segments`, enabled);
   } catch {
     // no segments bucket
   }
