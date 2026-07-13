@@ -91,6 +91,7 @@ export default {
       sortBy: "name",
       sortDirection: "asc",
       publicStatus: {},
+      publicLinks: {},
       publicBusy: {},
     };
   },
@@ -282,14 +283,14 @@ export default {
                   },
                 },
               }] : []),
-              ...(this.publicStatus[item.name] === true && this.$store.s3endpoint ? [{
+              ...(this.publicStatus[item.name] === true && this.publicLinks[item.name] ? [{
                 key: `pub_link_${item.name}`,
                 value: this.$t("message.public.link"),
                 component: {
                   tag: "c-link",
                   params: {
                     class: "public-link",
-                    href: `${this.$store.s3endpoint}/${encodeURIComponent(item.name)}/`,
+                    href: this.publicLinks[item.name],
                     target: "_blank",
                     rel: "noopener noreferrer",
                     color: "primary",
@@ -434,7 +435,9 @@ export default {
       }
       await Promise.all(missing.map(async (item) => {
         try {
-          this.publicStatus[item.name] = await getBucketPublicStatus(item.name);
+          const status = await getBucketPublicStatus(item.name);
+          this.publicStatus[item.name] = status.public;
+          this.publicLinks[item.name] = status.address;
         } catch {
           this.publicStatus[item.name] = false;
         }

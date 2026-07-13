@@ -31,7 +31,8 @@ from swift_browser_ui.ui.api import (
     keystone_gen_ec2,
     os_list_projects,
     replicate_bucket,
-    swift_list_containers,
+    swift_get_container_public,
+    swift_set_container_public,
 )
 from swift_browser_ui.ui.discover import (
     handle_discover,
@@ -242,7 +243,14 @@ async def servinit(
             aiohttp.web.get("/api/username", get_os_user),
             aiohttp.web.get("/api/projects", os_list_projects),
             aiohttp.web.get("/api/{project}/OS-EC2", keystone_gen_ec2),
-            aiohttp.web.get("/api/{project}", swift_list_containers),
+            # TODO(swift-deprecation): remove both /public routes
+            # together with their handlers in api.py
+            aiohttp.web.get(
+                "/api/{project}/{container}/public", swift_get_container_public
+            ),
+            aiohttp.web.put(
+                "/api/{project}/{container}/public", swift_set_container_public
+            ),
         ]
     )
 

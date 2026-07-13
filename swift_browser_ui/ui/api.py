@@ -1,12 +1,9 @@
 """Project functions for handling API requests from front-end."""
 
 import asyncio
-import json
 import ssl
 import time
-import typing
 import urllib.parse
-from datetime import datetime
 
 import aioboto3
 import aiohttp.web
@@ -16,7 +13,6 @@ import certifi
 
 from swift_browser_ui.ui._convenience import (
     ldap_get_project_titles,
-    sign,
 )
 from swift_browser_ui.ui.replicate import ObjectReplicator
 from swift_browser_ui.ui.settings import setd
@@ -57,47 +53,160 @@ async def os_list_projects(request: aiohttp.web.Request) -> aiohttp.web.Response
     )
 
 
-async def swift_list_containers(
+# TODO(swift-deprecation): this whole section (helpers +
+# swift_get_container_public + swift_set_container_public) is
+# transitional glue that only exists to keep the public toggle in sync
+# with the Swift UI. When Swift is deprecated, delete the section and
+# its two routes in server.py — public access itself is granted by the
+# bucket policy and keeps working. The frontend counterpart to update
+# is getBucketPublicStatus/setBucketPublic in s3commands.js.
+#
+# Public read access lives in the Swift container read ACL as the
+# ".r:*,.rlistings" tokens — the same markers the Swift UI uses. This is
+# deliberate: RGW maps Swift ACL tokens to internal permission bits
+# (READ_OBJS + referer grants) that the S3 ACL API can neither produce
+# nor see, so the only way to stay in sync with the Swift UI is to edit
+# the container ACL through the Swift API. The frontend additionally
+# mirrors the state into a bucket policy, which is what actually grants
+# anonymous object reads on the S3 endpoint.
+PUBLIC_READ_TOKENS = [".r:*", ".rlistings"]
+
+
+def _split_acl(acl: str) -> list[str]:
+    """Split ACL string into list of entries."""
+    if not acl:
+        return []
+    return [a.strip() for a in acl.split(",") if a.strip()]
+
+
+def _join_acl(parts: list[str]) -> str:
+    """Join ACL entries into a string, removing duplicates while preserving order."""
+    seen = set()
+    out = []
+    for p in parts:
+        if p not in seen:
+            out.append(p)
+            seen.add(p)
+    return ",".join(out)
+
+
+def _enable_public_read(read_acl: str) -> str:
+    """Enable public read access in the ACL string."""
+    parts = _split_acl(read_acl)
+    for tok in PUBLIC_READ_TOKENS:
+        if tok not in parts:
+            parts.append(tok)
+    return _join_acl(parts)
+
+
+def _disable_public_read(read_acl: str) -> str:
+    """Disable public read access in the ACL string."""
+    parts = [p for p in _split_acl(read_acl) if p not in PUBLIC_READ_TOKENS]
+    return _join_acl(parts)
+
+
+def _is_public_read(read_acl: str) -> bool:
+    """Check if ACL string has public read access enabled."""
+    parts = set(_split_acl(read_acl))
+    return all(tok in parts for tok in PUBLIC_READ_TOKENS)
+
+
+async def swift_get_container_public(
     request: aiohttp.web.Request,
-) -> aiohttp.web.StreamResponse:
-    """Proxy Swift list buckets available to a project."""
+) -> aiohttp.web.Response:
+    """Get the public read access status and public address of a container."""
     session = await aiohttp_session.get_session(request)
     client = request.app["api_client"]
-
     project = request.match_info["project"]
+    container = request.match_info["container"]
     request.app["Log"].info(
-        "API call for list buckets from "
-        f"{request.remote}, session: {session} :: {time.ctime()}"
+        "API call for container public status from "
+        f"{request.remote}, sess: {session} :: {time.ctime()}"
     )
 
-    # as of v 3.9.1 the return type of query is "MultiMapping[str]"
-    # however the actual function returns MultiDictProxy which has copy
-    # https://github.com/aio-libs/multidict/blob/master/multidict/_multidict_py.py#L146-L163
-    query = request.query.copy()  # type: ignore[attr-defined]
-    query["format"] = "json"
     try:
-        async with client.get(
-            session["projects"][project]["endpoint"],
-            headers={"X-Auth-Token": session["projects"][project]["token"]},
-            params=query,
-        ) as ret:
-            resp = aiohttp.web.StreamResponse(status=ret.status)
-            await resp.prepare(request)
-            if ret.status == 200:
-                async for chunk in ret.content.iter_chunked(65535):
-                    tasks = [
-                        _check_last_modified(request, container)
-                        for container in json.loads(chunk)
-                    ]
-                    containers = await asyncio.gather(*tasks)
-                    chunk = json.dumps(containers).encode()
-                    await resp.write(chunk)
-            await resp.write_eof()
-        return resp
+        endpoint = session["projects"][project]["endpoint"]
+        token = session["projects"][project]["token"]
     except KeyError:
         raise aiohttp.web.HTTPForbidden(
             reason="Account does not have access to the project."
         )
+
+    async with client.head(
+        f"{endpoint}/{container}",
+        headers={"X-Auth-Token": token},
+    ) as ret:
+        if ret.status == 404:
+            raise aiohttp.web.HTTPNotFound(reason=f"Container not found: {container}")
+        if ret.status not in {200, 204}:
+            raise aiohttp.web.HTTPForbidden(
+                reason=f"Failed to read container ACL: {container}"
+            )
+        read_acl = ret.headers.get("X-Container-Read", "")
+
+    # The trailing slash matters: without it RGW redirects to a URL
+    # missing the AUTH_ segment, which breaks the anonymous listing
+    return aiohttp.web.json_response(
+        {
+            "public": _is_public_read(read_acl),
+            "address": f"{endpoint}/{urllib.parse.quote(container)}/",
+        }
+    )
+
+
+async def swift_set_container_public(
+    request: aiohttp.web.Request,
+) -> aiohttp.web.Response:
+    """Set the public read access for a container."""
+    session = await aiohttp_session.get_session(request)
+    client = request.app["api_client"]
+    project = request.match_info["project"]
+    container = request.match_info["container"]
+    request.app["Log"].info(
+        "API call for setting container public status from "
+        f"{request.remote}, sess: {session} :: {time.ctime()}"
+    )
+
+    enabled_str = request.query.get("enabled", "").lower()
+    if enabled_str not in {"true", "false"}:
+        raise aiohttp.web.HTTPBadRequest(reason="Missing or invalid ?enabled=true|false")
+    enabled = enabled_str == "true"
+
+    try:
+        endpoint = session["projects"][project]["endpoint"]
+        token = session["projects"][project]["token"]
+    except KeyError:
+        raise aiohttp.web.HTTPForbidden(
+            reason="Account does not have access to the project."
+        )
+
+    async def _apply(name: str, *, allow_missing: bool) -> None:
+        headers = {"X-Auth-Token": token}
+        async with client.head(f"{endpoint}/{name}", headers=headers) as ret:
+            if ret.status == 404:
+                if allow_missing:
+                    return
+                raise aiohttp.web.HTTPNotFound(reason=f"Container not found: {name}")
+            if ret.status not in {200, 204}:
+                raise aiohttp.web.HTTPForbidden(
+                    reason=f"Failed to read container ACL: {name}"
+                )
+            read_acl = ret.headers.get("X-Container-Read", "")
+
+        headers["X-Container-Read"] = (
+            _enable_public_read(read_acl) if enabled else _disable_public_read(read_acl)
+        )
+
+        async with client.post(f"{endpoint}/{name}", headers=headers) as ret:
+            if ret.status != 204:
+                raise aiohttp.web.HTTPForbidden(reason="Failed to update container ACL")
+
+    await _apply(container, allow_missing=False)
+    # Legacy Swift large objects keep their data in a twin segments
+    # bucket; mirror the state there like the Swift UI does
+    await _apply(f"{container}_segments", allow_missing=True)
+
+    return aiohttp.web.Response(status=204)
 
 
 async def aws_list_buckets(
@@ -488,54 +597,6 @@ async def aws_bulk_update_bucket_cors(
             )
 
     return aiohttp.web.Response(status=204, body="")
-
-
-async def _check_last_modified(
-    request: aiohttp.web.Request,
-    container: typing.Dict[str, typing.Any],
-) -> typing.Dict[str, typing.Any]:
-    """Ensure container data includes 'last_modified' key and value.
-
-    :param request: A request instance
-    :param container: Container basic info
-    """
-    session = await aiohttp_session.get_session(request)
-    client = request.app["api_client"]
-    request.app["Log"].info(
-        "API call for project listing from "
-        f"{request.remote}, sess: {session} :: {time.ctime()}"
-    )
-    project = request.match_info["project"]
-    endpoint = session["projects"][project]["endpoint"]
-    if "owner" in request.query:
-        endpoint = endpoint.replace(project, request.query["owner"])
-
-    # If last_modified is not part of container basic info,
-    # head request is made to check container metadata
-    # and add last modified data from there.
-    if "last_modified" not in container.keys():
-        try:
-            name = container["name"]
-            async with client.head(
-                f"{endpoint}/{name}",
-                headers={
-                    "X-Auth-Token": session["projects"][project]["token"],
-                },
-            ) as ret:
-                date_str = ret.headers["Last-Modified"]
-                # Convert the date string to the ISO 8601 format
-                date_obj = datetime.strptime(date_str, "%a, %d %b %Y %H:%M:%S %Z")
-                iso_8601_str = date_obj.strftime("%Y-%m-%dT%H:%M:%S.%f")
-                container["last_modified"] = iso_8601_str
-        # we expect either the header Last Modified to be missing or
-        # the value is not what we expect for str to date conversion
-        except (KeyError, ValueError) as e:
-            # If anything goes wrong, set last_modified key anyway with null value
-            request.app["Log"].exception(
-                f"something happened when retrieving last modified {e}"
-            )
-            container["last_modified"] = None
-    return container
 
 
 async def _get_ec2_credentials(session, client, project) -> dict:

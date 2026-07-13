@@ -226,6 +226,43 @@ export async function awsAddBucketCors(
   }
 }
 
+// TODO(swift-deprecation): remove swiftGetBucketPublic and
+// swiftSetBucketPublic together with their backend routes; they only
+// exist to sync the public toggle with the Swift UI
+//
+// Get the public read status of a bucket (Swift container read ACL)
+// and its public web address
+export async function swiftGetBucketPublic(project, bucket) {
+  let fetchURL = new URL(
+    `/api/${encodeURI(project)}/${encodeURIComponent(bucket)}/public`,
+    document.location.origin,
+  );
+  let resp = await GET(fetchURL);
+
+  if (resp.status != 200) {
+    throw new Error("Failed to get the bucket public status.");
+  }
+
+  return await resp.json();
+}
+
+// Enable or disable public read access on a bucket via the backend,
+// which edits the Swift container read ACL (kept in sync with the
+// Swift UI)
+export async function swiftSetBucketPublic(project, bucket, enabled) {
+  let fetchURL = new URL(
+    `/api/${encodeURI(project)}/${encodeURIComponent(bucket)}/public`,
+    document.location.origin,
+  );
+  fetchURL.searchParams.append("enabled", enabled ? "true" : "false");
+
+  let resp = await PUT(fetchURL);
+
+  if (resp.status != 204) {
+    throw new Error("Failed to update the bucket public status.");
+  }
+}
+
 export function getPreviewUrl(project, bucket, objectName) {
   // Session-authenticated backend proxy: the URL only works for
   // logged-in members of the project, it is not a shareable link

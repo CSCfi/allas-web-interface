@@ -392,7 +392,7 @@ export default {
       if (idbMetadata) this.metadata = {...idbMetadata};
       if (!this.owner) {
         try {
-          this.bucketIsPublic = await getBucketPublicStatus(this.containerName);
+          this.bucketIsPublic = (await getBucketPublicStatus(this.containerName)).public;
         } catch {
           this.bucketIsPublic = null;
         }
