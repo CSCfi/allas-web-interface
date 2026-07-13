@@ -26,6 +26,7 @@
           <c-button
             size="small"
             outlined
+            :disabled="projectSuspended"
             data-testid="create-bucket"
             @click="toggleCreateBucketModal(false)"
             @keyup.enter="toggleCreateBucketModal(true)"
@@ -36,6 +37,15 @@
         </div>
       </div>
     </div>
+
+    <c-alert
+      v-if="projectSuspended"
+      class="suspended-alert"
+      type="warning"
+      data-testid="suspended-alert"
+    >
+      {{ $t("message.emptyProject.suspended") }}
+    </c-alert>
 
     <div id="cont-table-wrapper">
       <ContainerTable
@@ -114,6 +124,9 @@ export default {
     displayedCount() {
       const list = Array.isArray(this.renderingContainers) ? this.renderingContainers : [];
       return list.filter(c => c && typeof c.name === "string" && !c.name.endsWith("_segments")).length;
+    },
+    projectSuspended() {
+      return this.$store.state.projectSuspended;
     },
   },
   watch: {
@@ -244,7 +257,7 @@ export default {
         matchTags(c) &&
         matchPublic(c) &&
         matchMinItems(c) &&
-        matchMinSize(c)
+        matchMinSize(c),
       );
 
       if (wantAll && !wantFrom && !wantTo) {
@@ -315,10 +328,14 @@ export default {
 
       this.currentProject = await getDB().projects.get({ id: this.active.id });
 
-      this.containersToUpdateObjs = await this.$store.dispatch("updateContainers", {
-        projectID: this.active.id,
-        signal: this.abortController.signal,
-      });
+      try {
+        this.containersToUpdateObjs = await this.$store.dispatch("updateContainers", {
+          projectID: this.active.id,
+          signal: this.abortController.signal,
+        });
+      } catch (error) {
+        this.containersToUpdateObjs = [];
+      }
 
       this.containers = useObservable(
         liveQuery(() => getDB().containers.where({ projectID: this.active.id }).toArray()),
@@ -393,6 +410,10 @@ export default {
 
 #cont-table-wrapper {
   position: relative;
+}
+
+.suspended-alert {
+  margin-bottom: 1rem;
 }
 
 #cont-table-wrapper :deep(c-loader) {

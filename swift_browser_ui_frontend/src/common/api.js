@@ -6,6 +6,25 @@ import {
   DEV,
 } from "@/common/conv";
 
+// A suspended/closed project makes storage-backed calls return 401 even
+// though the login session is still valid. The handler lets the app flag
+// this state instead of treating the user as logged out.
+let projectSuspendedHandler = null;
+export function setProjectSuspendedHandler(handler) {
+  projectSuspendedHandler = handler;
+}
+
+let sessionCheck = null;
+async function sessionStillValid() {
+  if (!sessionCheck) {
+    sessionCheck = fetch("/api/username", { credentials: "same-origin" })
+      .then(resp => resp.ok)
+      .catch(() => false);
+    sessionCheck.finally(() => { sessionCheck = null; });
+  }
+  return sessionCheck;
+}
+
 async function fetchWithCookie({method, url, body, signal}) {
   return fetch(url, {
     method,
@@ -13,10 +32,13 @@ async function fetchWithCookie({method, url, body, signal}) {
     signal,
     credentials: "same-origin",
   })
-    .then(response => {
+    .then(async response => {
       switch (response.status) {
         case 401:
-          if (window.location.pathname !== "/accessibility") {
+          if (await sessionStillValid()) {
+            projectSuspendedHandler?.(true);
+          }
+          else if (window.location.pathname !== "/accessibility") {
             window.location.pathname = "/unauth";
           }
           break;
@@ -102,6 +124,7 @@ export async function getContainers(
   }
   let ret = await GET(getBucketsUrl, signal);
   if (ret.status == 200 && !signal?.aborted) {
+    projectSuspendedHandler?.(false);
     return await ret.json();
   }
   return [];
@@ -125,7 +148,7 @@ export async function getContainerMeta(
   }
 
   let ret = await GET(url, signal);
-  if (signal?.aborted) {
+  if (signal?.aborted || ret.status !== 200) {
     return ["", {}];
   }
   return await ret.json();

@@ -83,7 +83,7 @@
       <c-spacer />
       <div class="nav-item">
         <c-button
-          :disabled="isUploading || !canUpload"
+          :disabled="isUploading || !canUpload || projectSuspended"
           data-testid="upload-file"
           @click="toggleUploadModal(false)"
           @keyup.enter="toggleUploadModal(true)"
@@ -136,6 +136,9 @@ export default {
     },
     isUploading() {
       return this.$store.state.isUploading;
+    },
+    projectSuspended() {
+      return this.$store.state.projectSuspended;
     },
     owner() {
       return this.$route.params.owner;

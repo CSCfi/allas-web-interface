@@ -85,6 +85,7 @@ const store = createStore({
     selectedObjectInfo: null,
     previewOpenedToastVisible: false,
     publicBase: "",
+    projectSuspended: false,
   },
   mutations: {
     setProjects(state, newProjects) {
@@ -281,10 +282,13 @@ const store = createStore({
     setPublicBase(state, payload) {
       state.publicBase = payload || "";
     },
+    setProjectSuspended(state, suspended) {
+      state.projectSuspended = suspended;
+    },
   },
   actions: {
     updateContainers: async function (
-      { dispatch },
+      { dispatch, state },
       { projectID, signal, routeContainer = undefined },
     ) {
       const existingContainers = await getDB()
@@ -318,7 +322,11 @@ const store = createStore({
         }
       } while (containers?.length > 0);
 
-      const sharedContainers = await getSharedContainers(projectID, signal);
+      // A suspended project cannot operate on shared buckets either,
+      // so leave them out and let the cache cleanup below clear them
+      const sharedContainers = state.projectSuspended
+        ? []
+        : await getSharedContainers(projectID, signal).catch(() => []);
 
       if (sharedContainers.length > 0) {
         for (let i in sharedContainers) {
@@ -748,7 +756,7 @@ const store = createStore({
       const { base } = await getPublicBaseAddress(projectID, signal);
       commit("setPublicBase", base);
       return base;
-   },
+    },
   },
 });
 

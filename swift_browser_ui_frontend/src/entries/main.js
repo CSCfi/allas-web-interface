@@ -28,7 +28,7 @@ import { vControl } from "@/common/csc-ui-vue-directive";
 
 // Project JS functions
 import { i18n } from "@/common/i18n";
-import { getUser} from "@/common/api";
+import { getUser, setProjectSuspendedHandler } from "@/common/api";
 import { getProjects } from "@/common/api";
 
 // Import SharingView and Request API
@@ -224,6 +224,10 @@ const app = createApp({
   created() {
     document.title = this.$t("message.program_name");
 
+    setProjectSuspendedHandler(suspended => {
+      this.$store.commit("setProjectSuspended", suspended);
+    });
+
     let initialize = async () => {
       let active;
       let user = await getUser();
@@ -357,7 +361,7 @@ const app = createApp({
       this.$store.commit("setSocket", workers);
     },
     containerSyncWrapper: function () {
-      syncContainerACLs(this.$store);
+      syncContainerACLs(this.$store).catch(() => {});
     },
     cancelUpload: function(container) {
       this.socket.cancelUpload(container);
