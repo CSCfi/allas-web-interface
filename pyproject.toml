@@ -22,46 +22,45 @@ classifiers = [
 ]
 dependencies = [
     "aiohttp-session==2.12.1",
-    "aiohttp==3.12.15",
-    "redis==5.2.1",
-    "asyncpg==0.30.0",
-    "certifi==2025.1.31",
-    "click==8.1.8",
-    "cryptography==44.0.2",
-    "gunicorn==23.0.0",
-    "keystoneauth1==5.10.0",
+    "aiohttp==3.14.1",
+    "redis==8.0.1",
+    "asyncpg==0.31.0",
+    "certifi==2026.6.17",
+    "click==8.4.2",
+    "cryptography==49.0.0",
+    "gunicorn==26.0.0",
+    "keystoneauth1==5.15.0",
     "idpyoidc==5.0.0",
-    "python-swiftclient==4.7.0",
-    "uvloop==0.21.0",
-    "msgpack==1.1.0",
+    "uvloop==0.22.1",
+    "msgpack==1.2.1",
     "ldap3==2.9.1",
-    "aioboto3==15.2.0",
-    "setuptools==71.1.0",
-    "statsd==3.3.0",
+    "aioboto3==15.5.0",
+    "setuptools==83.0.0",
+    "statsd==4.0.1",
 ]
 
 [project.optional-dependencies]
 test = [
-    "black==25.1.0",
-    "coverage==7.8.0",
+    "black==26.5.1",
+    "coverage==7.15.1",
     "flake8-docstrings==1.7.0",
-    "flake8==7.2.0",
-    "mypy==1.15.0",
-    "pytest-cov==6.1.1",
-    "pytest-xdist==3.6.1",
-    "pytest==8.3.5",
-    "tox==4.25.0",
-    "setuptools==71.1.0",
+    "flake8==7.3.0",
+    "mypy==2.3.0",
+    "pytest-cov==7.1.0",
+    "pytest-xdist==3.8.0",
+    "pytest==9.1.1",
+    "tox==4.56.4",
+    "setuptools==83.0.0",
 ]
 ui_test = [
-    "pytest-timeout==2.3.1",
-    "pytest==8.3.5",
+    "pytest-timeout==2.4.0",
+    "pytest==9.1.1",
 ]
 dev = [
     "honcho==2.0.0",
-    "pre-commit==4.2.0",
-    "pyspelling==2.10",
-    "ruff==0.11.6",
+    "pre-commit==4.6.0",
+    "pyspelling==2.12.1",
+    "ruff==0.15.21",
     "types-certifi",
     "types-redis",
     "types-requests",
@@ -91,7 +90,8 @@ py_version=312
 line-length = 90
 target-version = "py312"
 
-# https://beta.ruff.rs/docs/rules/
+[tool.ruff.lint]
+# https://docs.astral.sh/ruff/rules/
 select = [
     "E",   # pycodestyle errors
     "W",   # pycodestyle warnings
@@ -106,7 +106,6 @@ select = [
 ]
 
 ignore = [
-    "ANN101",  # Missing type annotation for `self` in method
     "E501",    # line too long, handled by black
     "B904",    # do not perform function calls in argument defaults
     "PLR2004", # magic value used in comparison
@@ -115,5 +114,5 @@ ignore = [
     "D213",    # multi-line-summary-second-line
 ]
 
-[tool.ruff.mccabe]
+[tool.ruff.lint.mccabe]
 max-complexity = 15

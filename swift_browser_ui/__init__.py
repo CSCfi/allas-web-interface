@@ -1,7 +1,7 @@
-"""Web application for browsing OS Swift object storage.
+"""Web application for browsing object storage over the S3 API.
 
-Uses OS keystone for authentication and python-swiftclient for communicating
-with the object storage.
+Uses OS keystone for authentication and EC2 credentials for
+communicating with the object storage.
 """
 
 __name__ = "swift_browser_ui"

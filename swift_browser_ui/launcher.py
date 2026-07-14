@@ -14,6 +14,5 @@ def run_sharing() -> None:
     swift_browser_ui.sharing.server.main()
 
 
-
 if __name__ == "__main__":
     swift_browser_ui.ui.shell.main()

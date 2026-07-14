@@ -708,5 +708,3 @@ async def replicate_bucket(
     asyncio.create_task(run_replication())
 
     return aiohttp.web.HTTPAccepted(text="Replication started")
-
-
