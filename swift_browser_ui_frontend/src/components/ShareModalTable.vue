@@ -15,7 +15,7 @@
         nowrap
       >
         <p>
-          <b>{{ getPermObj(newPerms).name }}</b>{{ getPermObj(newPerms).desc }}
+          <b>{{ getPermObj(newPerms)?.name }}</b>{{ getPermObj(newPerms)?.desc }}
         </p>
         <c-card-actions>
           <c-button
