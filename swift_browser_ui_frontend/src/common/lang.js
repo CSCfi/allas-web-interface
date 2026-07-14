@@ -179,12 +179,12 @@ let default_translations = {
           "need maximum certainty that your files are not distributed " +
           "further. Note that you have to be also the project manager of " +
           "the recipient project.",
-        read_perm: "Transfer data",
+        read_perm: "Read",
         read_perm_desc:
-          ": The recipient project's members can copy your bucket " +
-          "and download files. Use this when you want to " +
-          "transfer your data to another project.",
-        write_perm: "Collaborate",
+          ": The recipient project's members can view and download " +
+          "files, and copy the bucket to their own project. They " +
+          "cannot upload to, edit, or delete anything from your bucket.",
+        write_perm: "Read and write",
         write_perm_desc:
           ": In addition to @:message.share.read_perm permission, " +
           "the recipient project's members can upload new files or delete " +
@@ -761,12 +761,12 @@ let default_translations = {
           "sisältöä. Käytä tätä, kun tarvitset varmuuden, ettei " +
           "tiedostojasi jaeta eteenpäin. Huomaa, että " +
           "sinun tulee olla myös vastaanottavan projektin omistaja.",
-        read_perm: "Siirrä tiedostot",
+        read_perm: "Luku",
         read_perm_desc:
-          ": Vastaanottavan projektin jäsenet voivat kopioida ämpärisi " +
-          "ja ladata tiedostot. " +
-          "Käytä tätä, kun haluat siirtää tiedostosi toiselle projektille.",
-        write_perm: "Yhteiskäyttö",
+          ": Vastaanottavan projektin jäsenet voivat katsella ja ladata " +
+          "tiedostoja sekä kopioida ämpärin omaan projektiinsa. He eivät " +
+          "voi lähettää, muokata tai poistaa tiedostoja ämpäristäsi.",
+        write_perm: "Luku ja kirjoitus",
         write_perm_desc:
           ": @:message.share.read_perm -oikeuksien lisäksi vastaanottavan " +
           "projektin jäsenet voivat lähettää uusia tai poistaa jo ämpärissä " +

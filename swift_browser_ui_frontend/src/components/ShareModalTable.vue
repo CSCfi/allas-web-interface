@@ -204,16 +204,19 @@ export default {
                     marginBottom: "-1.5rem",
                   },
                   items: this.accessRights,
+                  // Legacy view-only shares (empty access list) have no
+                  // matching option anymore; show an empty selection the
+                  // owner can upgrade from
                   value: item.access.length > 0
                     ? (
                       item.access.length > 1
                         ? this.accessRights[1]
                         : this.accessRights[0])
-                    : this.accessRights[2],
+                    : null,
                   onChangeValue: (e) =>  {
                     this.newPerms = this.getPermArray(e.detail.value);
-                    if (this.getPermObj(this.newPerms).name
-                      !== this.getPermObj(item.access).name) {
+                    if (this.getPermObj(this.newPerms)?.name
+                      !== this.getPermObj(item.access)?.name) {
                       //if different than current perms chosen
                       this.sharedTo = item.sharedTo;
                       this.clickedPermChange = true;
@@ -246,11 +249,12 @@ export default {
       }));
     },
     getPermObj(permArray) {
+      // Legacy view-only shares have an empty access list and no
+      // corresponding option
+      if (permArray.length === 0) return null;
       return permArray.length > 1
         ? this.accessRights[1]
-        : (this.accessRights[0].value[0] === permArray[0]
-          ? this.accessRights[0]
-          : this.accessRights[2]);
+        : this.accessRights[0];
     },
     clearPermChange() {
       this.clickedPermChange = false;
@@ -263,8 +267,7 @@ export default {
     },
     getPermArray(val) {
       if (!val) return [];
-      if (val === "view") return ["v"];
-      else if (val === "read") return ["r"];
+      if (val === "read") return ["r"];
       else return ["r", "w"];
     },
     editAccessRight: async function (sharedProjectId) {

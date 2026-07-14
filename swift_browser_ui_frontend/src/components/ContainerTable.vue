@@ -368,7 +368,10 @@ export default {
                       if (event.keyCode === 13)
                         this.handleCopyClick(item.name, item.owner, true);
                     },
-                    disabled: !item.bytes || item.hasSegments,
+                    // Legacy view-only shares can't read objects, so a
+                    // copy would fail — gate like the download button
+                    disabled: !item.bytes || item.hasSegments
+                      || (item.owner && item.accessRights?.length === 0),
                   },
                 },
               },

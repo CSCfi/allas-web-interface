@@ -79,10 +79,6 @@
               <b>{{ $t("message.share.write_perm") }}</b>{{
                 $t("message.share.write_perm_desc") }}
             </li>
-            <li>
-              <b>{{ $t("message.share.view_perm") }}</b>{{
-                $t("message.share.view_perm_desc") }}
-            </li>
           </ul>
         </div>
         <TagInput
@@ -250,9 +246,6 @@ export default {
     onSelectPermission: function(e) {
       const val = e.target.value.value;
       switch (val) {
-        case "view":
-          this.giveViewAccess();
-          break;
         case "read":
           this.giveReadAccess();
           break;
@@ -295,17 +288,7 @@ export default {
           value: "read and write",
           desc: this.$t("message.share.write_perm_desc"),
         },
-        {
-          name: this.$t("message.share.view_perm"),
-          value: "view",
-          desc: this.$t("message.share.view_perm_desc"),
-        },
       ];
-    },
-    giveViewAccess: function () {
-      this.view = true;
-      this.read = false;
-      this.write = false;
     },
     giveReadAccess: function () {
       this.view = true;
