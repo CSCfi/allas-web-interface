@@ -181,15 +181,16 @@ let default_translations = {
           "the recipient project.",
         read_perm: "Read",
         read_perm_desc:
-          ": The recipient project's members can view and download " +
-          "files, and copy the bucket to their own project. They " +
-          "cannot upload to, edit, or delete anything from your bucket.",
+          ": The recipient project's members can view, download, and " +
+          "copy files, but cannot upload new files to your bucket or " +
+          "delete existing ones. Use this when you want to " +
+          "share your data as read-only.",
         write_perm: "Read and write",
         write_perm_desc:
-          ": In addition to @:message.share.read_perm permission, " +
-          "the recipient project's members can upload new files or delete " +
-          "existing files from your bucket. Use this when " +
-          "you want the bucket to be your shared workspace.",
+          ": The recipient project's members can view, download, and " +
+          "copy files, as well as upload new files to your bucket or " +
+          "delete existing ones. Use this when you want the bucket " +
+          "to be a shared workspace.",
         shared_successfully: "Bucket was shared successfully!",
         remove_permission: "Permissions were removed successfully!",
         update_permission: "Permissions were changed successfully.",
@@ -763,15 +764,16 @@ let default_translations = {
           "sinun tulee olla myös vastaanottavan projektin omistaja.",
         read_perm: "Luku",
         read_perm_desc:
-          ": Vastaanottavan projektin jäsenet voivat katsella ja ladata " +
-          "tiedostoja sekä kopioida ämpärin omaan projektiinsa. He eivät " +
-          "voi lähettää, muokata tai poistaa tiedostoja ämpäristäsi.",
+          ": Vastaanottavan projektin jäsenet voivat katsella, ladata ja " +
+          "kopioida tiedostoja, mutta eivät voi lähettää ämpäriin uusia " +
+          "tiedostoja tai poistaa jo olemassa olevia. Käytä tätä, kun " +
+          "haluat jakaa tietosi vain luettavaksi.",
         write_perm: "Luku ja kirjoitus",
         write_perm_desc:
-          ": @:message.share.read_perm -oikeuksien lisäksi vastaanottavan " +
-          "projektin jäsenet voivat lähettää uusia tai poistaa jo ämpärissä " +
-          "olevia tiedostoja. Käytä tätä, kun haluat käyttää " +
-          "ämpäriä jaettuna työtilana.",
+          ": Vastaanottavan projektin jäsenet voivat katsella, ladata ja " +
+          "kopioida tiedostoja sekä lähettää ämpäriin uusia tiedostoja " +
+          "tai poistaa jo olemassa olevia. Käytä tätä, kun haluat " +
+          "käyttää ämpäriä jaettuna työtilana.",
         shared_successfully: "Ämpärin jakaminen onnistui.",
         remove_permission: "Käyttöoikeus poistettiin onnistuneesti.",
         update_permission: "Käyttöoikeus muutettiin onnistuneesti.",
