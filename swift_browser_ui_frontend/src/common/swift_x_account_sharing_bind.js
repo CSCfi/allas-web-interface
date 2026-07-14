@@ -180,9 +180,20 @@ class SwiftXAccountSharing {
         if (resp.status == 409) {
           throw new Error("Container already shared.");
         }
+        if (!resp.ok) {
+          throw new Error(`Failed to record the share (HTTP ${resp.status}).`);
+        }
         return resp.json();
       },
-    );
+    ).then((ret) => {
+      // The sharing service no-ops (returns false) when its database
+      // is unavailable — a share that isn't recorded must not look
+      // like a success
+      if (ret !== true) {
+        throw new Error("The sharing service did not record the share.");
+      }
+      return ret;
+    });
     return shared;
   }
 
@@ -209,7 +220,12 @@ class SwiftXAccountSharing {
     let shared = fetch(
       url, { method: "PATCH" },
     ).then(
-      (resp) => { return resp.json(); },
+      (resp) => {
+        if (!resp.ok) {
+          throw new Error(`Failed to update the share (HTTP ${resp.status}).`);
+        }
+        return resp.json();
+      },
     );
     return shared;
   }
