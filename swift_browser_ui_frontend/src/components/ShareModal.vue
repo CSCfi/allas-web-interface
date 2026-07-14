@@ -186,7 +186,6 @@ export default {
     return {
       tags: [],
       openShareGuide: false,
-      view: false,
       read: false,
       write: false,
       loading: false,
@@ -291,12 +290,10 @@ export default {
       ];
     },
     giveReadAccess: function () {
-      this.view = true;
       this.read = true;
       this.write = false;
     },
     giveReadWriteAccess: function () {
-      this.view = true;
       this.read = true;
       this.write = true;
     },
@@ -328,9 +325,6 @@ export default {
     },
     shareContainer: async function (bucket) {
       let rights = [];
-      if (this.view) {
-        rights.push("v");
-      }
       if (this.read) {
         rights.push("r");
       }
@@ -472,8 +466,13 @@ export default {
         this.$route.params.project,
         this.bucketName,
       ).then((ret) => {
-        this.sharedDetails = ret;
+        // A failed or non-JSON response must not hide the shares table
+        // silently — only accept a proper array
+        this.sharedDetails = Array.isArray(ret) ? ret : [];
         this.tags = [];
+      }).catch((e) => {
+        console.error(
+          `Could not fetch existing shares for ${this.bucketName}:`, e);
       });
     },
     updateSharedBucket: function () {
