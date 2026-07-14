@@ -230,6 +230,9 @@ export default {
           sourceProjectName,
         );
         await updateContainers(this.active.id);
+        // Pin the copy to the top of the bucket list, same as a bucket
+        // created via the create or upload modals
+        this.$store.setNewBucket(this.bucketName);
         // CORS for new bucket is added on bucket creation
         // Source bucket CORS checked on bucket copy click
         // Proceed with object fetch
