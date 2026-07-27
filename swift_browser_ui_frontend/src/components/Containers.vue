@@ -143,6 +143,13 @@ export default {
       );
       const sharingSet = new Set(sharingBuckets);
 
+      // For buckets shared BY this project, resolve the granted access
+      // levels so the sharing column can show them
+      const sharedAccessMap = await this.fetchSharedAccess(
+        bucketsNoSegments.filter(bucket => sharingSet.has(bucket.name)),
+        signal,
+      );
+
       const sharedBuckets = await this.enrichSharedBuckets(bucketsNoSegments, signal);
       const sharedMap = new Map(sharedBuckets.map(bucket => [bucket.name, bucket]));
 
@@ -160,6 +167,7 @@ export default {
           return {
             ...bucket,
             sharing: "sharing",
+            sharedAccess: sharedAccessMap.get(bucket.name) || [],
           };
         }
 
@@ -243,6 +251,30 @@ export default {
       } catch {
         return [];
       }
+    },
+    fetchSharedAccess: async function (buckets, signal) {
+      // Per-recipient access lists for buckets shared by this project
+      const accessMap = new Map();
+      const CONCURRENCY = 5;
+      for (let i = 0; i < buckets.length; i += CONCURRENCY) {
+        if (signal?.aborted) break;
+        const batch = buckets.slice(i, i + CONCURRENCY);
+        await Promise.all(batch.map(async (bucket) => {
+          try {
+            const details = await this.$store.sharingClient.getShareDetails(
+              this.$route.params.project,
+              bucket.name,
+              signal,
+            );
+            if (Array.isArray(details)) {
+              accessMap.set(bucket.name, details.map(d => d.access));
+            }
+          } catch {
+            // Sharing column just shows no access detail for this bucket
+          }
+        }));
+      }
+      return accessMap;
     },
     applyFilters: async function () {
       const myRun = ++this.filterRun;
@@ -360,16 +392,15 @@ export default {
         .where({ projectID })
         .toArray();
 
-      // Only owned buckets — shared buckets can't be HEAD-ed by this project
-      const ownedBuckets = allBuckets.filter(b => !b.owner);
-
       const CONCURRENCY = 5;
       const statsMap = new Map();
 
-      // Phase 1: fetch HeadBucket stats for all owned buckets
-      for (let i = 0; i < ownedBuckets.length; i += CONCURRENCY) {
+      // Phase 1: fetch HeadBucket stats. Shared-in buckets are included:
+      // the share policy grants s3:ListBucket, which HeadBucket needs.
+      // Failures (e.g. revoked access) return null and are skipped.
+      for (let i = 0; i < allBuckets.length; i += CONCURRENCY) {
         if (signal?.aborted) return;
-        const batch = ownedBuckets.slice(i, i + CONCURRENCY);
+        const batch = allBuckets.slice(i, i + CONCURRENCY);
         await Promise.all(batch.map(async (bucket) => {
           if (signal?.aborted) return;
           const stats = await getBucketStats(bucket.name);
@@ -379,7 +410,7 @@ export default {
 
       // Phase 2: roll up _segments bytes into parent, write to IDB
       // If no _segments buckets exist (Swift deprecated) this is a no-op.
-      for (const bucket of ownedBuckets) {
+      for (const bucket of allBuckets) {
         if (bucket.name.endsWith("_segments")) continue;
         const stats = statsMap.get(bucket.name);
         if (!stats) continue;

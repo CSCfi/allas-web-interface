@@ -163,7 +163,11 @@ export default {
 
       const getSharedStatus = (item) => {
         if (item.sharing === "sharing") {
-          return this.$t("message.table.sharing");
+          const labels = [
+            ...new Set((item.sharedAccess || []).map(permLabel).filter(Boolean)),
+          ];
+          return this.$t("message.table.sharing")
+            + (labels.length ? ` (${labels.join(", ")})` : "");
         }
         if (item.sharing === "shared") {
           const label = permLabel(item.accessRights);
