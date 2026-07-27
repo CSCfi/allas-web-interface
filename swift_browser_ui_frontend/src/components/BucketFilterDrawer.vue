@@ -178,6 +178,32 @@
                 {{ $t("message.filter.disableHint") }}
               </div>
             </div>
+
+            <div class="section">
+              <div class="section-title">
+                {{ $t("message.filter.display") }}
+              </div>
+
+              <div class="check">
+                <label>
+                  <input
+                    v-model="draft.exactTime"
+                    type="checkbox"
+                  >
+                  {{ $t("message.filter.showTimestamp") }}
+                </label>
+              </div>
+
+              <div class="check">
+                <label>
+                  <input
+                    v-model="draft.showAll"
+                    type="checkbox"
+                  >
+                  {{ $t("message.filter.showAll") }}
+                </label>
+              </div>
+            </div>
           </div>
           <div class="panel-footer">
             <c-button
@@ -216,6 +242,8 @@ export default {
         minItems: null,
         minSize: null,
         minSizeUnit: "GiB",
+        exactTime: false,
+        showAll: false,
       },
     };
   },
@@ -242,6 +270,8 @@ export default {
         minSizeMiB: Number.isFinite(minSizeMiB) ? minSizeMiB : null,
         minSize: Number.isFinite(minSize) ? minSize : null,
         minSizeUnit: ["MiB", "GiB", "TiB"].includes(minSizeUnit) ? minSizeUnit : null,
+        exactTime: q.exactTime === "1",
+        showAll: q.showAll === "1",
       };
     },
 
@@ -299,6 +329,24 @@ export default {
         });
       }
 
+      if (this.applied.exactTime) {
+        chips.push({
+          key: "display:exactTime",
+          type: "display",
+          value: "exactTime",
+          label: this.$t("message.filter.timestampChip"),
+        });
+      }
+
+      if (this.applied.showAll) {
+        chips.push({
+          key: "display:showAll",
+          type: "display",
+          value: "showAll",
+          label: this.$t("message.filter.showAllChip"),
+        });
+      }
+
       return chips;
     },
   },
@@ -327,6 +375,8 @@ export default {
     syncDraft() {
       this.draft.shared = [...this.applied.shared];
       this.draft.public = !!this.applied.public;
+      this.draft.exactTime = !!this.applied.exactTime;
+      this.draft.showAll = !!this.applied.showAll;
       this.draft.minItems = this.applied.minItems ?? null;
 
       if (this.applied.minSize != null && this.applied.minSizeUnit) {
@@ -372,6 +422,8 @@ export default {
         minSizeMiB: minSizeMiB != null ? String(minSizeMiB) : null,
         minSize: minSizeNum != null ? String(minSizeNum) : null,
         minSizeUnit: minSizeNum != null ? unit : null,
+        exactTime: this.draft.exactTime ? "1" : null,
+        showAll: this.draft.showAll ? "1" : null,
       };
 
       this.$emit("apply", patch);
@@ -386,6 +438,8 @@ export default {
         minSizeMiB: this.applied.minSizeMiB,
         minSize: this.applied.minSize,
         minSizeUnit: this.applied.minSizeUnit,
+        exactTime: !!this.applied.exactTime,
+        showAll: !!this.applied.showAll,
       };
 
       if (chip.type === "shared") {
@@ -402,6 +456,10 @@ export default {
         next.minSize = null;
         next.minSizeUnit = null;
       }
+      if (chip.type === "display") {
+        if (chip.value === "exactTime") next.exactTime = false;
+        if (chip.value === "showAll") next.showAll = false;
+      }
 
       const patch = {
         shared: next.shared.length ? next.shared.join(",") : null,
@@ -412,6 +470,8 @@ export default {
           ? String(next.minSize) : null,
         minSizeUnit: next.minSizeMiB != null && next.minSizeUnit
           ? String(next.minSizeUnit) : null,
+        exactTime: next.exactTime ? "1" : null,
+        showAll: next.showAll ? "1" : null,
       };
 
       this.$emit("apply", patch);

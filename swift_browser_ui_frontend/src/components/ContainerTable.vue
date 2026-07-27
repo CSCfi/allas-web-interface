@@ -85,7 +85,7 @@ export default {
       containers: [],
       direction: "asc",
       footerOptions: {
-        itemsPerPageOptions: [5, 10, 25, 50, 100],
+        itemsPerPageOptions: [10, 25, 50, 100, 200, 300],
       },
       paginationOptions: {},
       sortBy: "name",
@@ -153,11 +153,27 @@ export default {
         limit = this.paginationOptions.itemsPerPage;
       }
 
-      const getSharedStatus = (bucketSharing) => {
-        let status = "";
-        if (bucketSharing === "sharing") status = this.$t("message.table.sharing");
-        else if (bucketSharing === "shared") status = this.$t("message.table.shared");
-        return status;
+      // Access-level suffix: legacy view-only shares get no suffix
+      const permLabel = (access) => {
+        if (!access?.length) return "";
+        return access.includes("w")
+          ? this.$t("message.share.write_perm")
+          : this.$t("message.share.read_perm");
+      };
+
+      const getSharedStatus = (item) => {
+        if (item.sharing === "sharing") {
+          const labels = [
+            ...new Set((item.sharedAccess || []).map(permLabel).filter(Boolean)),
+          ];
+          return this.$t("message.table.sharing")
+            + (labels.length ? ` (${labels.join(", ")})` : "");
+        }
+        if (item.sharing === "shared") {
+          const label = permLabel(item.accessRights);
+          return this.$t("message.table.shared") + (label ? ` (${label})` : "");
+        }
+        return "";
       };
 
       const mappedContainers = this.conts;
@@ -245,7 +261,7 @@ export default {
               ? getHumanReadableSize(item.bytes, this.locale) : "—",
           },
           sharing: {
-            value: getSharedStatus(item.sharing),
+            value: getSharedStatus(item),
           },
           public: {
             value: null,

@@ -1,39 +1,30 @@
 <template>
   <div class="contents">
-    <c-row
-      id="optionsbar"
-      justify="space-between"
-    >
-      <!--<SearchBox :containers="renderingContainers" />-->
-      <BucketFilterDrawer
-        :result-count="displayedCount"
-        @apply="onFilterApply"
-        @clear="onFilterClear"
-      />
-      <div class="row-end">
-        <c-button
-          size="small"
-          outlined
-          :disabled="projectSuspended"
-          data-testid="create-bucket"
-          @click="toggleCreateBucketModal(false)"
-          @keyup.enter="toggleCreateBucketModal(true)"
-        >
-          <c-icon :path="mdiPlus" />
-          {{ $t("message.createBucket") }}
-        </c-button>
-        <c-menu
-          :key="optionsKey"
-          :items.prop="tableOptions"
-          data-testid="table-options-selector"
-        >
-          <span class="menu-active display-options-menu">
-            <i class="mdi mdi-tune" />
-            {{ $t("message.tableOptions.displayOptions") }}
-          </span>
-        </c-menu>
+    <div id="optionsbar">
+      <div class="options-row">
+        <!--<SearchBox :containers="renderingContainers" />-->
+        <div class="row-left">
+          <BucketFilterDrawer
+            :result-count="displayedCount"
+            @apply="onFilterApply"
+            @clear="onFilterClear"
+          />
+        </div>
+        <div class="row-end">
+          <c-button
+            size="small"
+            outlined
+            :disabled="projectSuspended"
+            data-testid="create-bucket"
+            @click="toggleCreateBucketModal(false)"
+            @keyup.enter="toggleCreateBucketModal(true)"
+          >
+            <c-icon :path="mdiPlus" />
+            {{ $t("message.createBucket") }}
+          </c-button>
+        </div>
       </div>
-    </c-row>
+    </div>
     <c-alert
       v-if="projectSuspended"
       class="suspended-alert"
@@ -84,12 +75,8 @@ export default {
   data: function () {
     return {
       mdiPlus,
-      currentProject: {},
       showTimestamp: false,
       hidePagination: false,
-      //hideTags: false,
-      showTags: true,
-      optionsKey: 1,
       abortController: null,
       abortRenderingController: null,
       containers: [], // idb bucket data
@@ -127,15 +114,6 @@ export default {
     readyToSetUp: function() {
       this.setUpIfReady();
     },
-    currentProject: function() {
-      const savedDisplayOptions = this.currentProject.displayOptions;
-      if (savedDisplayOptions) {
-        //this.hideTags = savedDisplayOptions.hideTags;
-        this.hidePagination = savedDisplayOptions.hidePagination;
-        this.showTimestamp = savedDisplayOptions.showTimestamp;
-        this.updateTableOptions();
-      }
-    },
     containers: async function() {
       if (!this.containers?.length)  {
         this.renderingContainers = [];
@@ -165,6 +143,13 @@ export default {
       );
       const sharingSet = new Set(sharingBuckets);
 
+      // For buckets shared BY this project, resolve the granted access
+      // levels so the sharing column can show them
+      const sharedAccessMap = await this.fetchSharedAccess(
+        bucketsNoSegments.filter(bucket => sharingSet.has(bucket.name)),
+        signal,
+      );
+
       const sharedBuckets = await this.enrichSharedBuckets(bucketsNoSegments, signal);
       const sharedMap = new Map(sharedBuckets.map(bucket => [bucket.name, bucket]));
 
@@ -182,6 +167,7 @@ export default {
           return {
             ...bucket,
             sharing: "sharing",
+            sharedAccess: sharedAccessMap.get(bucket.name) || [],
           };
         }
 
@@ -224,12 +210,8 @@ export default {
         this.$store.setSharingUpdated(false);
       }
     },
-    locale: function () {
-      this.updateTableOptions();
-    },
   },
   created() {
-    this.updateTableOptions();
     this.abortController = new AbortController();
     this.abortRenderingController = new AbortController();
     this.setUpIfReady();
@@ -243,9 +225,6 @@ export default {
     setUpIfReady: async function () {
       // Check id: not available on created on page refresh
       if (this.readyToSetUp) {
-        this.currentProject = await getDB().projects.get({
-          id: this.active.id,
-        });
         this.fetchContainers(true);
       }
     },
@@ -273,6 +252,30 @@ export default {
         return [];
       }
     },
+    fetchSharedAccess: async function (buckets, signal) {
+      // Per-recipient access lists for buckets shared by this project
+      const accessMap = new Map();
+      const CONCURRENCY = 5;
+      for (let i = 0; i < buckets.length; i += CONCURRENCY) {
+        if (signal?.aborted) break;
+        const batch = buckets.slice(i, i + CONCURRENCY);
+        await Promise.all(batch.map(async (bucket) => {
+          try {
+            const details = await this.$store.sharingClient.getShareDetails(
+              this.$route.params.project,
+              bucket.name,
+              signal,
+            );
+            if (Array.isArray(details)) {
+              accessMap.set(bucket.name, details.map(d => d.access));
+            }
+          } catch {
+            // Sharing column just shows no access detail for this bucket
+          }
+        }));
+      }
+      return accessMap;
+    },
     applyFilters: async function () {
       const myRun = ++this.filterRun;
       const q = this.$route.query || {};
@@ -285,6 +288,10 @@ export default {
       const wantPublic = q.public === "1" || q.public === 1 || q.public === true;
       const minItems = Number(q.minItems) > 0 ? Number(q.minItems) : null;
       const minSizeMiB = Number(q.minSizeMiB) > 0 ? Number(q.minSizeMiB) : null;
+
+      // Display toggles also live in the filter query
+      this.showTimestamp = q.exactTime === "1";
+      this.hidePagination = q.showAll === "1";
 
       let filtered = this.enrichedContainers;
 
@@ -346,75 +353,10 @@ export default {
     onFilterClear: function () {
       const {
         shared, public: pub, minItems, minSizeMiB, minSize, minSizeUnit,
+        exactTime, showAll,
         ...rest
       } = this.$route.query || {};
       this.$router.push({ query: rest });
-    },
-    updateTableOptions: function () {
-      const displayOptions = {
-        showTimestamp: this.showTimestamp,
-        //hideTags: this.hideTags,
-        hidePagination: this.hidePagination,
-      };
-      this.tableOptions = [
-        /*{
-          name: this.showTimestamp
-            ? this.$t("message.tableOptions.fromNow")
-            : this.$t("message.tableOptions.timestamp"),
-          action: async () => {
-            this.showTimestamp = !(this.showTimestamp);
-
-            const newProject = {
-              ...this.currentProject,
-              displayOptions: {
-                ...displayOptions,
-                showTimestamp: this.showTimestamp,
-              },
-            };
-            await getDB().projects.put(newProject);
-
-            this.updateTableOptions();
-          },
-        },*/
-        /*{
-          name: this.hideTags
-            ? this.$t("message.tableOptions.showTags")
-            : this.$t("message.tableOptions.hideTags"),
-          action: async () => {
-            this.hideTags = !(this.hideTags);
-
-            const newProject = {
-              ...this.currentProject,
-              displayOptions: {
-                ...displayOptions,
-                hideTags: this.hideTags,
-              },
-            };
-            await getDB().projects.put(newProject);
-
-            this.updateTableOptions();
-          },
-        },*/
-        {
-          name: this.hidePagination
-            ? this.$t("message.tableOptions.showPagination")
-            : this.$t("message.tableOptions.hidePagination"),
-          action: async () => {
-            this.hidePagination = !(this.hidePagination);
-
-            const newProject = {
-              ...this.currentProject,
-              displayOptions: {
-                ...displayOptions,
-                hidePagination: this.hidePagination,
-              },
-            };
-            await getDB().projects.put(newProject);
-            this.updateTableOptions();
-          },
-        },
-      ];
-      this.optionsKey++;
     },
     fetchContainers: async function (withLoader = false) {
       if (this.active.id === undefined
@@ -512,6 +454,25 @@ export default {
 #optionsbar {
   margin: 0.5em 0;
   background: #fff;
+  overflow: visible;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.options-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+}
+
+.row-left {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+  padding-left: 0.75rem;
 }
 
 #cont-table-wrapper {
