@@ -1,5 +1,5 @@
 import { createRouter, createWebHistory } from "vue-router";
-import BucketsView from "@/views/Buckets.vue";
+import ContainersView from "@/components/Containers.vue";
 import ObjectsView from "@/views/Objects.vue";
 import SharedObjects from "@/views/SharedObjects.vue";
 import { getProjects } from "@/common/api.js";
@@ -62,7 +62,7 @@ export default createRouter({
     {
       path: "/browse",
       name: "Browse",
-      component: BucketsView,
+      component: ContainersView,
     },
     {
       path: "/browse/:user/:project/:container/shared/:owner",
@@ -73,17 +73,20 @@ export default createRouter({
       path: "/browse/:user/:project",
       beforeEnter: checkProject,
       name: "AllBuckets",
-      component: BucketsView,
+      component: ContainersView,
     },
+    // The shared/to and shared/from paths are kept for old links and
+    // the table's empty-state texts; the merged view renders for all
+    // three routes and the filter drawer selects the content
     {
       path: "/browse/:user/:project/shared/to",
       name: "SharedTo",
-      component: BucketsView,
+      component: ContainersView,
     },
     {
       path: "/browse/:user/:project/shared/from",
       name: "SharedFrom",
-      component: BucketsView,
+      component: ContainersView,
     },
     {
       path: "/browse/:user/:project/:container",

@@ -2,9 +2,14 @@
   <div class="contents">
     <c-row
       id="optionsbar"
-      justify="end"
+      justify="space-between"
     >
       <!--<SearchBox :containers="renderingContainers" />-->
+      <BucketFilterDrawer
+        :result-count="displayedCount"
+        @apply="onFilterApply"
+        @clear="onFilterClear"
+      />
       <div class="row-end">
         <c-button
           size="small"
@@ -60,11 +65,12 @@ import { liveQuery } from "dexie";
 import { getDB } from "@/common/idb";
 import { updateContainers, updateBucketStats } from "@/common/idbFunctions";
 import { useObservable } from "@vueuse/rxjs";
-import { getBucketStats } from "@/common/s3commands";
+import { getBucketStats, getBucketPublicStatus } from "@/common/s3commands";
 import { mdiPlus } from "@mdi/js";
 import { toggleCreateBucketModal, DEV } from "@/common/globalFunctions";
 import { getAccessDetails, getSharingContainers } from "@/common/share";
 import ContainerTable from "@/components/ContainerTable.vue";
+import BucketFilterDrawer from "@/components/BucketFilterDrawer.vue";
 //import SearchBox from "@/components/SearchBox.vue";
 import { setPrevActiveElement } from "@/common/keyboardNavigation";
 
@@ -72,6 +78,7 @@ export default {
   name: "ContainersView",
   components: {
     ContainerTable,
+    BucketFilterDrawer,
     //SearchBox,
   },
   data: function () {
@@ -86,7 +93,10 @@ export default {
       abortController: null,
       abortRenderingController: null,
       containers: [], // idb bucket data
+      enrichedContainers: [], // merged bucket list with sharing info
       renderingContainers: [], // enriched and filtered data for table
+      publicStatusCache: new Map(), // bucket name -> bool, for the public filter
+      filterRun: 0,
       contsLoading: false,
     };
   },
@@ -108,6 +118,9 @@ export default {
     },
     projectSuspended() {
       return this.$store.projectSuspended;
+    },
+    displayedCount() {
+      return (this.renderingContainers || []).length;
     },
   },
   watch: {
@@ -144,64 +157,51 @@ export default {
         .filter(bucket => !bucket.name.endsWith("_segments"))
         .map(bucket => ({ ...bucket, hasSegments: segmentNames.has(bucket.name) }));
 
-      let finalBuckets = [];
+      // Single merged view: own, shared-to and shared-from buckets are
+      // all in one list; the filter drawer narrows it via query params
+      const sharingBuckets = await getSharingContainers(
+        this.$route.params.project,
+        signal,
+      );
+      const sharingSet = new Set(sharingBuckets);
 
-      if (this.$route.name === "SharedTo") {
-        // Shared to current project
-        finalBuckets = await this.enrichSharedBuckets(bucketsNoSegments, signal);
-      }
-      else if (this.$route.name === "SharedFrom") {
-        // Shared from current project
-        const sharingBuckets = await getSharingContainers(
-          this.$route.params.project,
-          signal,
-        );
-        const sharingSet = new Set(sharingBuckets);
-        finalBuckets = bucketsNoSegments
-          .filter(
-            bucket => sharingSet.has(bucket.name))
-          .map((bucket) => ({...bucket, sharing: "sharing"}));
-      }
-      else {
-        // All buckets
-        const sharingBuckets = await getSharingContainers(
-          this.$route.params.project,
-          signal,
-        );
-        const sharingSet = new Set(sharingBuckets);
+      const sharedBuckets = await this.enrichSharedBuckets(bucketsNoSegments, signal);
+      const sharedMap = new Map(sharedBuckets.map(bucket => [bucket.name, bucket]));
 
-        const sharedBuckets = await this.enrichSharedBuckets(bucketsNoSegments, signal);
-        const sharedMap = new Map(sharedBuckets.map(bucket => [bucket.name, bucket]));
-
-        // Combine buckets
-        finalBuckets = bucketsNoSegments.map(bucket => {
-          if (sharedMap.has(bucket.name)) {
-            return {
-              ...bucket,
-              ...sharedMap.get(bucket.name),
-              sharing: "shared",
-            };
-          }
-
-          else if (sharingSet.has(bucket.name)) {
-            return {
-              ...bucket,
-              sharing: "sharing",
-            };
-          }
-
+      // Combine buckets
+      const finalBuckets = bucketsNoSegments.map(bucket => {
+        if (sharedMap.has(bucket.name)) {
           return {
             ...bucket,
-            sharing: "none",
+            ...sharedMap.get(bucket.name),
+            sharing: "shared",
           };
-        });
-      }
+        }
+
+        else if (sharingSet.has(bucket.name)) {
+          return {
+            ...bucket,
+            sharing: "sharing",
+          };
+        }
+
+        return {
+          ...bucket,
+          sharing: "none",
+        };
+      });
 
       if (!signal?.aborted) {
-        // Assign once to prevent table re-renders
-        this.renderingContainers = finalBuckets;
+        this.enrichedContainers = finalBuckets;
+        await this.applyFilters();
         this.contsLoading = false;
       }
+    },
+    "$route.query": {
+      deep: true,
+      handler() {
+        this.applyFilters();
+      },
     },
     isBucketUploading(newValue) {
       if (newValue === false) {
@@ -272,6 +272,83 @@ export default {
       } catch {
         return [];
       }
+    },
+    applyFilters: async function () {
+      const myRun = ++this.filterRun;
+      const q = this.$route.query || {};
+
+      const shared = Array.isArray(q.shared)
+        ? q.shared
+        : q.shared ? String(q.shared).split(",").filter(Boolean) : [];
+      const wantFrom = shared.includes("from");
+      const wantTo = shared.includes("to");
+      const wantPublic = q.public === "1" || q.public === 1 || q.public === true;
+      const minItems = Number(q.minItems) > 0 ? Number(q.minItems) : null;
+      const minSizeMiB = Number(q.minSizeMiB) > 0 ? Number(q.minSizeMiB) : null;
+
+      let filtered = this.enrichedContainers;
+
+      if (wantFrom || wantTo) {
+        filtered = filtered.filter(cont =>
+          (wantFrom && cont.sharing === "sharing")
+          || (wantTo && cont.sharing === "shared"),
+        );
+      }
+      if (minItems != null) {
+        filtered = filtered.filter(cont => (cont.count || 0) >= minItems);
+      }
+      if (minSizeMiB != null) {
+        const minBytes = minSizeMiB * 1024 * 1024;
+        filtered = filtered.filter(cont => (cont.bytes || 0) >= minBytes);
+      }
+      if (wantPublic) {
+        // Public status isn't kept on the bucket objects — resolve it
+        // on demand and cache for the session. Shared-in buckets can't
+        // be queried and are treated as not public.
+        await this.ensurePublicStatuses(
+          filtered.filter(cont => !cont.owner),
+        );
+        if (myRun !== this.filterRun) return; // superseded run
+        filtered = filtered.filter(
+          cont => !cont.owner && this.publicStatusCache.get(cont.name) === true,
+        );
+      }
+
+      this.renderingContainers = filtered;
+    },
+    ensurePublicStatuses: async function (buckets) {
+      const missing = buckets.filter(
+        bucket => !this.publicStatusCache.has(bucket.name),
+      );
+      const CONCURRENCY = 5;
+      for (let i = 0; i < missing.length; i += CONCURRENCY) {
+        const batch = missing.slice(i, i + CONCURRENCY);
+        await Promise.all(batch.map(async (bucket) => {
+          try {
+            const status = await getBucketPublicStatus(bucket.name);
+            this.publicStatusCache.set(bucket.name, status.public === true);
+          } catch {
+            this.publicStatusCache.set(bucket.name, false);
+          }
+        }));
+      }
+    },
+    onFilterApply: function (queryPatch) {
+      const query = { ...this.$route.query, ...queryPatch };
+      for (const key of Object.keys(query)) {
+        if (query[key] === null || query[key] === undefined
+          || query[key] === "") {
+          delete query[key];
+        }
+      }
+      this.$router.push({ query });
+    },
+    onFilterClear: function () {
+      const {
+        shared, public: pub, minItems, minSizeMiB, minSize, minSizeUnit,
+        ...rest
+      } = this.$route.query || {};
+      this.$router.push({ query: rest });
     },
     updateTableOptions: function () {
       const displayOptions = {
