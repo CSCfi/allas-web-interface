@@ -1,5 +1,5 @@
 <template>
-  <div class="contents">
+  <div class="contents container-box">
     <div id="optionsbar">
       <div class="options-row">
         <!--<SearchBox :containers="renderingContainers" />-->
@@ -143,13 +143,6 @@ export default {
       );
       const sharingSet = new Set(sharingBuckets);
 
-      // For buckets shared BY this project, resolve the granted access
-      // levels so the sharing column can show them
-      const sharedAccessMap = await this.fetchSharedAccess(
-        bucketsNoSegments.filter(bucket => sharingSet.has(bucket.name)),
-        signal,
-      );
-
       const sharedBuckets = await this.enrichSharedBuckets(bucketsNoSegments, signal);
       const sharedMap = new Map(sharedBuckets.map(bucket => [bucket.name, bucket]));
 
@@ -167,7 +160,6 @@ export default {
           return {
             ...bucket,
             sharing: "sharing",
-            sharedAccess: sharedAccessMap.get(bucket.name) || [],
           };
         }
 
@@ -251,30 +243,6 @@ export default {
       } catch {
         return [];
       }
-    },
-    fetchSharedAccess: async function (buckets, signal) {
-      // Per-recipient access lists for buckets shared by this project
-      const accessMap = new Map();
-      const CONCURRENCY = 5;
-      for (let i = 0; i < buckets.length; i += CONCURRENCY) {
-        if (signal?.aborted) break;
-        const batch = buckets.slice(i, i + CONCURRENCY);
-        await Promise.all(batch.map(async (bucket) => {
-          try {
-            const details = await this.$store.sharingClient.getShareDetails(
-              this.$route.params.project,
-              bucket.name,
-              signal,
-            );
-            if (Array.isArray(details)) {
-              accessMap.set(bucket.name, details.map(d => d.access));
-            }
-          } catch {
-            // Sharing column just shows no access detail for this bucket
-          }
-        }));
-      }
-      return accessMap;
     },
     applyFilters: async function () {
       const myRun = ++this.filterRun;
