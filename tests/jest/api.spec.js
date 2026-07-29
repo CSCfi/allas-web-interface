@@ -1,17 +1,21 @@
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { awsListBuckets, setProjectSuspendedHandler } from "@/common/api";
 
 // Mock fetch per-URL: the bucket listing returns `bucketStatus`, while the
 // session probe (/api/username) returns `sessionOk`.
 function mockFetch({ bucketStatus, sessionOk }) {
-  global.fetch = jest.fn((url) => {
-    if (String(url).includes("/api/username")) {
-      return Promise.resolve({ ok: sessionOk, status: sessionOk ? 200 : 401 });
-    }
-    return Promise.resolve({
-      status: bucketStatus,
-      json: async () => ({}),
-    });
-  });
+  vi.stubGlobal(
+    "fetch",
+    vi.fn((url) => {
+      if (String(url).includes("/api/username")) {
+        return Promise.resolve({ ok: sessionOk, status: sessionOk ? 200 : 401 });
+      }
+      return Promise.resolve({
+        status: bucketStatus,
+        json: async () => ({}),
+      });
+    }),
+  );
 }
 
 describe("awsListBuckets 401 handling", () => {
@@ -33,7 +37,8 @@ describe("awsListBuckets 401 handling", () => {
       value: originalLocation,
     });
     setProjectSuspendedHandler(null);
-    jest.restoreAllMocks();
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
   });
 
   it("flags the project as suspended instead of redirecting when the session is still valid", async () => {
@@ -56,11 +61,15 @@ describe("awsListBuckets 401 handling", () => {
   });
 
   it("clears the suspended flag on a successful listing", async () => {
-    mockFetch({ bucketStatus: 200, sessionOk: true });
-    global.fetch = jest.fn(() => Promise.resolve({
-      status: 200,
-      json: async () => ({ Buckets: [] }),
-    }));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() =>
+        Promise.resolve({
+          status: 200,
+          json: async () => ({ Buckets: [] }),
+        }),
+      ),
+    );
 
     await awsListBuckets("test-project");
 

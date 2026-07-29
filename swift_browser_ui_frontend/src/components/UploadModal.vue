@@ -488,7 +488,7 @@ export default {
             await awsCreateBucket(this.active.id, container);
             await awsAddBucketCors(this.active.id, container);
           } catch (e) {
-            if (DEV) console.log(`Couldn't create bucket ${container}`, e);
+            if (DEV) console.log("Couldn't create bucket", container, e);
             this.uploadError = this.$t("message.container_ops.folderCreateFail");
             return;
           }

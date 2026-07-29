@@ -132,9 +132,17 @@ async def handle_login(
     response: typing.Union[aiohttp.web.Response, aiohttp.web.FileResponse]
     response = aiohttp.web.Response(status=302, reason="Redirection to login")
 
-    # Add a cookie for navigating
-    if "navto" in request.query.keys():
-        response.set_cookie("NAV_TO", request.query["navto"], expires=str(3600))
+    # Add a cookie for navigating. Only accept a same-site relative path to
+    # avoid cookie/header injection from the user-controlled query value.
+    navto = request.query.get("navto")
+    if (
+        navto
+        and navto.startswith("/")
+        and not navto.startswith("//")
+        and "\r" not in navto
+        and "\n" not in navto
+    ):
+        response.set_cookie("NAV_TO", navto, expires=str(3600))
 
     if setd["oidc_enabled"]:
         session = await aiohttp_session.get_session(request)

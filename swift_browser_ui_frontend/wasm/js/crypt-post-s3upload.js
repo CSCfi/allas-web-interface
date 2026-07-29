@@ -38,7 +38,9 @@ function createS3Client(access, secret, endpoint) {
 
 function ensureBucket(bucket) {
   if (!mountedFiles[bucket]) {
-    mountedFiles[bucket] = {};
+    // Null-prototype object so a user-controlled file name such as
+    // "__proto__" cannot pollute Object.prototype when used as a key.
+    mountedFiles[bucket] = Object.create(null);
   }
 }
 
