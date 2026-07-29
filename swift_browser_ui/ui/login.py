@@ -139,6 +139,7 @@ async def handle_login(
         navto
         and navto.startswith("/")
         and not navto.startswith("//")
+        and "\\" not in navto
         and "\r" not in navto
         and "\n" not in navto
     ):
