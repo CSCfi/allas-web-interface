@@ -1,6 +1,7 @@
 aakkosia
 aihe
 aika
+aikaleima
 aikana
 aina
 ajaksi
@@ -13,6 +14,7 @@ alkanut
 alla
 aloitettiin
 aloitettu
+altaaseen
 alustetaan
 anna
 annetut
@@ -22,6 +24,7 @@ arvioinut
 arvot
 asetukset
 asiakaspalveluun
+asiakirjat
 asiasana
 asiasanalla
 asiasanat
@@ -36,9 +39,11 @@ avain
 avainta
 avainten
 avautuu
+avoin
 avustavan
 avustavassa
 dataa
+datapolitiikka
 digitaalisessa
 digitaalisten
 edellinen
@@ -63,6 +68,7 @@ erillinen
 erillisen
 erissä
 erityyppisiä
+esikatselu
 esim
 esimerkiksi
 esitetty
@@ -84,6 +90,7 @@ hakea
 haku
 hakuindeksi
 hallittavuus
+halua
 haluat
 haluatko
 halutaan
@@ -104,6 +111,7 @@ huolimatta
 huoltokatkoistamme
 huomaa
 huomaat
+huomioithan
 huomioon
 hyväksy
 hyväksyä
@@ -127,6 +135,7 @@ jaettavat
 jaettiin
 jaettu
 jaettua
+jaettuihin
 jaettuja
 jaettuna
 jaettuun
@@ -150,6 +159,7 @@ jakopyyntöjen
 jakopyyntöjä
 jakotunnus
 jakotunnusta
+jatkuu
 jatkuvasti
 jne
 jo
@@ -168,6 +178,7 @@ jota
 jotka
 jotkin
 julkinen
+julkisen
 julkiset
 julkisia
 julkisten
@@ -178,10 +189,12 @@ jäseneltä
 jäsenet
 jäsenille
 jäsenten
+jätä
 kaikille
 kaikissa
 kaikki
 kaikkien
+kaikkiin
 kansio
 kansioiden
 kansioille
@@ -198,6 +211,9 @@ kanssa
 kanssasi
 katoaa
 katsele
+katsella
+kautta
+kayttajan
 kehittäessämme
 kehittänyt
 kelpaa
@@ -271,7 +287,9 @@ koskee
 koskevia
 kuin
 kuinka
+kuka
 kuluessa
+kuluttua
 kulutuksesta
 kulutus
 kun
@@ -313,6 +331,8 @@ käytössä
 käytöstä
 ladata
 ladattavat
+ladatuissa
+lahdekoodi
 lakia
 laskettu
 laskutuksesta
@@ -328,6 +348,7 @@ latinalaisia
 leikepöydälle
 liiku
 liitä
+linkin
 linkki
 lista
 listaa
@@ -341,6 +362,7 @@ lisätäksesi
 lisää
 loogisesti
 loppuminen
+luettavaksi
 luettelo
 luku
 lukuoikeus
@@ -349,6 +371,7 @@ luodaan
 luomisen
 luonnin
 luonti
+luontiaika
 luottamuksellisia
 luotu
 lupa
@@ -436,6 +459,8 @@ nykyisen
 nykyisiä
 näet
 nähdä
+näitä
+näkymät
 näkyvissä
 näkyvä
 näkyvän
@@ -448,6 +473,8 @@ näyttäminen
 näyttöasetukset
 näytä
 näytöillä
+objekteille
+objekteissa
 objekteja
 objekti
 objektia
@@ -483,6 +510,7 @@ omistaja
 omistavan
 omistusoikeuden
 on
+ongelma
 ongelmat
 ongelmia
 ongelmiin
@@ -505,6 +533,7 @@ osoite
 osoitettaessa
 osoitin
 osoitintoiminnot
+osoitteeseen
 ota
 otamme
 otathan
@@ -609,6 +638,7 @@ pyydetty
 pyydetyn
 pyydä
 pyyntö
+päivittäminen
 päivitä
 päivitämme
 päivän
@@ -616,6 +646,7 @@ päivätty
 päivää
 päänäkymään
 pääsy
+pääsyn
 pääsyä
 päätasolle
 päättyy
@@ -623,6 +654,7 @@ päättyä
 rajan
 rajattu
 rajatun
+rajoitettu
 rajoitettua
 rajoitettuihin
 rajoittamattomat
@@ -634,11 +666,14 @@ responsiivinen
 responsiivisuus
 resurssienkäyttö
 resurssit
+riippuu
 rivinvaihtoa
 ruotsiksi
 saa
 saamaasi
 saatavilla
+saattavat
+saava
 saavu
 saavutettava
 saavutettavan
@@ -678,6 +713,7 @@ selaamiseen
 selaamisesta
 selailla
 selailu
+selaimessasi
 selaimestasi
 selaimet
 selain
@@ -699,12 +735,14 @@ siirto
 siirtymisen
 siirtää
 siitä
+sijaan
 sinulle
 sinun
 sisällön
 sisällöstä
 sisältää
 sisältö
+sisältötyyppi
 sisältöä
 sisään
 sisäänkirjauksen
@@ -723,7 +761,11 @@ sovelletaan
 suhteet
 sulje
 suljet
+suljettu
 suodata
+suodatin
+suodattimet
+suodattimia
 suomeksi
 suorittaa
 suositellut
@@ -747,6 +789,7 @@ säiliöt
 säiliötä
 säiliöön
 säilön
+tahansa
 tai
 takaisin
 tallenna
@@ -754,6 +797,7 @@ tallennettujen
 tallennustilaan
 talteen
 tapauksessa
+tarjoaa
 tarjoamisesta
 tarkastele
 tarkastella
@@ -789,9 +833,12 @@ tieteen
 tieto
 tietoa
 tietoja
+tietosi
 tietosivulta
+tietosuoja
 tietotekniikan
 tietotekniikkakeskus
+tietoturva
 tietää
 tila
 tilan
@@ -819,6 +866,8 @@ tuemme
 tueta
 tuettu
 tuettua
+tukeen
+tukemattomat
 tuki
 tulee
 tulisi
@@ -841,7 +890,10 @@ turvalliseen
 tyhjennä
 tyhjiä
 tyhjä
+tyhjäksi
 tyhjää
+tyypistä
+tyypit
 tyyppi
 tyytyväinen
 työkaluvinkki
@@ -870,12 +922,14 @@ uniikki
 useiden
 useille
 useisiin
+useita
 uudella
 uudelle
 uudelleen
 uuden
 uusi
 uusia
+uuteen
 vaatii
 vaatimusten
 vaativat
@@ -902,6 +956,7 @@ valmistellaan
 valmistuu
 valvontaviranomainen
 valvontaviranomaisen
+vanha
 varmasti
 varmennus
 varmistaa
@@ -931,6 +986,7 @@ viimeisimmästä
 viimeisin
 viimeksi
 viiva
+vinkki
 viraston
 virhe
 virheellinen
@@ -945,11 +1001,14 @@ vuoksi
 vähintään
 väliaikaiseen
 väliaikaisten
+välilehteen
 väliviivaa
 vältä
 yhdelle
+yhdellä
 yhden
 yhdistetty
+yhdistääksesi
 yhteenlaskettu
 yhteensopivia
 yhteiskäyttö
@@ -960,12 +1019,14 @@ yhteyttä
 yhtään
 yksikkö
 yksilöllinen
+yksinkertaisen
 yksityinen
 yksityisen
 yksityisestä
 yksityiskohtaiset
 yksityiskohtia
 yksityistä
+ylempään
 yli
 ylimääräisiä
 ylläpitoon
@@ -974,6 +1035,7 @@ ymmärrettävyys
 yritit
 yritä
 ämpäreiden
+ämpäreihin
 ämpäreille
 ämpäreitä
 ämpäri
@@ -985,30 +1047,3 @@ yritä
 ämpärit
 ämpäriä
 åäöé
-kayttajan
-Julkisen
-päivittäminen
-pääsyn
-Kuka
-linkin
-saava
-tahansa
-jaettuihin
-rajoitettu
-Esikatselu
-uuteen
-välilehteen
-riippuu
-saattavat
-tukemattomat
-tyypistä
-tyypit
-sijaan
-kuluttua
-tukeen
-jatkuu
-ongelma
-tarjoaa
-yksinkertaisen
-Altaaseen
-Vanha
