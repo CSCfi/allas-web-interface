@@ -592,9 +592,7 @@ class APITestClass(tests.common.mockups.APITestBase):
             "ListBuckets",
         )
         mock_client_ctx = unittest.mock.MagicMock()
-        mock_client_ctx.__aenter__ = unittest.mock.AsyncMock(
-            return_value=mock_s3_client
-        )
+        mock_client_ctx.__aenter__ = unittest.mock.AsyncMock(return_value=mock_s3_client)
         mock_client_ctx.__aexit__ = unittest.mock.AsyncMock(return_value=False)
         mock_session = unittest.mock.MagicMock()
         mock_session.client.return_value = mock_client_ctx
@@ -627,9 +625,7 @@ class APITestClass(tests.common.mockups.APITestBase):
                     aiohttp.web.HTTPUnauthorized,
                     msg=f"error code {code} should map to 401",
                 ):
-                    await swift_browser_ui.ui.api.aws_list_buckets(
-                        self.mock_request
-                    )
+                    await swift_browser_ui.ui.api.aws_list_buckets(self.mock_request)
 
     async def test_aws_list_buckets_unknown_error_maps_to_500(self):
         """Unrelated S3 errors should still map to 500."""

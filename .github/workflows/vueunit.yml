@@ -8,18 +8,18 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node: ["18"]
+        node: ["20"]
     name: Jest unit tests
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 8
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node }}
           cache: "pnpm"
           cache-dependency-path: swift_browser_ui_frontend/pnpm-lock.yaml
-      - uses: pnpm/action-setup@v2
-        with:
-          version: 8
       - name: Install dependencies and run tests
         run: |
           pushd swift_browser_ui_frontend

@@ -7,8 +7,6 @@ import aiohttp_session
 
 import swift_browser_ui.ui._convenience
 
-from .settings import setd
-
 LOGGER = logging.getLogger("signature")
 
 
@@ -30,5 +28,3 @@ async def handle_signature_request(
     return aiohttp.web.json_response(
         await swift_browser_ui.ui._convenience.sign(valid_for, path_to_sign)
     )
-
-    return resp

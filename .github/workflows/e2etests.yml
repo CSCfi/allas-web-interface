@@ -8,7 +8,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node: ["18"]
+        node: ["20"]
         browser: ["firefox", "chrome"]
 
     # https://docs.github.com/en/actions/using-containerized-services/about-service-containers

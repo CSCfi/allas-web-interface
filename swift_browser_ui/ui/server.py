@@ -9,10 +9,6 @@ import ssl
 import sys
 import typing
 
-# Alpine Linux's mimetypes database omits common web types; needed for add_static route
-mimetypes.add_type("application/javascript", ".js")
-mimetypes.add_type("application/javascript", ".mjs")
-
 import aiohttp.web
 import aiohttp_session
 import aiohttp_session.redis_storage
@@ -77,6 +73,10 @@ from swift_browser_ui.ui.signature import (
 # temporarily ignore typecheck from mypy until
 # this issue is fixed https://github.com/MagicStack/uvloop/issues/575
 asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())  # type: ignore
+
+# Alpine Linux's mimetypes database omits common web types; needed for add_static route
+mimetypes.add_type("application/javascript", ".js")
+mimetypes.add_type("application/javascript", ".mjs")
 
 
 async def open_client_to_app(app: aiohttp.web.Application) -> None:
