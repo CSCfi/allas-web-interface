@@ -152,8 +152,10 @@ class TestBaseDB(BaseDBConnTestClass):
         """Test closing the database connection."""
         with self.patch_asyncpg_pool, self.patch_os_environ_get:
             await self.db.open()
+            pool = self.db.pool
             await self.db.close()
-            self.db.pool.close.assert_awaited_once()
+            pool.close.assert_awaited_once()
+            self.assertIsNone(self.db.pool)
 
 
 class SharingDBConnTestClass(BaseDBConnTestClass):

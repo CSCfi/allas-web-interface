@@ -43,7 +43,7 @@ async def oidc_start(request: aiohttp.web.Request) -> aiohttp.web.Response:
         )
 
     response = aiohttp.web.Response(status=302, reason="Redirection to login")
-    response.headers["Location"] = oidc_url
+    response.headers["Location"] = oidc_url["url"]
     return response
 
 

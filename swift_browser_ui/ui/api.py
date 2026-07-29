@@ -407,14 +407,34 @@ async def aws_create_bucket(
             await s3_client.create_bucket(Bucket=bucket)
         except botocore.exceptions.ClientError as e:
             error_code = e.response["Error"]["Code"]
-            if error_code == 403 or error_code == 409:
+            http_status = e.response.get("ResponseMetadata", {}).get("HTTPStatusCode")
+            logger.info(
+                f"CreateBucket failed for {bucket} in {project} with error code "
+                f"{error_code} (HTTP {http_status})."
+            )
+            # RGW/S3 report the error as a symbolic string code, not an int.
+            if (
+                error_code in {"BucketAlreadyExists", "BucketAlreadyOwnedByYou"}
+                or http_status == 409
+            ):
                 raise aiohttp.web.HTTPConflict(text="Bucket already exists")
-            if error_code == 400:
-                raise aiohttp.web.HTTPClientError
-            else:
-                raise aiohttp.web.HTTPInternalServerError(
+            if error_code in {
+                "AccessDenied",
+                "UserSuspended",
+                "InvalidAccessKeyId",
+                "SignatureDoesNotMatch",
+            } or http_status in {401, 403}:
+                raise aiohttp.web.HTTPUnauthorized(
+                    text="Unauthorized. Project storage might be suspended "
+                    "or credentials stale."
+                )
+            if http_status == 400:
+                raise aiohttp.web.HTTPBadRequest(
                     text="Could not create requested bucket."
                 )
+            raise aiohttp.web.HTTPInternalServerError(
+                text="Could not create requested bucket."
+            )
 
     # Add CORS entries for the newly created bucket to allow access via browser
     await _update_bucket_cors(logger, s3session, bucket)
@@ -530,7 +550,7 @@ async def aws_bulk_update_bucket_cors(
     logger = request.app["Log"]
     project = request.match_info["project"]
 
-    buckets = request.query.get("buckets", "").split(";")
+    buckets = [b for b in request.query.get("buckets", "").split(";") if b]
 
     logger.info(
         f"API call to allow CORS for all buckets in {project} from "
@@ -578,7 +598,8 @@ async def aws_bulk_update_bucket_cors(
                         await _update_bucket_cors(logger, s3session, aws_bucket["Name"])
                     except Exception as e:
                         request.app["Log"].error(
-                            f"Failed to bulk add CORS to bucket {bucket} for reason {e}",
+                            f"Failed to bulk add CORS to bucket "
+                            f"{aws_bucket['Name']} for reason {e}",
                         )
 
                 # End execution if API tells us there's no more pages

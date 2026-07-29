@@ -15,7 +15,6 @@ from swift_browser_ui.ui.server import servinit, run_server_insecure
 from swift_browser_ui.ui.server import run_server_secure
 from swift_browser_ui.ui.settings import setd
 
-
 # Set static folder in settings so it can be tested
 setd["static_directory"] = os.getcwd() + "/swift_browser_ui_frontend"
 
