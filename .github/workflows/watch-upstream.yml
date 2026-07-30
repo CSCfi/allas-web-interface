@@ -1,0 +1,70 @@
+name: Watch upstream fixes
+
+# Weekly heads-up about new commits in CSCfi/swift-browser-ui (our upstream)
+# that touch code we still share — the backend brokering and the
+# sharing/request/common services. It opens a tracking issue listing them so we
+# can cherry-pick what's relevant:
+#     git fetch upstream && git cherry-pick <sha>
+#
+# Dependency bumps are intentionally NOT watched here — Dependabot raises those
+# against our own tree. Crypto/Swift/upload paths we removed are excluded too.
+
+on:
+  schedule:
+    - cron: "0 6 * * 1" # Mondays 06:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Compare against our S3 branch; change to the default branch once
+          # this work is merged.
+          ref: migration/noncrypto-s3
+          fetch-depth: 0
+
+      - name: Notify on new upstream fixes in shared paths
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git remote add upstream https://github.com/CSCfi/swift-browser-ui.git
+          git fetch -q upstream main
+          # Whole shared Python backend: all of ui/ (login/auth, server,
+          # settings, health, signature, api, _convenience, ...), plus the
+          # common and sharing services. Dependency files are omitted on
+          # purpose — Dependabot handles those. (request/ and upload/ don't
+          # exist on this branch, so nothing to watch there.)
+          PATHS="swift_browser_ui/ui \
+                 swift_browser_ui/common \
+                 swift_browser_ui/sharing"
+          # New (last week) upstream commits in shared paths not in our branch.
+          git log --oneline --no-merges --since='8 days ago' \
+            HEAD..upstream/main -- $PATHS > /tmp/upstream.txt || true
+          if [ ! -s /tmp/upstream.txt ]; then
+            echo "No new upstream fixes in shared paths."
+            exit 0
+          fi
+          {
+            echo "New commits in CSCfi/swift-browser-ui touching code we share:"
+            echo
+            cat /tmp/upstream.txt
+            echo
+            echo "Cherry-pick what applies:"
+            echo '```'
+            echo "git fetch upstream && git cherry-pick <sha>"
+            echo '```'
+          } > /tmp/body.md
+          # Ensure the label exists (no-op if it already does), then file it.
+          gh label create upstream-sync --color 0e8a16 \
+            --description "New upstream swift-browser-ui fixes to review" \
+            2>/dev/null || true
+          gh issue create --repo "$GITHUB_REPOSITORY" \
+            --title "Upstream fixes to review ($(date +%F))" \
+            --label upstream-sync \
+            --body-file /tmp/body.md

@@ -153,12 +153,11 @@ export default {
         limit = this.paginationOptions.itemsPerPage;
       }
 
-      // Access-level suffix: legacy view-only shares get no suffix
+      // Access-level suffix: legacy view-only shares get no suffix.
+      // Compact R / R+W badge (language-neutral).
       const permLabel = (access) => {
         if (!access?.length) return "";
-        return access.includes("w")
-          ? this.$t("message.share.write_perm")
-          : this.$t("message.share.read_perm");
+        return access.includes("w") ? "R+W" : "R";
       };
 
       const getSharedStatus = (item) => {

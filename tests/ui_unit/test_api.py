@@ -177,6 +177,31 @@ class APITestClass(tests.common.mockups.APITestBase):
             ]
         )
 
+    async def test_os_list_projects_ldap_failure_degrades_to_empty_titles(self):
+        """A failing LDAP lookup must degrade to empty titles, not a 500."""
+        p_ldap = unittest.mock.patch(
+            "swift_browser_ui.ui.api.ldap_get_project_titles",
+            unittest.mock.AsyncMock(side_effect=Exception("ldap down")),
+        )
+        with self.p_get_sess, self.p_json_resp, p_ldap:
+            await swift_browser_ui.ui.api.os_list_projects(self.mock_request)
+        self.aiohttp_json_response_mock.assert_called_once_with(
+            [
+                {
+                    "id": "test-id-0",
+                    "title": "",
+                    "name": "test-name-0",
+                    "tainted": False,
+                },
+                {
+                    "id": "test-id-1",
+                    "title": "",
+                    "name": "test-name-1",
+                    "tainted": False,
+                },
+            ]
+        )
+
     def _aws_list_buckets_mocks(self, error_response):
         """Build mocks for aws_list_buckets with a failing S3 client."""
         self.setd_mock["s3api_endpoint"] = "https://test-s3-endpoint"
