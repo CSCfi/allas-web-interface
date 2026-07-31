@@ -214,6 +214,10 @@ export default {
               component: {
                 tag: "c-select",
                 params: {
+                  // v3 c-select renders blank for an object `value` unless
+                  // return-object is set; it also then emits the object via
+                  // changeValue.detail (which onChangeValue reads as .value).
+                  returnObject: true,
                   style: {
                     width: "100%",
                     fontSize: "0.875rem",

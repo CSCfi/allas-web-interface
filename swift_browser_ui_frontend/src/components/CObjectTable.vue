@@ -496,7 +496,7 @@ export default {
 
       let pagedLength = 0;
 
-      this.objects = filteredObjs.reduce((items, item) => {
+      const rows = filteredObjs.reduce((items, item) => {
         if (isFile(item.name, this.$route) || !this.renderFolders) {
           items.push(item);
         } else {
@@ -534,7 +534,16 @@ export default {
         }
         pagedLength = items.length;
         return items;
-      }, [])
+      }, []);
+
+      // TEMP DEBUG (remove after diagnosing the folder-icon issue): dumps the
+      // real S3 keys + computed folder flags. Unconditional so it fires on the
+      // production test build too (DEV is false there).
+      console.log("[CObjectTable] renderFolders", this.renderFolders, getPrefix(this.$route));
+      console.log("[CObjectTable] raw keys from S3", this.objs.map(o => o.name));
+      console.log("[CObjectTable] rows", rows.map(o => ({ name: o.name, folder: !!o.folder })));
+
+      this.objects = rows
         .sort((a, b) => sortItems(a, b, this.sortBy, this.sortDirection))
         .slice(offset, offset + limit)
         .map(item => this.formatItem(item));

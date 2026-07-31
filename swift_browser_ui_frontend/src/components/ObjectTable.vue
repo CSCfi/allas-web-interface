@@ -81,6 +81,7 @@
           size="small"
           outlined
           data-testid="create-folder"
+          :disabled="owner != undefined && accessRights.length <= 1"
           @click="openFolderModal(false)"
           @keyup.enter="openFolderModal(true)"
         >
