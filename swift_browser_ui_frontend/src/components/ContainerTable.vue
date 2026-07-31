@@ -32,7 +32,7 @@ import {
 import {
   mdiTrayArrowDown,
   mdiShareVariantOutline,
-  mdiDotsHorizontal,
+  mdiDeleteOutline,
   mdiPail,
   mdiPailPlus,
 } from "@mdi/js";
@@ -450,50 +450,37 @@ export default {
                 ],
               },
               {
-                value: null,
+                value: "",
                 component: {
-                  tag: "c-menu",
+                  tag: "c-button",
                   params: {
-                    custom: true,
-                    items: [
-                      {
-                        name: this.$t("message.delete"),
-                        action: () => this.handleDeleteClick(item.name),
-                        disabled: item.owner || isLegacy,
-                      },
-                    ],
+                    testid: "delete-container",
+                    text: true,
+                    size: "small",
+                    onClick: () => this.handleDeleteClick(item.name),
+                    onKeyUp: (event) => {
+                      if (event.keyCode === 13)
+                        this.handleDeleteClick(item.name);
+                    },
+                    disabled: item.owner || isLegacy,
                   },
                 },
                 children: [
                   {
                     value: "",
                     component: {
-                      tag: "c-button",
+                      tag: "c-icon",
                       params: {
-                        text: true,
-                        size: "small",
-                        disabled: (item.owner &&
-                          item.accessRights?.length === 0),
+                        path: mdiDeleteOutline,
+                        size: "18",
                       },
                     },
-                    children: [
-                      {
-                        value: "",
-                        component: {
-                          tag: "c-icon",
-                          params: {
-                            path: mdiDotsHorizontal,
-                            size: "18",
-                          },
-                        },
-                      },
-                      {
-                        value: this.$t("message.options"),
-                        component: {
-                          tag: "span",
-                        },
-                      },
-                    ],
+                  },
+                  {
+                    value: this.$t("message.delete"),
+                    component: {
+                      tag: "span",
+                    },
                   },
                 ],
               },
