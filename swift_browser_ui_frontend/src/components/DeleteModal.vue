@@ -2,7 +2,7 @@
   <c-card
     id="delete-objs-modal"
     ref="deleteObjsModal"
-    class="delete-modal"
+    class="no-padding-card"
     @keydown="handleKeyDown"
   >
     <c-alert
@@ -420,10 +420,6 @@ export default {
 </script>
 
 <style scoped>
-
-.delete-modal {
-  padding: 0px;
-}
 
 c-progress-bar {
   padding: 0.5rem;

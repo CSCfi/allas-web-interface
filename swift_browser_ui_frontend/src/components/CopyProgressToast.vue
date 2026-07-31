@@ -94,7 +94,7 @@ export default {
 }
 
 .copy-toast-card {
-  background: var(--csc-white, #fff);
+  background: var(--c-white, #fff);
   color: var(--csc-dark, #222);
   border-radius: 6px;
   box-shadow: 0 12px 28px rgba(0,0,0,0.18);
@@ -121,7 +121,7 @@ export default {
   font-size: 12px;
   padding: 2px 10px;
   border-radius: 999px;
-  background: var(--csc-light-grey, #eee);
+  background: var(--c-tertiary-100, #eee);
   text-transform: capitalize;
   white-space: nowrap;
   margin-top: 2px;

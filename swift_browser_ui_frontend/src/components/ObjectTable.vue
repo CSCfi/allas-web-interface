@@ -5,7 +5,7 @@
     <BreadcrumbNav @breadcrumbClicked="breadcrumbClickHandler" />
     <div class="bucket-info">
       <div class="bucket-info-heading">
-        <i class="mdi mdi-pail-outline" />
+        <c-icon :path="mdiPailOutline" />
         <span>{{ containerName }}</span>
       </div>
       <ul class="bucket-details">
@@ -60,10 +60,7 @@
         :placeholder="$t('message.objects.filterBy')"
         type="search"
       >
-        <i
-          slot="pre"
-          class="mdi mdi-filter-variant mdi-24px"
-        />
+        <c-icon :path="mdiFilterVariant" size="24" />
       </c-text-field>-->
       <c-button
         v-if="showGoUp"
@@ -73,10 +70,7 @@
         @click="goUpOneLevel"
         @keyup.enter="goUpOneLevel"
       >
-        <i
-          slot="icon"
-          class="mdi mdi-arrow-up-left"
-        />
+        <c-icon :path="mdiArrowUpLeft" size="20" />
         {{ atBucketRoot
           ? $t("message.objects.backToBuckets")
           : $t("message.objects.upOneLevel") }}
@@ -90,19 +84,16 @@
           @click="openFolderModal(false)"
           @keyup.enter="openFolderModal(true)"
         >
-          <i
-            slot="icon"
-            class="mdi mdi-folder-plus-outline"
-          />
+          <c-icon :path="mdiFolderPlusOutline" size="20" />
           {{ $t("message.objects.createFolder") }}
         </c-button>
         <c-menu
           :key="optionsKey"
           :items.prop="tableOptions"
-          options-testid="table-options-selector"
+          data-testid="table-options-selector"
         >
+          <c-icon :path="mdiTune" size="20" />
           <span class="menu-active display-options-menu">
-            <i class="mdi mdi-tune" />
             {{ $t("message.tableOptions.displayOptions") }}
           </span>
         </c-menu>
@@ -113,7 +104,7 @@
       class="selection-bar"
     >
       <div class="info">
-        <i class="mdi mdi-information-outline" />
+        <c-icon :path="mdiInformationOutline" size="20" />
         <span>
           {{ checkedRows.length }}
           {{ checkedRows.length === 1
@@ -133,11 +124,8 @@
           @click="button.action"
           @keyup.enter="button.action"
         >
-          <i
-            slot="icon"
-            :class="button.icon"
-            class="mdi"
-          /> {{ button.label }}
+          <c-icon :path="button.icon" size="20" />
+          {{ button.label }}
         </c-button>
       </div>
     </div>
@@ -165,6 +153,15 @@
 </template>
 
 <script>
+import {
+  mdiPailOutline,
+  mdiTune,
+  mdiInformationOutline,
+  mdiArrowUpLeft,
+  mdiFolderPlusOutline,
+  mdiRefresh,
+  mdiTrashCanOutline,
+} from "@mdi/js";
 import {
   DEV,
   toggleDeleteModal,
@@ -206,6 +203,11 @@ export default {
   },
   data: function () {
     return {
+      mdiPailOutline,
+      mdiTune,
+      mdiInformationOutline,
+      mdiArrowUpLeft,
+      mdiFolderPlusOutline,
       accessRights: [],
       sharedStatus: "",
       sharedContainers: [],
@@ -716,13 +718,13 @@ export default {
       this.selectionActionButtons = [
         {
           label: this.$t("message.table.clearSelected"),
-          icon: "mdi-refresh",
+          icon: mdiRefresh,
           testid: "clear-checkboxes",
           action: () => this.clearSelections(),
         },
         {
           label: this.$t("message.table.deleteSelected"),
-          icon: "mdi-trash-can-outline",
+          icon: mdiTrashCanOutline,
           testid: "delete-checked-files",
           action: () => {
             const rows = this.checkedRows.map(item => ({
@@ -783,7 +785,7 @@ export default {
 }
 
 .bucket-info {
-  border: 1px solid var(--csc-primary);
+  border: 1px solid var(--c-primary-600);
   margin: 0rem 0rem;
 }
 
@@ -798,11 +800,8 @@ export default {
   font-weight: 700;
   background: var(--csc-dark-blue);
   align-items: center;
-  & .mdi {
-    font-size: 1.5rem;
-    padding-right: .5rem
-  }
   & span {
+    margin-left: 0.5rem;
     align-self: center;
     display: inline-block;
   }
@@ -834,11 +833,8 @@ export default {
     flex: 1;
     min-width: 12rem;
     padding: 1rem;
-    & .mdi {
-      font-size: 1.5rem;
-      padding-right: .5rem
-    }
     & span {
+      margin-left: 0.5rem;
       align-self: center;
       display: inline-block;
     }

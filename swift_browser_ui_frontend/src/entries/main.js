@@ -19,8 +19,8 @@ import ObjectInfoModal from "@/components/ObjectInfoModal.vue";
 import PreviewOpenedToast from "@/components/PreviewOpenedToast.vue";
 
 // CSC UI things
-import { applyPolyfills, defineCustomElements } from "allas-ui/dist/loader";
-import { vControl } from "@/common/csc-ui-vue-directive";
+import { defineCustomElements } from "@cscfi/csc-ui/loader";
+import { vControl } from "@cscfi/csc-ui-vue";
 
 // Project JS functions
 import { i18n } from "@/common/i18n";
@@ -77,9 +77,7 @@ window.addEventListener("rejectionhandled", function (event) {
 });
 
 // Configure csc-ui
-applyPolyfills().then(() => {
-  defineCustomElements();
-});
+defineCustomElements();
 
 const pinia = createPinia();
 const app = createApp({

@@ -8,7 +8,11 @@
         @click="openPanel"
         @keyup.enter="openPanel"
       >
-        <i class="mdi mdi-tune filter-icon" />
+        <c-icon
+          :path="mdiTune"
+          size="20"
+          class="filter-icon"
+        />
         {{ $t("message.filter.filter") }}
       </c-button>
 
@@ -75,7 +79,10 @@
               size="small"
               @click="closePanel"
             >
-              <i class="mdi mdi-close" />
+              <c-icon
+                :path="mdiClose"
+                size="20"
+              />
             </c-button>
           </div>
 
@@ -227,6 +234,8 @@
 </template>
 
 <script>
+import { mdiTune, mdiClose } from "@mdi/js";
+
 export default {
   name: "BucketFilterDrawer",
   props: {
@@ -235,6 +244,8 @@ export default {
   emits: ["apply", "clear"],
   data() {
     return {
+      mdiTune,
+      mdiClose,
       open: false,
       draft: {
         shared: [],
@@ -493,7 +504,7 @@ export default {
 
 .bucket-count {
   font-size: 14px;
-  color: var(--csc-dark-grey, #4b5563);
+  color: var(--c-tertiary-700, #4b5563);
   white-space: nowrap;
 }
 

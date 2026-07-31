@@ -1,8 +1,8 @@
 import { createApp } from "vue";
 import SelectPage from "@/pages/SelectPage.vue";
 
-import { applyPolyfills, defineCustomElements } from "allas-ui/dist/loader";
-import { vControl } from "@/common/csc-ui-vue-directive";
+import { defineCustomElements } from "@cscfi/csc-ui/loader";
+import { vControl } from "@cscfi/csc-ui-vue";
 
 import { i18n } from "@/common/i18n";
 
@@ -11,9 +11,7 @@ import { getProjects } from "@/common/api";
 // Import project css
 import "@/assets/main.css";
 
-applyPolyfills().then(() => {
-  defineCustomElements();
-});
+defineCustomElements();
 
 const app = createApp({
   data: function() {

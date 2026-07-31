@@ -1,7 +1,7 @@
 <template>
   <c-card
     ref="shareContainer"
-    class="share-card"
+    class="modal-card"
     @keydown="handleKeyDown"
   >
     <c-card-actions
@@ -30,23 +30,21 @@
       id="share-card-modal-content"
       class="modal-content-wrapper"
     >
-      <c-container>
-        <c-flex
-          class="toggle-instructions"
-        >
+      <div class="container">
+        <div class="flex toggle-instructions">
           <c-link
             underline
             tabindex="0"
-            :path="mdiInformationOutline"
             :aria-label="$t('label.shareid_instructions')"
             @click="toggleShareGuide"
             @keyup.enter="toggleShareGuide"
           >
+            <c-icon :path="mdiInformationOutline" size="16" />
             {{ openShareGuide ? $t("message.share.close_instructions")
               : $t("message.share.instructions")
             }}
           </c-link>
-        </c-flex>
+        </div>
         <div
           v-show="openShareGuide"
           class="content guide-content"
@@ -100,8 +98,6 @@
             :placeholder="$t('message.share.permissions')"
             hide-details
             @changeValue="onSelectPermission($event)"
-            @mouseenter="calculateSelectPosition(false)"
-            @mouseleave="calculateSelectPosition(true)"
           >
             <c-option
               v-for="(perm, i) in accessRights"
@@ -110,7 +106,9 @@
               :name="perm.name"
               :value="perm.value"
             >
-              <b>{{ perm.name }}</b>{{ perm.desc }}
+              <span style="white-space: normal;">
+                <b>{{ perm.name }}</b>{{ perm.desc }}
+              </span>
             </c-option>
           </c-select>
         </div>
@@ -123,7 +121,7 @@
         >
           {{ $t('message.share.confirm') }}
         </c-button>
-      </c-container>
+      </div>
       <c-alert
         v-show="isShared || isPermissionRemoved || isPermissionUpdated"
         type="success"
@@ -251,28 +249,6 @@ export default {
         case "read and write":
           this.giveReadWriteAccess();
           break;
-      }
-    },
-    calculateSelectPosition: function(reset) {
-      const div = document.getElementById("share-select");
-      const divWidth = div.getBoundingClientRect().width;
-      const cselect = document.getElementById("select-share-access");
-      const cselectHeight = cselect.getBoundingClientRect().height;
-
-      if (reset) {
-        cselect.style.position = "relative";
-        cselect.style.maxWidth = "none";
-        div.style.minHeight  = "none";
-      }
-      else {
-        const content = document.getElementById("share-card-modal-content");
-        if (content.scrollTop <= 0) {
-          // don't apply fixed position if scrolled on modal
-          cselect.style.position = "fixed";
-          // fixed element leaves normal flow, adjust for it
-          div.style.minHeight = cselectHeight + "px";
-          cselect.style.maxWidth = divWidth + "px";
-        }
       }
     },
     setAccessRights: function () {
@@ -590,34 +566,6 @@ export default {
 
 <style scoped>
 
-.share-card {
-  padding: 2rem;
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  max-height: 75vh;
-}
-
-@media screen and (max-width: 767px), (max-height: 580px) {
-  .share-card {
-    top: -5rem;
-  }
-}
-
-@media screen and (max-height: 580px) and (max-width: 767px),
-(max-width: 525px) {
-  .share-card {
-    top: -9rem;
-  }
-}
-
-@media screen and (max-height: 580px) and (max-width: 525px) {
-  .share-card {
-    top: -13rem;
-  }
-}
-
 #share-select {
   width: 100%;
   margin-bottom: 1.5rem;
@@ -627,7 +575,7 @@ export default {
   z-index: 2;
 }
 
-c-container {
+div.container {
   width: 100%;
 }
 
@@ -646,7 +594,7 @@ c-card-actions > h2 {
 .toggle-instructions {
   justify-content: flex-end;
   align-items: center;
-  color: var(--csc-primary);
+  color: var(--c-primary-600);
 }
 
 .guide-content {
@@ -669,6 +617,7 @@ c-select {
 }
 
 c-link {
+  --c-link-hover: none;
   min-width: 60px;
 }
 
@@ -676,10 +625,14 @@ c-link > span {
   font-size: 0.875rem;
 }
 
-c-flex, .shared-notification {
+div.flex, .shared-notification {
   display: flex;
   flex-direction: row;
   justify-content: space-between;
+}
+
+div.flex {
+  flex-direction: row-reverse;
 }
 
 c-alert[type="success"] {

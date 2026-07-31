@@ -1,5 +1,5 @@
 <template>
-  <c-container>
+  <div class="container">
     <h3 class="title is-5">
       {{ $t("message.share.shared_table_title") }}
     </h3>
@@ -68,7 +68,7 @@
       :footerOptions.prop="footer"
       horizontal-scrolling
     />
-  </c-container>
+  </div>
 </template>
 
 <script>
@@ -126,14 +126,12 @@ export default {
           sortable: false,
           children: [
             {
-              value: this.$t("message.delete"),
+              value: "",
               component: {
                 tag: "c-button",
                 params: {
                   text: true,
                   size: "small",
-                  title: this.$t("message.delete"),
-                  path: mdiDelete,
                   onClick: ({ data }) => {
                     this.toDelete = data;
                     this.clickedDelete = true;
@@ -157,6 +155,24 @@ export default {
                   },
                 },
               },
+              children: [
+                {
+                  value: "",
+                  component: {
+                    tag: "c-icon",
+                    params: {
+                      path: mdiDelete,
+                      size: "18",
+                    },
+                  },
+                },
+                {
+                  value: this.$t("message.delete"),
+                  component: {
+                    tag: "span",
+                  },
+                },
+              ],
             },
           ],
         },
@@ -362,7 +378,7 @@ c-data-table {
   padding-bottom: 4rem;
 }
 
-c-container {
+div.container {
   min-width: 0;
 }
 </style>

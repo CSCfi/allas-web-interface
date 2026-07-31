@@ -253,23 +253,37 @@ export default {
 
       return {
         name: {
-          value: name,
-          component: {
-            tag: "c-link",
-            params: {
-              href: "javascript:void(0)",
-              color: "dark-grey",
-              path: item?.folder ? mdiFolder : mdiFileOutline,
-              iconFill: "primary",
-              iconStyle: {
-                marginRight: "1rem",
-                flexShrink: "0",
+          value: "",
+          children: [
+            {
+              value: "",
+              component: {
+                tag: "c-icon",
+                params: {
+                  path: item?.folder ? mdiFolder : mdiFileOutline,
+                  color: "var(--c-primary-600)",
+                  size: "18",
+                },
               },
-              onClick: item?.folder
-                ? () => this.changeFolder(name)
-                : () => this.openPreview(item),
             },
-          },
+            {
+              value: name,
+              component: {
+                tag: "c-link",
+                params: {
+                  href: "javascript:void(0)",
+                  style: {
+                    "--c-link-color": "var(--c-tertiary-700)",
+                    "--c-link-hover": "none",
+                    marginLeft: "1rem",
+                  },
+                  onClick: item?.folder
+                    ? () => this.changeFolder(name)
+                    : () => this.openPreview(item),
+                },
+              },
+            },
+          ],
         },
         size: {
           value: getHumanReadableSize(item.bytes, this.locale),
@@ -303,15 +317,13 @@ export default {
           align: "end",
           children: [
             {
-              value: this.$t("message.download.download"),
+              value: "",
               component: {
                 tag: "c-button",
                 params: {
                   testid: "download-object",
                   text: true,
                   size: "small",
-                  title: "Download",
-                  path: mdiTrayArrowDown,
                   onClick: ({ event }) => {
                     this.beginDownload(item, event.isTrusted);
                   },
@@ -319,17 +331,33 @@ export default {
                     this.accessRights.length === 0,
                 },
               },
+              children: [
+                {
+                  value: "",
+                  component: {
+                    tag: "c-icon",
+                    params: {
+                      path: mdiTrayArrowDown,
+                      size: "18",
+                    },
+                  },
+                },
+                {
+                  value: this.$t("message.download.download"),
+                  component: {
+                    tag: "span",
+                  },
+                },
+              ],
             },
             {
-              value: this.$t("message.objects.info"),
+              value: "",
               component: {
                 tag: "c-button",
                 params: {
                   testid: "object-info",
                   text: true,
                   size: "small",
-                  title: "Info",
-                  path: mdiInformationOutline,
                   onClick: () => this.onOpenInfoModal(item),
                   onKeyUp: (event) => {
                     if (event.keyCode === 13) this.onOpenInfoModal(item, true);
@@ -338,6 +366,24 @@ export default {
                     this.accessRights.length === 0,
                 },
               },
+              children: [
+                {
+                  value: "",
+                  component: {
+                    tag: "c-icon",
+                    params: {
+                      path: mdiInformationOutline,
+                      size: "18",
+                    },
+                  },
+                },
+                {
+                  value: this.$t("message.objects.info"),
+                  component: {
+                    tag: "span",
+                  },
+                },
+              ],
             },
             /*{
               value: this.$t("message.table.editTags"),
@@ -362,15 +408,13 @@ export default {
               },
             },*/
             {
-              value: this.$t("message.delete"),
+              value: "",
               component: {
                 tag: "c-button",
                 params: {
                   testid: "delete-object",
                   text: true,
                   size: "small",
-                  title: "Delete object",
-                  path: mdiDeleteOutline,
                   onClick: () => {
                     this.$emit("delete-object", item);
                   },
@@ -383,6 +427,24 @@ export default {
                     this.owner != undefined && this.accessRights.length <= 1,
                 },
               },
+              children: [
+                {
+                  value: "",
+                  component: {
+                    tag: "c-icon",
+                    params: {
+                      path: mdiDeleteOutline,
+                      size: "18",
+                    },
+                  },
+                },
+                {
+                  value: this.$t("message.delete"),
+                  component: {
+                    tag: "span",
+                  },
+                },
+              ],
             },
           ],
         },

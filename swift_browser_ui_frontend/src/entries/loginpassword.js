@@ -1,4 +1,5 @@
 import { createApp } from "vue";
+import { mdiLogin } from "@mdi/js";
 import LoginPassword from "@/pages/LoginPassword.vue";
 import LanguageSelector from "@/components/CLanguageSelector.vue";
 
@@ -8,16 +9,14 @@ import { i18n } from "@/common/i18n";
 
 import CFooter from "@/components/CFooter.vue";
 
-import { applyPolyfills, defineCustomElements } from "allas-ui/dist/loader";
-import { vControl } from "@/common/csc-ui-vue-directive";
+import { defineCustomElements } from "@cscfi/csc-ui/loader";
+import { vControl } from "@cscfi/csc-ui-vue";
 
 
 // Import project css
 import "@/assets/main.css";
 
-applyPolyfills().then(() => {
-  defineCustomElements();
-});
+defineCustomElements();
 
 const app = createApp({
   name: "LoginPassword",
@@ -30,6 +29,7 @@ const app = createApp({
       langs: [{ph: "In English", value: "en"}, {ph: "Suomeksi", value: "fi"}],
       idb: true,
       bannerUrl,
+      mdiLogin,
     };
   },
   created() {

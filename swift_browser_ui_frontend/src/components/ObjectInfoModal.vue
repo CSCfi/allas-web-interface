@@ -1,7 +1,7 @@
 <template>
   <c-card
     ref="infoContainer"
-    class="info-card"
+    class="modal-card"
     data-testid="object-info-modal"
     @keydown="handleKeyDown"
   >
@@ -13,11 +13,10 @@
         v-if="info"
         class="title is-4 title-row"
       >
-        <c-link
-          href="javascript:void(0)"
-          color="dark-grey"
+        <c-icon
           :path="info.isFolder ? mdiFolder : mdiFileOutline"
-          icon-fill="primary"
+          color="var(--c-primary-600)"
+          size="20"
           class="title-icon-link"
         />
         {{ info.name }}
@@ -47,7 +46,6 @@
               @keyup.enter="copyToClipboard(info.etag)"
             >
               <c-icon
-                slot="icon"
                 :path="mdiContentCopy"
               />
             </c-button>
@@ -72,7 +70,6 @@
               @keyup.enter="copyToClipboard(info.checksum)"
             >
               <c-icon
-                slot="icon"
                 :path="mdiContentCopy"
               />
             </c-button>
@@ -161,14 +158,6 @@ export default {
 </script>
 
 <style scoped>
-.info-card {
-  padding: 3rem;
-  position: absolute;
-  top: -1rem;
-  left: 0;
-  right: 0;
-  max-height: 75vh;
-}
 c-card-content {
   padding: 1rem 0 0 0;
   color: var(--csc-dark);

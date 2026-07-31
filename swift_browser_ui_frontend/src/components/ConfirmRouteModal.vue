@@ -1,6 +1,6 @@
 <template>
   <c-card
-    class="confirm-route-modal"
+    class="no-padding-card"
   >
     <c-alert type="warning">
       <div slot="title">
@@ -56,11 +56,3 @@ export default {
   },
 };
 </script>
-
-<style scoped>
-
-.confirm-route-modal {
-  padding: 0px;
-}
-
-</style>

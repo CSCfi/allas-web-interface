@@ -2,7 +2,7 @@
 <template>
   <c-card
     ref="uploadContainer"
-    class="upload-card"
+    class="modal-card"
     data-testid="upload-modal"
     @keydown="handleKeyDown"
   >
@@ -16,10 +16,10 @@
         vertical="bottom"
         absolute
       />
-      <h2 class="title is-4">
-        {{ $t("message.uploadDialog.uploadFiles") }}
-      </h2>
-      <c-card-content>
+      <c-card-content class="modal-card-content">
+        <h2 class="title is-4">
+          {{ $t("message.uploadDialog.uploadFiles") }}
+        </h2>
         <div v-if="!currentBucket" class="content-div">
           <h3 class="title is-6">
             1. {{ $t("message.uploadDialog.uploadStep1.title") }}
@@ -87,10 +87,7 @@
                 size="small"
                 @click="error.show = false"
               >
-                <i
-                  slot="icon"
-                  class="mdi mdi-close"
-                />
+                <c-icon :path="mdiClose" />
                 {{ $t("message.close") }}
               </c-button>
             </div>
@@ -161,7 +158,7 @@
             target="_blank"
           >
             {{ $t("message.container_ops.viewProjectMembers") }}
-            <i class="mdi mdi-open-in-new" />
+            <c-icon :path="mdiOpenInNew" />
           </c-link>
           {{ !owner ? "" :
             ") " + $t("message.uploadDialog.uploadedToShared") }}
@@ -220,7 +217,7 @@ import {
 import { awsAddBucketCors, awsCreateBucket } from "@/common/api";
 
 import { debounce, delay } from "lodash";
-import { mdiDelete } from "@mdi/js";
+import { mdiDelete, mdiClose, mdiOpenInNew } from "@mdi/js";
 
 export default {
   name: "UploadModal",
@@ -233,6 +230,8 @@ export default {
   },
   data() {
     return {
+      mdiClose,
+      mdiOpenInNew,
       inputBucket: "",
       CUploadButton,
       projectInfoLink: "",
@@ -529,14 +528,12 @@ export default {
             delete: {
               children: [
                 {
-                  value: this.$t("message.upload.remove"),
+                  value: "",
                   component: {
                     tag: "c-button",
                     params: {
                       text: true,
                       size: "small",
-                      title: this.$t("message.upload.remove"),
-                      path: mdiDelete,
                       onClick: () => {
                         this.deleteDropFile(file);
                       },
@@ -547,6 +544,24 @@ export default {
                       },
                     },
                   },
+                  children: [
+                    {
+                      value: "",
+                      component: {
+                        tag: "c-icon",
+                        params: {
+                          path: mdiDelete,
+                          size: "18",
+                        },
+                      },
+                    },
+                    {
+                      value: this.$t("message.upload.remove"),
+                      component: {
+                        tag: "span",
+                      },
+                    },
+                  ],
                 },
               ],
             },
@@ -564,14 +579,12 @@ export default {
           delete: {
             children: [
               {
-                value: this.$t("message.upload.remove"),
+                value: "",
                 component: {
                   tag: "c-button",
                   params: {
                     text: true,
                     size: "small",
-                    title: this.$t("message.upload.remove"),
-                    path: mdiDelete,
                     onClick: () => {
                       this.emptyFolders =
                         this.emptyFolders.filter(x => x !== p);
@@ -579,6 +592,24 @@ export default {
                     },
                   },
                 },
+                children: [
+                  {
+                    value: "",
+                    component: {
+                      tag: "c-icon",
+                      params: {
+                        path: mdiDelete,
+                        size: "18",
+                      },
+                    },
+                  },
+                  {
+                    value: this.$t("message.upload.remove"),
+                    component: {
+                      tag: "span",
+                    },
+                  },
+                ],
               },
             ],
           },
@@ -815,39 +846,6 @@ export default {
 
 <style scoped>
 
-.upload-card {
-  padding: 3rem;
-  position: absolute;
-  top: -1rem;
-  left: 0;
-  right: 0;
-  max-height: 75vh;
-}
-
-@media screen and (max-width: 767px), (max-height: 580px) {
-   .upload-card {
-    top: -5rem;
-  }
-}
-
-@media screen and (max-height: 580px) and (max-width: 767px),
-(max-width: 525px) {
-  .upload-card {
-    top: -9rem;
-  }
-}
-
-@media screen and (max-height: 580px) and (max-width: 525px) {
-  .upload-card {
-    top: -13rem;
-  }
-}
-
-c-card-content {
-  padding: 1rem 0 0 0;
-  color: var(--csc-dark);
-}
-
 c-card-actions {
   padding: 0;
 }
@@ -868,7 +866,7 @@ c-card-actions {
 }
 
 .over-dropArea {
-  border: 2px dashed var(--csc-primary);
+  border: 2px dashed var(--c-primary-600);
 }
 
 c-data-table.files-table {

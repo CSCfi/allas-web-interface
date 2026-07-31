@@ -153,29 +153,6 @@ body {
   z-index: 1;
 }
 
-c-modal {
-  position: relative;
-  margin: 0 auto;
-  display: inline-flex;
-}
-
-.modal-content-wrapper {
-  overflow-y: scroll;
-  scrollbar-width: 0.5rem;
-  padding-right: 0.5rem;
-
-  &::-webkit-scrollbar {
-    width: 0.5rem;
-  }
-  &::-webkit-scrollbar-thumb {
-    background: var(--csc-mid-grey);
-    border-radius: 10px;
-    &:hover {
-      background: var(--csc-dark-grey);
-    }
-  }
-}
-
 .content-wrapper {
   margin: 0;
   padding: 0;
@@ -209,7 +186,7 @@ c-modal {
 
 .menu-active,
 .menu-icon {
-  color: var(--csc-primary);
+  color: var(--c-primary-600);
 }
 
 .menu-icon {
@@ -217,7 +194,7 @@ c-modal {
 }
 
 .menu-active, .menu-icon {
-  color: var(--csc-primary);
+  color: var(--c-primary-600);
 }
 
 .hero-body #login-center{
@@ -293,7 +270,7 @@ c-modal {
 }
 
 .button-focus {
-  outline: 2px var(--csc-primary) solid;
+  outline: 2px var(--c-primary-600) solid;
   outline-offset: 2px;
   border-radius: 4px;
 }

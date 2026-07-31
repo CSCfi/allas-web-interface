@@ -27,65 +27,58 @@
               (subItem.route || subItem.href) && handleItemRoute(subItem);
               subItem.action && subItem.action();
             },
-            icon: subItem.href && extLinkIcon,
+            icon: subItem.href && mdiOpenInNew,
           }))"
           :data-testid="item.testid"
         >
-          <i
-            class="mdi pr-3 menu-icon"
-            :class="item.icon"
+          <c-icon
+            :path="item.icon"
+            size="36"
+            class="pr-3 menu-icon"
           />
           <span class="menu-active">{{ item.title }}</span>
         </c-menu>
       </div>
 
-      <c-navigationbutton class="pr-4" />
+      <c-navigation-button class="pr-4" />
     </div>
 
-    <c-sidenavigation
+    <c-side-navigation
       mobile="true"
-      :menu-visible="menuVisible"
+      :key="sideNavKey"
     >
-      <c-sidenavigationitem
+      <c-side-navigation-item
         v-for="item of navigationMenuItems"
         :key="item.title"
         :data-testid="item.testid + '-mobile'"
       >
-        <div slot="main">
-          <span :class="'mdi ' + item.icon" />
-          {{ item.title }}
-        </div>
-
-        <div
-          v-if="item.subs && item.subs.length"
-          slot="subnavitem"
+        <c-icon :path="item.icon" />
+        {{ item.title }}
+        <c-sub-navigation-item
+          v-for="subItem of item.subs"
+          :key="subItem.title"
+          :href="subItem.href"
+          :target="subItem.href && '_blank'"
+          :data-testid="subItem.testid + '-mobile'"
+          @click="() => {
+            (subItem.route || subItem.href) && handleItemRoute(subItem);
+            subItem.action && subItem.action();
+          }"
         >
-          <c-subnavigationitem
-            v-for="subItem of item.subs"
-            :key="subItem.title"
-            :href="subItem.href"
-            :target="subItem.href && '_blank'"
-            :data-testid="subItem.testid + '-mobile'"
-            @click="() => {
-              (subItem.route || subItem.href) && handleItemRoute(subItem);
-              subItem.action && subItem.action();
-            }"
-          >
-            {{ subItem.title }}
-            <i
-              v-if="subItem.href"
-              class="mdi mdi-open-in-new"
-            />
-          </c-subnavigationitem>
-        </div>
-      </c-sidenavigationitem>
-    </c-sidenavigation>
+          {{ subItem.title }}
+          <c-icon
+            v-if="subItem.href"
+            :path="mdiOpenInNew"
+          />
+        </c-sub-navigation-item>
+      </c-side-navigation-item>
+    </c-side-navigation>
   </div>
 </template>
 
 <script>
 import { getProjectNumber } from "@/common/globalFunctions";
-import { mdiOpenInNew } from "@mdi/js";
+import { mdiOpenInNew, mdiWeb, mdiHelpCircleOutline, mdiAccount } from "@mdi/js";
 
 export default {
   name: "BrowserMainNavbar",
@@ -94,11 +87,11 @@ export default {
   ],
   data() {
     return {
-      menuVisible: false,
       navigationMenuItems: [],
       currentLang: "",
-      extLinkIcon: mdiOpenInNew,
       projectInfoLink: "",
+      mdiOpenInNew,
+      sideNavKey: 0,
     };
   },
   computed: {
@@ -131,11 +124,10 @@ export default {
   },
   methods: {
     setNavigationMenu() {
-      this.navigationMenuItems = [];
       const menuArr = [
         {
           title: this.currentLang,
-          icon: "mdi-web",
+          icon: mdiWeb,
           testid: "language-selector",
           ariaLabel: this.$t("label.language_menu"),
           subs: this.langs
@@ -150,7 +142,7 @@ export default {
         },
         {
           title: this.$t("message.support"),
-          icon: "mdi-help-circle-outline",
+          icon: mdiHelpCircleOutline,
           id: "support-menu",
           testid: "support-menu",
           ariaLabel: this.$t("label.support_menu"),
@@ -167,7 +159,7 @@ export default {
         },
         {
           title: this.uname,
-          icon: "mdi-account",
+          icon: mdiAccount,
           testid: "user-menu",
           ariaLabel: this.$t("label.user_menu"),
           subs: [
@@ -180,6 +172,7 @@ export default {
         },
       ];
       this.navigationMenuItems = menuArr;
+      this.sideNavKey++;
     },
     setCookieLang: function () {
       const expiryDate = new Date();
@@ -239,7 +232,7 @@ c-menu {
 }
 
 @media screen and (min-width: 768px) {
-  c-navigationbutton, c-sidenavigation {
+  c-navigation-button, c-side-navigation {
     display: none;
   }
 }

@@ -200,7 +200,7 @@ export default {
             value: this.$t("message.table.legacy_swift"),
             component: {
               tag: "c-tag",
-              params: { flat: true, style: { "--csc-primary": "#b71c1c" } },
+              params: { flat: true, style: { "--c-primary-600": "#b71c1c" } },
             },
           });
         } else if (item.hasSegments) {
@@ -209,47 +209,56 @@ export default {
             component: { tag: "c-tag", params: { flat: true } },
           });
         }
-        const linkParams = {
-          href: "javascript:void(0)",
-          color: "dark-grey",
-          path: mdiPail,
-          iconFill: "primary",
-          iconStyle: {
-            marginRight: "1rem",
-            flexShrink: "0",
-          },
-          onClick: () => {
-            if(item.owner) {
-              this.$router.push({
-                name: "SharedObjects",
-                params: {
-                  container: item.name,
-                  owner: item.owner,
-                },
-              });
-            } else {
-              this.$router.push({
-                name: "ObjectsView",
-                params: {
-                  container: item.name,
-                },
-              });
-            }
-          },
-        };
-        containersPage.push({
-          name: tags.length ? {
-            value: null,
-            children: [
-              {
-                value: truncate(item.name),
-                component: { tag: "c-link", params: linkParams },
+        const nameChildren = [
+          {
+            value: "",
+            component: {
+              tag: "c-icon",
+              params: {
+                path: mdiPail,
+                color: "var(--c-primary-600)",
+                size: "18",
               },
-              ...tags,
-            ],
-          } : {
+            },
+          },
+          {
             value: truncate(item.name),
-            component: { tag: "c-link", params: linkParams },
+            component: {
+              tag: "c-link",
+              params: {
+                href: "javascript:void(0)",
+                style: {
+                  "--c-link-color": "var(--c-tertiary-700)",
+                  "--c-link-hover": "none",
+                  marginLeft: "1rem",
+                },
+                onClick: () => {
+                  if(item.owner) {
+                    this.$router.push({
+                      name: "SharedObjects",
+                      params: {
+                        container: item.name,
+                        owner: item.owner,
+                      },
+                    });
+                  } else {
+                    this.$router.push({
+                      name: "ObjectsView",
+                      params: {
+                        container: item.name,
+                      },
+                    });
+                  }
+                },
+              },
+            },
+          },
+          ...tags,
+        ];
+        containersPage.push({
+          name: {
+            value: "",
+            children: nameChildren,
           },
           items: {
             value: item.count != null && (item.count > 0 || isS3CompatibleBucketName(item.name))
@@ -308,7 +317,9 @@ export default {
                     href: this.publicLinks[item.name],
                     target: "_blank",
                     rel: "noopener noreferrer",
-                    color: "primary",
+                    style: {
+                      "--c-link-color": "var(--c-primary-600)",
+                    },
                   },
                 },
               }] : []),
@@ -324,14 +335,13 @@ export default {
             sortable: null,
             children: [
               {
-                value: this.$t("message.download.download"),
+                value: "",
                 component: {
                   tag: "c-button",
                   params: {
                     testid: "download-container",
                     text: true,
                     size: "small",
-                    title: this.$t("message.download.download"),
                     onClick: ({ event }) => {
                       this.handleDownloadClick(
                         item.name,
@@ -340,24 +350,39 @@ export default {
                       );
                     },
                     target: "_blank",
-                    path: mdiTrayArrowDown,
                     disabled: isLegacy || (
                       item.owner && item.accessRights?.length === 0
                     ),
                   },
                 },
+                children: [
+                  {
+                    value: "",
+                    component: {
+                      tag: "c-icon",
+                      params: {
+                        path: mdiTrayArrowDown,
+                        size: "18",
+                      },
+                    },
+                  },
+                  {
+                    value: this.$t("message.download.download"),
+                    component: {
+                      tag: "span",
+                    },
+                  },
+                ],
               },
               // Share button is disabled for Shared (with you) buckets
               {
-                value: this.$t("message.share.share"),
+                value: "",
                 component: {
                   tag: "c-button",
                   params: {
                     testid: "share-container",
                     text: true,
                     size: "small",
-                    title: this.$t("message.share.share"),
-                    path: mdiShareVariantOutline,
                     onClick: () =>
                       this.onOpenShareModal(item.name),
                     onKeyUp: (event) => {
@@ -367,17 +392,33 @@ export default {
                     disabled: item.owner || isLegacy,
                   },
                 },
+                children: [
+                  {
+                    value: "",
+                    component: {
+                      tag: "c-icon",
+                      params: {
+                        path: mdiShareVariantOutline,
+                        size: "18",
+                      },
+                    },
+                  },
+                  {
+                    value: this.$t("message.share.share"),
+                    component: {
+                      tag: "span",
+                    },
+                  },
+                ],
               },
               {
-                value: this.$t("message.copy"),
+                value: "",
                 component: {
                   tag: "c-button",
                   params: {
                     testid: "copy-container",
                     text: true,
                     size: "small",
-                    title: this.$t("message.copy"),
-                    path: mdiPailPlus,
                     onClick: () => this.handleCopyClick(item.name, item.owner),
                     onKeyUp: (event) => {
                       if (event.keyCode === 13)
@@ -389,12 +430,31 @@ export default {
                       || (item.owner && item.accessRights?.length === 0),
                   },
                 },
+                children: [
+                  {
+                    value: "",
+                    component: {
+                      tag: "c-icon",
+                      params: {
+                        path: mdiPailPlus,
+                        size: "18",
+                      },
+                    },
+                  },
+                  {
+                    value: this.$t("message.copy"),
+                    component: {
+                      tag: "span",
+                    },
+                  },
+                ],
               },
               {
                 value: null,
                 component: {
                   tag: "c-menu",
                   params: {
+                    custom: true,
                     items: [
                       {
                         name: this.$t("message.delete"),
@@ -402,22 +462,40 @@ export default {
                         disabled: item.owner || isLegacy,
                       },
                     ],
-                    customTrigger: {
-                      value: this.$t("message.options"),
-                      component: {
-                        tag: "c-button",
-                        params: {
-                          text: true,
-                          path: mdiDotsHorizontal,
-                          title: this.$t("message.options"),
-                          size: "small",
-                          disabled: (item.owner &&
-                            item.accessRights?.length === 0),
-                        },
-                      },
-                    },
                   },
                 },
+                children: [
+                  {
+                    value: "",
+                    component: {
+                      tag: "c-button",
+                      params: {
+                        text: true,
+                        size: "small",
+                        disabled: (item.owner &&
+                          item.accessRights?.length === 0),
+                      },
+                    },
+                    children: [
+                      {
+                        value: "",
+                        component: {
+                          tag: "c-icon",
+                          params: {
+                            path: mdiDotsHorizontal,
+                            size: "18",
+                          },
+                        },
+                      },
+                      {
+                        value: this.$t("message.options"),
+                        component: {
+                          tag: "span",
+                        },
+                      },
+                    ],
+                  },
+                ],
               },
             ],
           },

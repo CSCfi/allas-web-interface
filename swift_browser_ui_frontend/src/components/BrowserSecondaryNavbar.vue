@@ -38,10 +38,7 @@
           @click="copyProjectId"
           @keyup.enter="copyProjectId"
         >
-          <i
-            slot="icon"
-            class="mdi mdi-content-copy"
-          />
+          <c-icon :path="mdiContentCopy" />
           {{ $t("message.share.share_id_copy") }}
         </c-button>
         <div
@@ -106,6 +103,7 @@ import { addErrorToastOnMain } from "@/common/globalFunctions";
 import { getAccessDetails } from "@/common/share";
 import { setPrevActiveElement } from "@/common/keyboardNavigation";
 import {
+  mdiContentCopy,
   mdiInformationOutline,
   mdiTrayArrowUp,
 } from "@mdi/js";
@@ -115,6 +113,7 @@ export default {
   props: ["multipleProjects", "projects"],
   data: function () {
     return {
+      mdiContentCopy,
       mdiInformationOutline,
       mdiTrayArrowUp,
       copy: false,
@@ -315,7 +314,7 @@ c-toasts {
 
 .tooltip c-icon {
   margin-left: 0.5rem;
-  color: var(--csc-primary);
+  color: var(--c-primary-600);
 }
 
 .tooltip-content {
@@ -323,7 +322,7 @@ c-toasts {
   text-align: left;
   width: 20rem;
   background-color: white;
-  border: 1px solid var(--csc-primary);
+  border: 1px solid var(--c-primary-600);
   border-radius: 0.375rem;
   padding: 1rem;
   font-size: 14px;
@@ -349,7 +348,7 @@ c-toasts {
   width: 0;
   height: 0;
   border: 0.7rem solid transparent;
-  border-bottom-color: var(--csc-primary);
+  border-bottom-color: var(--c-primary-600);
 }
 .tooltip-content::after {
   content: " ";

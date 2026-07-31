@@ -1,7 +1,7 @@
 <template>
   <c-card
     ref="createBucketContainer"
-    class="add-bucket"
+    class="modal-card"
     data-testid="create-bucket-modal"
     @keydown="handleKeyDown"
   >
@@ -15,10 +15,10 @@
         vertical="bottom"
         absolute
       />
-      <h2 class="title is-4">
-        {{ $t("message.container_ops.addContainer") }}
-      </h2>
-      <c-card-content>
+      <c-card-content class="modal-card-content">
+        <h2 class="title is-4">
+          {{ $t("message.container_ops.addContainer") }}
+        </h2>
         <p class="info-text">
           {{ $t("message.uploadDialog.uploadStep1.nonModifiable") }}
         </p>
@@ -61,7 +61,7 @@
           target="_blank"
         >
           {{ $t("message.container_ops.viewProjectMembers") }}
-          <i class="mdi mdi-open-in-new" />
+          <c-icon :path="mdiOpenInNew" />
         </c-link>
       </c-card-content>
     </div>
@@ -88,6 +88,7 @@
 </template>
 
 <script>
+import { mdiOpenInNew } from "@mdi/js";
 import { getDB } from "@/common/idb";
 
 import {
@@ -119,6 +120,7 @@ export default {
   },
   data() {
     return {
+      mdiOpenInNew,
       bucketName: "",
       tags: [],
       projectInfoLink: "",
@@ -262,39 +264,6 @@ export default {
 </script>
 
 <style scoped>
-
-.add-bucket {
-  padding: 3rem;
-  position: absolute;
-  top: -1rem;
-  left: 0;
-  right: 0;
-  max-height: 75vh;
-}
-
-@media screen and (max-width: 767px), (max-height: 580px) {
-   .add-bucket {
-    top: -5rem;
-  }
-}
-
-@media screen and (max-height: 580px) and (max-width: 767px),
-(max-width: 525px) {
-  .add-bucket {
-    top: -9rem;
-  }
-}
-
-@media screen and (max-height: 580px) and (max-width: 525px) {
-  .add-bucket {
-    top: -13rem;
-  }
-}
-
-c-card-content {
-  color: var(--csc-dark);
-  padding: 1.5rem 0 0 0;
-}
 
 c-card-actions {
   padding: 0;
