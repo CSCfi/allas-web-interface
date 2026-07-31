@@ -241,7 +241,13 @@ export default {
   },
   methods: {
     onSelectPermission: function(e) {
-      const val = e.target.value.value;
+      // v3 c-select emits the selected value via event.detail
+      // (a CSelectItem { name, value }); older csc-ui exposed it on
+      // e.target.value. Support both, preferring detail.
+      const detail = e?.detail;
+      const val = detail && typeof detail === "object"
+        ? detail.value
+        : detail ?? e?.target?.value?.value;
       switch (val) {
         case "read":
           this.giveReadAccess();

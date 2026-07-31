@@ -253,7 +253,17 @@ export default {
 
       return {
         name: {
-          value: "",
+          // `value` must carry the real name: c-data-table's
+          // selection-property="name" reads row.name.value to identify
+          // selected rows (falls back to row index when empty, which
+          // breaks checkbox selection + bulk delete). The icon + clickable
+          // name are rendered via `children`; the raw value is wrapped in a
+          // display:none span so it isn't shown twice.
+          value: name,
+          component: {
+            tag: "span",
+            params: { style: { display: "none" } },
+          },
           children: [
             {
               value: "",
