@@ -119,10 +119,13 @@
 export default {
   mounted() {
     // Plausible
+    const plausibleHost = window.location.hostname === "allas.csc.fi"
+      ? "https://stats.rahtiapp.fi"
+      : "https://stats-dev.rahtiapp.fi";
     const script = document.createElement("script");
     script.setAttribute("defer", "");
-    script.setAttribute("data-domain", "allas.csc.fi");
-    script.setAttribute("src", "https://stats.rahtiapp.fi/js/script.outbound-links.js");
+    script.setAttribute("data-domain", window.location.hostname);
+    script.setAttribute("src", `${plausibleHost}/js/script.outbound-links.js`);
     document.head.appendChild(script);
   },
 };
