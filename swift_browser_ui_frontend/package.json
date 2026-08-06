@@ -15,7 +15,7 @@
   },
   "dependencies": {
     "@aws-sdk/client-s3": "3.1085.0",
-    "@cscfi/csc-ui": "3",
+    "@cscfi/csc-ui": "^3.0.19",
     "@cscfi/csc-ui-vue": "^0.0.2",
     "@intlify/unplugin-vue-i18n": "^11.2.4",
     "@mdi/js": "^7.4.47",
@@ -52,8 +52,11 @@
   },
   "pnpm": {
     "overrides": {
-      "brace-expansion@<5.0.8": ">=5.0.8",
-      "fast-uri@<3.1.4": ">=3.1.4"
+      "brace-expansion@<5.0.9": ">=5.0.9",
+      "fast-uri@<4.1.2": ">=4.1.2",
+      "postcss@<8.5.23": ">=8.5.23",
+      "swiper@<12.1.2": ">=12.1.2",
+      "uuid@<11.1.1": ">=11.1.1"
     }
   }
 }
