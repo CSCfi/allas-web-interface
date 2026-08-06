@@ -46,12 +46,17 @@ export function newApp(name, data, Component) {
       // same code serves every deployment: events are attributed to
       // whichever site matching this hostname is registered in the
       // Plausible admin (unregistered hostnames are simply dropped).
+      // Production uses the main Plausible instance, everything else
+      // reports to the dev instance.
       const host = window.location.hostname;
       if (host !== "localhost" && !host.startsWith("127.")) {
+        const plausibleHost = host === "allas.csc.fi"
+          ? "https://stats.rahtiapp.fi"
+          : "https://stats-dev.rahtiapp.fi";
         const script = document.createElement("script");
         script.setAttribute("defer", "");
         script.setAttribute("data-domain", host);
-        script.setAttribute("src", "https://stats.rahtiapp.fi/js/script.outbound-links.js");
+        script.setAttribute("src", `${plausibleHost}/js/script.outbound-links.js`);
         document.head.appendChild(script);
       }
 
