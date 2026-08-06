@@ -190,6 +190,16 @@ div.padding {
   padding: 24px;
 }
 
+/* v3 c-login-card sizes to its content: when a page gives the host a fixed
+   height (index/OIDC login cards), the inner article and .c-login-card div
+   must fill it too, or the absolutely-positioned banner image stops at the
+   content edge and bare card background shows below. Light DOM, so this
+   global rule reaches the internals. No-op when the host height is auto. */
+c-login-card article,
+c-login-card article .c-login-card {
+  height: 100%;
+}
+
 c-menu {
   --c-menu-text-color: var(--c-primary-600);
 }
