@@ -221,6 +221,36 @@ export async function updateCorsFlag(projectID, buckets, corsAdded) {
   }
 }
 
+export async function getSavedDisplayOptions() {
+  return await getDB().preferences.get({ id: "displayOptions"});
+}
+
+export async function getSavedPaginationOptions() {
+  return await getDB().preferences.get({ id: "paginationOptions"});
+}
+
+export async function updateDisplayOptions(options) {
+  try {
+    await getDB().preferences.put({
+      id: "displayOptions",
+      ...options,
+    });
+  } catch {
+    if (DEV) console.log("Error updating display options in IDB");
+  }
+}
+
+export async function updatePaginationOptions(options) {
+  try {
+    await getDB().preferences.put({
+      id: "paginationOptions",
+      ...options,
+    });
+  } catch {
+    if (DEV) console.log("Error updating pagination options in IDB");
+  }
+}
+
 export async function updateBucketStats(projectID, bucketName, count, bytes) {
   await getDB().containers
     .where({ projectID, name: bucketName })

@@ -135,7 +135,6 @@
         :breadcrumb-clicked-prop="breadcrumbClicked"
         :objs="filtering ? filteredObjects : oList"
         :disable-pagination="hidePagination"
-        :hide-tags="true"
         :render-folders="renderFolders"
         :show-timestamp="showTimestamp"
         :access-rights="accessRights"
@@ -182,11 +181,16 @@ import {
   truncate,
 } from "@/common/tableFunctions";
 import { getDB } from "@/common/idb";
-import { getBucketMetadata, saveBucketMetadata, updateContainers } from "@/common/idbFunctions";
+import {
+  getBucketMetadata,
+  saveBucketMetadata,
+  updateContainers,
+  getSavedDisplayOptions,
+  updateDisplayOptions,
+} from "@/common/idbFunctions";
 import CObjectTable from "@/components/CObjectTable.vue";
 import { debounce, escapeRegExp } from "lodash";
 import BreadcrumbNav from "@/components/BreadcrumbNav.vue";
-import { toRaw } from "vue";
 import { awsListObjects, getBucketPublicStatus } from "@/common/s3commands";
 
 export default {
@@ -214,7 +218,6 @@ export default {
       showTimestamp: false,
       hidePagination: false,
       renderFolders: true,
-      //hideTags: false,
       searchQuery: "",
       checkedRows: [],
       optionsKey: 1,
@@ -306,17 +309,6 @@ export default {
       // Run debounced search every time the search box input changes
       this.debounceFilter();
     },
-    currentContainer: async function() {
-      if (this.currentContainer === undefined) return;
-      const savedDisplayOptions = toRaw(this.currentContainer.displayOptions);
-      if (savedDisplayOptions) {
-        this.renderFolders = savedDisplayOptions.renderFolders;
-        this.showTimestamp = savedDisplayOptions.showTimestamp;
-        //this.hideTags = savedDisplayOptions.hideTags;
-        this.hidePagination = savedDisplayOptions.hidePagination;
-        this.setTableOptionsMenu();
-      }
-    },
     locale () {
       this.setLocalizedContent();
       this.getBucketSharedStatus();
@@ -359,11 +351,13 @@ export default {
     },
   },
 
-  created: function () {
+  created: async function () {
     // Lodash debounce to prevent the search execution from executing on
     // every keypress, thus blocking input
     this.debounceFilter = debounce(this.filter, 400);
     this.setLocalizedContent();
+    await this.setSavedDisplayOptions();
+    this.setTableOptionsMenu();
   },
   beforeMount () {
     this.abortController = new AbortController();
@@ -631,12 +625,19 @@ export default {
       const dataTable = document.getElementById("obj-table");
       dataTable.clearSelections();
     },
+    setSavedDisplayOptions: async function() {
+      const savedDisplayOptions = await getSavedDisplayOptions() || {};
+      for (const key of ["renderFolders", "showTimestamp", "hidePagination"]) {
+        if (savedDisplayOptions[key] !== undefined) {
+          this[key] = savedDisplayOptions[key];
+        }
+      }
+    },
     setTableOptionsMenu() {
       this.$store.toggleRenderedFolders(this.renderFolders);
       const displayOptions = {
         renderFolders: this.renderFolders,
         showTimestamp: this.showTimestamp,
-        //hideTags: this.hideTags,
         hidePagination: this.hidePagination,
       };
 
@@ -648,11 +649,8 @@ export default {
           action: async () => {
             this.renderFolders = !(this.renderFolders);
 
-            const newContainer = {
-              ...toRaw(this.currentContainer),
-              displayOptions: {
-                ...displayOptions, renderFolders: this.renderFolders }};
-            await getDB().containers.put(newContainer);
+            await updateDisplayOptions({
+              ...displayOptions, renderFolders: this.renderFolders });
 
             this.setTableOptionsMenu();
           },
@@ -664,31 +662,12 @@ export default {
           action: async () => {
             this.showTimestamp = !(this.showTimestamp);
 
-            const newContainer = {
-              ...toRaw(this.currentContainer),
-              displayOptions: {
-                ...displayOptions, showTimestamp: this.showTimestamp }};
-            await getDB().containers.put(newContainer);
+            await updateDisplayOptions({
+              ...displayOptions, showTimestamp: this.showTimestamp });
 
             this.setTableOptionsMenu();
           },
         },
-        /*{
-          name: this.hideTags
-            ? this.$t("message.tableOptions.showTags")
-            : this.$t("message.tableOptions.hideTags"),
-          action: async () => {
-            this.hideTags = !(this.hideTags);
-
-            const newContainer = {
-              ...toRaw(this.currentContainer),
-              displayOptions: {
-                ...displayOptions, hideTags: this.hideTags }};
-            await getDB().containers.put(newContainer);
-
-            this.setTableOptionsMenu();
-          },
-        },*/
         {
           name: this.hidePagination
             ? this.$t("message.tableOptions.showPagination")
@@ -696,11 +675,8 @@ export default {
           action: async () => {
             this.hidePagination = !(this.hidePagination);
 
-            const newContainer = {
-              ...toRaw(this.currentContainer),
-              displayOptions: {
-                ...displayOptions, hidePagination: this.hidePagination }};
-            await getDB().containers.put(newContainer);
+            await updateDisplayOptions({
+              ...displayOptions, hidePagination: this.hidePagination });
 
             this.setTableOptionsMenu();
           },

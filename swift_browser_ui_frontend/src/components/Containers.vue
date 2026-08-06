@@ -39,7 +39,6 @@
         :conts="renderingContainers"
         :show-timestamp="showTimestamp"
         :disable-pagination="hidePagination"
-        :hide-tags="true"
         @delete-container="(cont) => removeContainer(cont)"
       />
       <c-loader v-show="contsLoading" />

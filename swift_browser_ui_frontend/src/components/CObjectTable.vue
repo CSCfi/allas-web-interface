@@ -3,12 +3,12 @@
     <!-- Footer options needs to be in CamelCase,
     because csc-ui wont recognise it otherwise. -->
     <c-data-table
+      v-if="paginationReady"
       :key="tableKey"
       id="obj-table"
       data-testid="object-table"
       :data.prop="objects"
-      :headers.prop="hideTags ?
-        headers.filter(header => header.key !== 'tags'): headers"
+      :headers.prop="headers"
       :pagination.prop="disablePagination ? null : paginationOptions"
       :hide-footer="disablePagination"
       :footerOptions.prop="footerOptions"
@@ -54,10 +54,11 @@ import {
   mdiTrayArrowDown,
   //mdiPencilOutline,
   mdiDeleteOutline,
-  mdiFolder ,
+  mdiFolder,
   mdiFileOutline,
   mdiInformationOutline,
 } from "@mdi/js";
+import { updatePaginationOptions } from "@/common/idbFunctions";
 
 export default {
   name: "CObjectTable",
@@ -67,10 +68,6 @@ export default {
       default: () => [],
     },
     disablePagination: {
-      type: Boolean,
-      default: false,
-    },
-    hideTags: {
       type: Boolean,
       default: false,
     },
@@ -136,19 +133,27 @@ export default {
     owner() {
       return this.$route.params.owner;
     },
+    paginationReady() {
+      return this.disablePagination || !!this.paginationOptions?.itemsPerPage;
+    },
   },
   watch: {
     prefix() {
       this.getPage();
     },
-    locale() {
+    async locale() {
       this.setHeaders();
-      this.setPagination();
+      await this.setPagination();
+    },
+    "paginationOptions.itemsPerPage": async function (newVal, oldVal) {
+      if (oldVal && newVal) {
+        await updatePaginationOptions({ itemsPerPage: newVal });
+      }
     },
   },
-  created() {
+  async created() {
     this.setHeaders();
-    this.setPagination();
+    await this.setPagination();
   },
   beforeUpdate() {
     this.getPage();
@@ -304,24 +309,6 @@ export default {
             this.locale, item.last_modified, this.$t, false) :
             parseDateFromNow(this.locale, item.last_modified, this.$t),
         },
-        ...(this.hideTags ? {} : {
-          tags: {
-            value: null,
-            children: [
-              ...(item.tags?.length ?
-                item.tags.map((tag, index) => ({
-                  key: "tag_" + index + "",
-                  value: tag,
-                  component: {
-                    tag: "c-tag",
-                    params: {
-                      flat: true,
-                    },
-                  },
-                })) : [{ key: "no_tags", value: "-" }]),
-            ],
-          },
-        }),
         actions: {
           value: null,
           sortable: null,
@@ -463,6 +450,9 @@ export default {
     },
 
     getPage: function () {
+      if (!this.paginationReady) {
+        return;
+      }
       let offset = 0;
       let limit = this.objs.length;
       if (!this.disablePagination || this.objs.length > 500) {
@@ -578,8 +568,8 @@ export default {
         this.$router.replace({"query": queryWithOutFile});
       }
     },
-    setPagination: function () {
-      const paginationOptions = getPaginationOptions(this.$t);
+    setPagination: async function () {
+      const paginationOptions = await getPaginationOptions(this.$t);
       this.paginationOptions = paginationOptions;
     },
     onSort(event) {
@@ -649,11 +639,6 @@ export default {
         {
           key: "size",
           value: this.$t("message.table.size"),
-          sortable: true,
-        },
-        {
-          key: "tags",
-          value: this.$t("message.table.tags"),
           sortable: true,
         },
         {
