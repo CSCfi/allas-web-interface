@@ -53,6 +53,7 @@ c-login-card {
   margin-right: auto;
   margin-left: auto;
   max-width: 55rem;
+  height: 35rem;
 }
 c-button {
   margin-top: 2rem;

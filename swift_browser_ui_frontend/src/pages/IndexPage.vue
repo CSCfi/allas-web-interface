@@ -114,7 +114,7 @@ export default {};
 
 <style scoped>
 
-c-card {
+c-card, c-login-card {
   height: 35rem;
 }
 
