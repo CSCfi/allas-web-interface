@@ -140,7 +140,8 @@
         :show-timestamp="showTimestamp"
         :access-rights="accessRights"
         :no-data-text="filtering ?
-          $t('message.search.empty') : $t('message.emptyContainer')"
+          $t('message.search.empty') : (prefix ?
+            $t('message.emptyFolder') : $t('message.emptyContainer'))"
         @selected-rows="handleSelection"
         @delete-object="confirmDelete"
       />

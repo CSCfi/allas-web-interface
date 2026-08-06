@@ -236,6 +236,7 @@ let default_translations = {
         share_delete_confirm: "Delete permissions",
       },
       emptyContainer: "This bucket has no content.",
+      emptyFolder: "This folder has no content.",
       emptyProject: {
         all: "There are no buckets in this project.",
         sharedFrom: "You haven't shared any buckets.",
@@ -843,6 +844,7 @@ let default_translations = {
         share_delete_confirm: "Poista käyttöoikeus",
       },
       emptyContainer: "Tämä ämpäri on tyhjä.",
+      emptyFolder: "Tämä kansio on tyhjä.",
       emptyProject: {
         all: "Tässä projektissa ei ole ämpäreitä.",
         sharedFrom: "Et ole jakanut yhtään ämpäriä.",

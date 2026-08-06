@@ -106,21 +106,10 @@
 </template>
 
 <script>
-export default {
-  mounted() {
-    // Plausible analytics. The site is keyed by data-domain, so the
-    // same code serves every deployment: events are attributed to
-    // whichever site matching this hostname is registered in the
-    // Plausible admin (unregistered hostnames are simply dropped).
-    const host = window.location.hostname;
-    if (host === "localhost" || host.startsWith("127.")) return;
-    const script = document.createElement("script");
-    script.setAttribute("defer", "");
-    script.setAttribute("data-domain", host);
-    script.setAttribute("src", "https://stats.rahtiapp.fi/js/script.outbound-links.js");
-    document.head.appendChild(script);
-  },
-};
+// NOTE: no mounted() here — the newApp factory spreads this component
+// last (`...Component`), so a local mounted() would REPLACE the factory's
+// mounted() (svg cleanup + checkIDB + Plausible), not merge with it.
+export default {};
 </script>
 
 <style scoped>

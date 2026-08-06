@@ -217,4 +217,5 @@ export async function syncBucketPolicies(project) {
     }
   }
   if (DEV) console.log("Sharing sync done.");
+  return true;
 }
