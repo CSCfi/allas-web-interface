@@ -266,7 +266,12 @@ export default {
               component: {
                 tag: "c-icon",
                 params: {
-                  path: item?.folder ? mdiFolder : mdiFileOutline,
+                  // Empty folders exist as zero-byte "name/" placeholder
+                  // objects: in the flat file-path view they aren't reduced
+                  // into pseudo-folders (item.folder stays unset), but they
+                  // should still read as folders, not files.
+                  path: item?.folder || item.name.endsWith("/")
+                    ? mdiFolder : mdiFileOutline,
                   color: "var(--c-primary-600)",
                   size: "18",
                 },
