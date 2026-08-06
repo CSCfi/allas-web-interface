@@ -64,19 +64,6 @@ export async function checkBucketAccessible(bucket) {
   }
 }
 
-export async function checkBucketExists(bucket) {
-  const command = new HeadBucketCommand({
-    Bucket: bucket,
-  });
-  try {
-    const resp = await sendS3Command(command);
-    if (resp?.$metadata?.httpStatusCode === 200) return true;
-  } catch (e) {
-    if (e?.$metadata?.httpStatusCode === 403) return true;
-    return false;
-  }
-}
-
 export async function getBucketStats(bucket) {
   // Returns Ceph-specific { count, bytes } from x-rgw-* response headers,
   // or null if headers are absent (non-Ceph S3) or the call fails.

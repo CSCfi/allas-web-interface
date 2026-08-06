@@ -273,3 +273,19 @@ export function getPreviewUrl(project, bucket, objectName) {
     document.location.origin,
   ).toString();
 }
+
+// Check if bucket with given name exists. Proxied via the backend because
+// a browser-side HeadBucket fails at the CORS preflight stage for buckets
+// that have no CORS configuration yet.
+export async function checkBucketExists(
+  project,
+  bucket,
+) {
+  let fetchURL = new URL(`/api/s3/${encodeURI(project)}/${encodeURI(bucket)}`, document.location.origin);
+  let resp = await fetch(fetchURL, {
+    method: "HEAD",
+    credentials: "same-origin",
+  });
+  if (resp.status === 404) return false;
+  if (resp.status === 200 || resp.status === 403) return true;
+}

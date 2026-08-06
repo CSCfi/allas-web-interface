@@ -1,9 +1,9 @@
 // Miscellaneous global functions
 
 import useStore from "@/common/store";
-import { checkBucketExists, awsHeadObject } from "@/common/s3commands";
+import { awsHeadObject } from "@/common/s3commands";
 import { checkCorsFlag, updateCorsFlag } from "./idbFunctions";
-import { awsAddBucketCors } from "./api";
+import { awsAddBucketCors, checkBucketExists } from "./api";
 
 export const DEV = import.meta.env.MODE === "development";
 
@@ -35,7 +35,7 @@ export function isFile(path, route) {
   return path.replace(getPrefix(route), "").match("/") ? false : true;
 }
 
-export async function validateBucketName(input) {
+export async function validateBucketName(project, input) {
   let result = {
     lowerCaseOrNum: undefined,
     inputLength: undefined,
@@ -54,7 +54,7 @@ export async function validateBucketName(input) {
   result.alphaNumHyphen = !!input.match(/^[a-z0-9-]+$/g);
 
   if (result.lowerCaseOrNum && result.inputLength && result.alphaNumHyphen) {
-    const bucketExists = await checkBucketExists(input);
+    const bucketExists = await checkBucketExists(project, input);
     // In undefined case allow user to attempt bucket creation
     result.ownable = !bucketExists;
   } else {
