@@ -2,37 +2,36 @@
   <div class="main">
     <MainToolbar />
     <CookieConsentModal />
-    <c-row v-if="!notindex && idb">
-      <div class="flex">
-        <div class="container padding">
-          <form>
-            <c-login-card
-              :src="bannerUrl"
+    <div
+      v-if="!notindex && idb"
+      class="container"
+    >
+      <form>
+        <c-login-card :src="bannerUrl">
+          <c-login-card-title>
+            {{ $t('message.program_name') }}
+          </c-login-card-title>
+          <c-login-card-content>
+            <p>{{ $t('message.program_description') }}</p>
+          </c-login-card-content>
+          <c-spacer />
+          <c-login-card-actions>
+            <c-button
+              v-for="item in $tm('message.index.loginmethods')"
+              :key="item.msg"
+              :disabled="!idb"
+              :href="item.href"
+              target="_self"
+              type="button"
             >
-              <c-login-card-title>
-                {{ $t('message.program_name') }}
-              </c-login-card-title>
-              <c-login-card-content>
-                <p>{{ $t('message.program_description') }}</p>
-              </c-login-card-content>
-              <c-login-card-actions>
-                <c-button
-                  v-for="item in $tm('message.index.loginmethods')"
-                  :key="item.msg"
-                  :disabled="!idb"
-                  :href="item.href"
-                  target="_self"
-                  type="button"
-                >
-                  <c-icon :path="mdiLogin" />
-                  {{ item.msg }}
-                </c-button>
-              </c-login-card-actions>
-            </c-login-card>
-          </form>
-        </div>
-      </div>
-    </c-row>
+              <c-icon :path="mdiLogin" />
+              {{ item.msg }}
+            </c-button>
+          </c-login-card-actions>
+          <c-spacer />
+        </c-login-card>
+      </form>
+    </div>
     <c-card v-else>
       <c-card-title v-if="!idb">
         {{ $t('message.error.idb') }}
@@ -131,7 +130,8 @@ c-card {
 }
 
 c-card, c-login-card {
-  margin: 2rem auto;
+  margin-left: auto;
+  margin-right: auto;
   width: 55rem;
 }
 

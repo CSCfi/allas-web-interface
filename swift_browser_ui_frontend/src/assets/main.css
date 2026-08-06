@@ -17,6 +17,15 @@
   --csc-medium-grey: #757575;
 }
 
+html, body {
+  height: 100vh;
+}
+
+body {
+  /* Prevent open c-select from hiding overflow-y */
+  overflow-y: scroll !important;
+}
+
 html,
 body,
 p,
@@ -166,9 +175,7 @@ div.main {
 }
 
 div.flex {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
+  display: block;
   flex: 1;
 }
 

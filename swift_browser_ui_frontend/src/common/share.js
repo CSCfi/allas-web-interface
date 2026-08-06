@@ -112,7 +112,14 @@ export async function syncBucketPolicies(project) {
   }
 
   // Check bucket policies and sync sharing db
-  for (let [bucket] of bucketsByName) {
+  for (let [bucket, bucketMeta] of bucketsByName) {
+    // Buckets shared to us carry an `owner` field. Only the owning project
+    // can read a bucket policy (GetBucketPolicy returns AccessDenied for
+    // everyone else) and only the owner's grants live in the sharing DB,
+    // so there is nothing to sync for them here.
+    if (bucketMeta?.owner) {
+      continue;
+    }
     // Get sharing information for bucket
     const shareDetails = await client.getShareDetails(project, bucket);
     let statements = [];

@@ -82,8 +82,8 @@
           outlined
           data-testid="create-folder"
           :disabled="owner != undefined && accessRights.length <= 1"
-          @click="openFolderModal(false)"
-          @keyup.enter="openFolderModal(true)"
+          @click="openFolderModal"
+          @keyup.enter="openFolderModal"
         >
           <c-icon :path="mdiFolderPlusOutline" size="20" />
           {{ $t("message.objects.createFolder") }}
@@ -180,11 +180,6 @@ import {
   getHumanReadableSize,
   truncate,
 } from "@/common/tableFunctions";
-import {
-  setPrevActiveElement,
-  disableFocusOutsideModal,
-  addFocusClass,
-} from "@/common/keyboardNavigation";
 import { getDB } from "@/common/idb";
 import { getBucketMetadata, saveBucketMetadata, updateContainers } from "@/common/idbFunctions";
 import CObjectTable from "@/components/CObjectTable.vue";
@@ -437,9 +432,8 @@ export default {
       // at bucket root, go back to the bucket listing
       this.$router.push({ name: "AllBuckets" });
     },
-    openFolderModal(keypress) {
+    openFolderModal() {
       toggleCreateBucketModal();
-      if (keypress) setPrevActiveElement();
       this.$nextTick(() => {
         setTimeout(() => {
           const input = document.querySelector("#newFolder-input input");
@@ -512,10 +506,9 @@ export default {
       this.$store.toggleShareModal(true);
       this.$store.setBucketName(this.containerName);
     },
-    confirmDelete: function(item, keypress) {
+    confirmDelete: function(item) {
       const isFolder = !isFile(item.name, this.$route) && this.renderFolders;
       toggleDeleteModal([{ ...item, isFolder }]);
-      if (keypress) this.moveFocusToDeleteModal();
     },
     getCurrentContainer: function () {
       return getDB().containers
@@ -733,14 +726,7 @@ export default {
               isFolder: item.isFolder === true ||
                 (!isFile(item.name, this.$route) && this.renderFolders),
             }));
-            this.onOpenDeleteModal(rows);
-            const deleteSelectionsBtn = document
-              .querySelector("#delete-selections");
-            deleteSelectionsBtn.addEventListener("keydown", (e) =>{
-              if (e.keyCode === 13) {
-                this.onOpenDeleteModal(rows, true);
-              }
-            });
+            toggleDeleteModal(rows);
           },
         },
       ];
@@ -748,22 +734,6 @@ export default {
     setLocalizedContent() {
       this.setTableOptionsMenu();
       this.setSelectionActionButtons();
-    },
-    onOpenDeleteModal(checkedRows, keypress) {
-      toggleDeleteModal(checkedRows);
-      if (keypress) this.moveFocusToDeleteModal();
-    },
-    moveFocusToDeleteModal() {
-      const deleteObjsModal = document.getElementById("delete-objs-modal");
-      setPrevActiveElement();
-      disableFocusOutsideModal(deleteObjsModal);
-
-      setTimeout(() => {
-        const deleteObjsBtn = document.getElementById("delete-objs-btn");
-        deleteObjsBtn.tabIndex = "0";
-        deleteObjsBtn.focus();
-        addFocusClass(deleteObjsBtn);
-      }, 300);
     },
   },
 };

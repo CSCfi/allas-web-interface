@@ -102,11 +102,7 @@
 </template>
 
 <script>
-import {
-  getFocusableElements,
-  keyboardNavigationInsideModal,
-  moveFocusOutOfModal,
-} from "@/common/keyboardNavigation";
+import { captureKeyboardNavInsideModal } from "@/common/keyboardNavigation";
 import { mdiFolder, mdiFileOutline, mdiContentCopy } from "@mdi/js";
 
 export default {
@@ -121,9 +117,6 @@ export default {
   computed: {
     info() {
       return this.$store.selectedObjectInfo;
-    },
-    prevActiveEl() {
-      return this.$store.prevActiveEl;
     },
   },
   methods: {
@@ -144,14 +137,13 @@ export default {
     close() {
       this.$store.toggleObjectInfoModal(false);
       this.$store.setSelectedObjectInfo(null);
-      moveFocusOutOfModal(this.prevActiveEl);
     },
     handleKeyDown(e) {
-      const focusableList = this.$refs.infoContainer.querySelectorAll(
-        "c-link, c-button, textarea, c-text-field, c-data-table",
-      );
-      const { first, last } = getFocusableElements(focusableList);
-      keyboardNavigationInsideModal(e, first, last, true);
+      if (e.key === "Escape") {
+        this.close();
+      } else {
+        captureKeyboardNavInsideModal(e, this.$refs.infoContainer);
+      }
     },
   },
 };

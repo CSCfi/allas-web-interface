@@ -21,8 +21,8 @@
       <c-card-actions justify="end">
         <c-button
           outlined
-          @click="toggleDeleteModal(false)"
-          @keyup.enter="toggleDeleteModal(true)"
+          @click="toggleDeleteModal()"
+          @keyup.enter="toggleDeleteModal()"
         >
           {{ $t("message.cancel") }}
         </c-button>
@@ -61,12 +61,7 @@
 import { getDB } from "@/common/idb";
 import { updateBucketStats } from "@/common/idbFunctions";
 import { isFile } from "@/common/globalFunctions";
-import {
-  getFocusableElements,
-  addFocusClass,
-  removeFocusClass,
-  moveFocusOutOfModal,
-} from "@/common/keyboardNavigation";
+import { captureKeyboardNavInsideModal } from "@/common/keyboardNavigation";
 import {
   awsDeleteBucket,
   awsDeleteObjects,
@@ -135,22 +130,11 @@ export default {
     },
   },
   methods: {
-    toggleDeleteModal: function(keypress) {
+    toggleDeleteModal: function() {
       this.$store.toggleDeleteModal(false);
       this.$store.setDeletableObjects([]);
       this.deleteTotal = 0;
       this.deletedSoFar = 0;
-
-      /*
-        Prev Active element is a popup menu and it is removed from DOM
-        when we click it to open Delete Modal.
-        Therefore, we need to make its focusable parent
-        to be focused instead after we close the modal.
-      */
-      if (keypress) {
-        const prevActiveElParent = document.getElementById("obj-table");
-        moveFocusOutOfModal(prevActiveElParent, true);
-      }
     },
     async batchDelete(keys, bucket) {
       const BATCH = 1000;
@@ -384,35 +368,10 @@ export default {
       this.toggleDeleteModal();
     },
     handleKeyDown: function (e) {
-      const focusableList = this.$refs.deleteObjsModal.querySelectorAll(
-        "c-button",
-      );
-      const { first, last } = getFocusableElements(focusableList);
-
-      if (e.key === "Tab" && !e.shiftKey) {
-        if (e.target === last) {
-          removeFocusClass(last);
-          first.tabIndex="0";
-          first.focus();
-          addFocusClass(first);
-        } else if (e.target === first) {
-          removeFocusClass(first);
-          last.tabIndex="0";
-          last.focus();
-          addFocusClass(last);
-        }
-      }
-      else if (e.key === "Tab" && e.shiftKey) {
-        if (e.target === first) {
-          e.preventDefault();
-          last.tabIndex = "0";
-          last.focus();
-          if (last === document.activeElement) {
-            addFocusClass(last);
-          }
-        } else if (e.target === last) {
-          removeFocusClass(last);
-        }
+      if (e.key === "Escape") {
+        this.toggleDeleteModal();
+      } else {
+        captureKeyboardNavInsideModal(e, this.$refs.deleteObjsModal);
       }
     },
   },

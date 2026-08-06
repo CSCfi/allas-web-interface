@@ -3,6 +3,7 @@
     <!-- Footer options needs to be in CamelCase,
     because csc-ui wont recognise it otherwise. -->
     <c-data-table
+      :key="tableKey"
       id="obj-table"
       data-testid="object-table"
       :data.prop="objects"
@@ -39,7 +40,7 @@ import {
 
 import {
   DEV,
-  toggleEditTagsModal,
+  // toggleEditTagsModal, (re-add when the edit-tags cell below is restored)
   toggleObjectInfoModal,
   isFile,
   getFolderName,
@@ -49,10 +50,6 @@ import {
 import { awsHeadObject } from "@/common/s3commands";
 import { getPreviewUrl } from "@/common/api";
 import { DateTime } from "luxon";
-import {
-  setPrevActiveElement,
-  disableFocusOutsideModal,
-} from "@/common/keyboardNavigation";
 import {
   mdiTrayArrowDown,
   //mdiPencilOutline,
@@ -102,6 +99,11 @@ export default {
     return {
       currentDownload: undefined,
       objects: [],
+      // Remounts the c-data-table when the visible rows' folder/file pattern
+      // changes: v3 renders cell-children (our name icon) with no vdom key, so
+      // c-icon elements get reused by position and keep a stale path across
+      // folder navigation/sort (files inheriting a folder icon).
+      tableKey: "",
       footerOptions: {
         itemsPerPageOptions: [5, 10, 25, 50, 100],
       },
@@ -209,16 +211,10 @@ export default {
         checksum: meta.sha256 || "-",
       };
     },
-    async onOpenInfoModal(item, keypress) {
+    async onOpenInfoModal(item) {
       try {
         const info = await this.buildInfoForItem(item);
         toggleObjectInfoModal(info, this.container);
-
-        if (keypress) {
-          setPrevActiveElement();
-          const modal = document.getElementById("object-info-modal");
-          disableFocusOutsideModal(modal);
-        }
       } catch (e) {
         if (DEV) console.error("Info modal failed:", e);
         addErrorToastOnMain(this.$t("message.objects.noInfo"));
@@ -370,7 +366,7 @@ export default {
                   size: "small",
                   onClick: () => this.onOpenInfoModal(item),
                   onKeyUp: (event) => {
-                    if (event.keyCode === 13) this.onOpenInfoModal(item, true);
+                    if (event.keyCode === 13) this.onOpenInfoModal(item);
                   },
                   disabled: this.owner != undefined &&
                     this.accessRights.length === 0,
@@ -406,10 +402,10 @@ export default {
                   title: "Edit tags",
                   path: mdiPencilOutline,
                   onClick: () =>
-                    this.onOpenEditTagsModal(item.name),
+                    toggleEditTagsModal(item.name, null),
                   onKeyUp: (event) => {
                     if(event.keyCode === 13) {
-                      this.onOpenEditTagsModal(item.name, true);
+                      toggleEditTagsModal(item.name, null);
                     }
                   },
                   disabled: item?.folder ||
@@ -485,7 +481,7 @@ export default {
       // If the prefix no longer matches anything (e.g. the folder was
       // deleted in another tab), navigate up one level instead of erroring
       const p = this.$route.query.prefix || "";
-      if (p && !this.$store.openDeleteModal &&
+      if (p && this.objs.length && !this.$store.openDeleteModal &&
         !this.objs.some(o => o.name === p || o.name.startsWith(getPrefix(this.$route)))) {
         let up = p.replace(/[^/]+\/?$/, "");
         if (up && !up.endsWith("/")) up += "/";
@@ -536,17 +532,13 @@ export default {
         return items;
       }, []);
 
-      // TEMP DEBUG (remove after diagnosing the folder-icon issue): dumps the
-      // real S3 keys + computed folder flags. Unconditional so it fires on the
-      // production test build too (DEV is false there).
-      console.log("[CObjectTable] renderFolders", this.renderFolders, getPrefix(this.$route));
-      console.log("[CObjectTable] raw keys from S3", this.objs.map(o => o.name));
-      console.log("[CObjectTable] rows", rows.map(o => ({ name: o.name, folder: !!o.folder })));
-
-      this.objects = rows
+      const pageRows = rows
         .sort((a, b) => sortItems(a, b, this.sortBy, this.sortDirection))
-        .slice(offset, offset + limit)
-        .map(item => this.formatItem(item));
+        .slice(offset, offset + limit);
+
+      this.tableKey = getPrefix(this.$route) + "|"
+        + pageRows.map(o => (o.folder ? "d" : "f")).join("");
+      this.objects = pageRows.map(item => this.formatItem(item));
 
       this.paginationOptions = {
         ...this.paginationOptions,
@@ -671,19 +663,6 @@ export default {
           sortable: false,
         },
       ];
-    },
-    onOpenEditTagsModal(itemName, keypress) {
-      toggleEditTagsModal(itemName, null);
-      if (keypress) {
-        setPrevActiveElement();
-        const editTagsModal = document.getElementById("edit-tags-modal");
-        disableFocusOutsideModal(editTagsModal);
-      }
-      setTimeout(() => {
-        const editTagsInput = document.getElementById("edit-tags-input")
-          ?.children[0];
-        editTagsInput.focus();
-      }, 300);
     },
   },
 };

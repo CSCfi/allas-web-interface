@@ -9,15 +9,17 @@
       active
     >
       <span>{{ tag }}</span>
-      <c-icon
-        tabindex="0"
-        :path="mdiClose"
+      <c-icon-button
         :alt="$t('label.delete_tag')"
-        color="white"
-        size="16"
+        size="x-small"
         @click="$emit('deleteTag', $event, tag)"
         @keyup.enter="$emit('deleteTag', $event, tag)"
-      />
+      >
+        <c-icon
+          :path="mdiClose"
+          size="16"
+        />
+      </c-icon-button>
     </c-tag>
     <input
       type="text"
@@ -79,6 +81,10 @@ export default {
   border: none;
   outline: none;
   flex: 1;
+}
+
+input[type="text"] {
+  font-size: 1rem;
 }
 
 span {

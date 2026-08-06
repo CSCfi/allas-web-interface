@@ -46,8 +46,8 @@
         outlined
         size="large"
         data-testid="cancel-save-folder"
-        @click="close(false)"
-        @keyup.enter="close(true)"
+        @click="close"
+        @keyup.enter="close"
       >
         {{ $t("message.cancel") }}
       </c-button>
@@ -55,8 +55,8 @@
       <c-button
         size="large"
         data-testid="save-folder"
-        @click="create(false)"
-        @keyup.enter="create(true)"
+        @click="create"
+        @keyup.enter="create"
       >
         {{ $t("message.save") }}
       </c-button>
@@ -67,11 +67,7 @@
 <script>
 import { toRaw } from "vue";
 import { awsPutObject } from "@/common/s3commands";
-import {
-  getFocusableElements,
-  moveFocusOutOfModal,
-  keyboardNavigationInsideModal,
-} from "@/common/keyboardNavigation";
+import { captureKeyboardNavInsideModal } from "@/common/keyboardNavigation";
 
 export default {
   name: "FolderModal",
@@ -83,9 +79,6 @@ export default {
     };
   },
   computed: {
-    prevActiveEl() {
-      return this.$store.prevActiveEl;
-    },
     container() {
       return this.$route.params.container;
     },
@@ -106,7 +99,7 @@ export default {
     },
   },
   methods: {
-    async create(keypress) {
+    async create() {
       this.folderName = (this.folderName || "").trim();
       this.errorMsg = this.validateName(this.folderName);
       if (this.errorMsg) return;
@@ -118,7 +111,7 @@ export default {
 
       try {
         await awsPutObject(this.container, objectName);
-        this.close(keypress);
+        this.close();
       } catch {
         document.querySelector("#folder-toasts")?.addToast({
           id: "create-folder-toast",
@@ -129,13 +122,12 @@ export default {
       }
     },
 
-    close(keypress) {
+    close() {
       this.$store.toggleCreateBucketModal(false);
       this.folderName = "";
       this.interacted = false;
       this.errorMsg = "";
       document.querySelector("#folder-toasts")?.removeToast("create-folder-toast");
-      if (keypress) moveFocusOutOfModal(this.prevActiveEl);
     },
 
     validateName(name) {
@@ -147,10 +139,11 @@ export default {
     },
 
     handleKeyDown(e) {
-      const focusableList = this.$refs.folderContainer
-        .querySelectorAll("input, c-link, c-button");
-      const { first, last } = getFocusableElements(focusableList);
-      keyboardNavigationInsideModal(e, first, last);
+      if (e.key === "Escape") {
+        this.close();
+      } else {
+        captureKeyboardNavInsideModal(e, this.$refs.folderContainer);
+      }
     },
   },
 };

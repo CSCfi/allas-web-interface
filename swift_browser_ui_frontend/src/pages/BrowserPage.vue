@@ -107,7 +107,7 @@
       </c-toasts>
       <c-toasts
         id="container-error-toasts"
-        vertical="top"
+        vertical="bottom"
         horizontal="center"
       />
     </div>
@@ -129,14 +129,6 @@ export default {
 </script>
 
 <style>
-
-html, body {
-  height: 100vh;
-}
-
-body {
-  overflow-y: auto;
-}
 
 #mainContainer {
   min-height: 100vh;

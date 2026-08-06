@@ -213,4 +213,8 @@ h3 {
   flex-direction: inherit;
   gap: 0.5rem;
 }
+
+c-button {
+  width: max-content;
+}
 </style>

@@ -106,7 +106,7 @@ c-alert {
 
 h3 {
   font-size: 18px;
-  i {
+  c-icon {
     margin-right: 0.5rem;
   }
 }

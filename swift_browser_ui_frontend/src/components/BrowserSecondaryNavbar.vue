@@ -70,12 +70,12 @@
       </div>
       <c-toasts
         id="copy-toasts"
-        vertical="center"
+        vertical="top"
         data-testid="copy-toasts"
       />
       <c-toasts
         id="download-error-toasts"
-        vertical="center"
+        vertical="top"
         data-testid="download-error-toasts"
       />
       <c-spacer />
@@ -83,8 +83,8 @@
         <c-button
           :disabled="isUploading || !canUpload || workersInitializing || projectSuspended"
           data-testid="upload-file"
-          @click="toggleUploadModal(false)"
-          @keyup.enter="toggleUploadModal(true)"
+          @click="toggleUploadModal"
+          @keyup.enter="toggleUploadModal"
         >
           <c-icon :path="mdiTrayArrowUp" />
           {{
@@ -101,7 +101,6 @@
 <script>
 import { addErrorToastOnMain } from "@/common/globalFunctions";
 import { getAccessDetails } from "@/common/share";
-import { setPrevActiveElement } from "@/common/keyboardNavigation";
 import {
   mdiContentCopy,
   mdiInformationOutline,
@@ -209,17 +208,9 @@ export default {
         }
       }
     },
-    toggleUploadModal: function (keypress) {
+    toggleUploadModal: function () {
       this.$store.setFilesAdded(true);
       this.$store.toggleUploadModal(true);
-      if (keypress) setPrevActiveElement();
-      if (!this.container) {
-        setTimeout(() => {
-          const uploadBucketInput = document
-            .querySelector("#upload-bucket-input input");
-          uploadBucketInput.focus();
-        }, 300);
-      }
     },
     checkIfCanReadWrite: async function () {
       //disable upload if user doesn't have rw perms
