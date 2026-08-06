@@ -8,7 +8,11 @@
       :key="tag"
       active
     >
-      <span>{{ tag }}</span>
+      <span v-if="typeof tag === 'string'">{{ tag }}</span>
+      <div v-else>
+        <span v-if="tag?.projectName">{{ tag.projectName }}&nbsp;-&nbsp;</span>
+        <span>{{ tag.shareID }}</span>
+      </div>
       <c-icon-button
         :alt="$t('label.delete_tag')"
         size="x-small"
