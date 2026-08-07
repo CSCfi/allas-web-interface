@@ -43,6 +43,9 @@ jobs:
           tox -e pytest
           coverage lcov -o lcov.info
       - name: Send coverage to coveralls
+        # Coverage upload is informational; a coveralls.io outage must not
+        # fail the test job (the tests themselves have already passed here)
+        continue-on-error: true
         uses: coverallsapp/github-action@master
         with:
           github-token: ${{ secrets.github_token }}
