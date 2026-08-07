@@ -9,7 +9,7 @@ jobs:
     strategy:
       matrix:
         node: ["22"]
-    name: Jest unit tests
+    name: Vitest unit tests
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v2

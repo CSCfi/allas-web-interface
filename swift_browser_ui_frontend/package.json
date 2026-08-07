@@ -39,8 +39,6 @@
     "@faker-js/faker": "^10.5.0",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/vue": "^8.1.0",
-    "cypress": "^15.18.1",
-    "cypress-cloud": "^1.13.1",
     "eslint": "^10.7.0",
     "eslint-plugin-vue": "^10.9.2",
     "globals": "^17.7.0",
