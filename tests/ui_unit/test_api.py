@@ -202,6 +202,80 @@ class APITestClass(tests.common.mockups.APITestBase):
             ]
         )
 
+    async def test_os_list_projects_caches_titles_in_session(self):
+        """Titles are fetched from LDAP once, then served from the session."""
+        ldap_mock = unittest.mock.AsyncMock(
+            return_value={
+                "test-name-0": "Test Project 0",
+                "test-name-1": "Test Project 1",
+            }
+        )
+        p_ldap = unittest.mock.patch(
+            "swift_browser_ui.ui.api.ldap_get_project_titles",
+            ldap_mock,
+        )
+        with self.p_get_sess, self.p_json_resp, p_ldap:
+            await swift_browser_ui.ui.api.os_list_projects(self.mock_request)
+            await swift_browser_ui.ui.api.os_list_projects(self.mock_request)
+        ldap_mock.assert_awaited_once()
+        self.assertEqual(
+            self.session_return["project_titles"],
+            {
+                "test-name-0": "Test Project 0",
+                "test-name-1": "Test Project 1",
+            },
+        )
+        self.aiohttp_json_response_mock.assert_called_with(
+            [
+                {
+                    "id": "test-id-0",
+                    "title": "Test Project 0",
+                    "name": "test-name-0",
+                    "tainted": False,
+                },
+                {
+                    "id": "test-id-1",
+                    "title": "Test Project 1",
+                    "name": "test-name-1",
+                    "tainted": False,
+                },
+            ]
+        )
+
+    async def test_os_list_projects_ldap_failure_is_not_cached(self):
+        """A failed LDAP lookup must be retried on the next listing."""
+        ldap_mock = unittest.mock.AsyncMock(
+            side_effect=[
+                Exception("ldap down"),
+                {"test-name-0": "Test Project 0", "test-name-1": ""},
+            ]
+        )
+        p_ldap = unittest.mock.patch(
+            "swift_browser_ui.ui.api.ldap_get_project_titles",
+            ldap_mock,
+        )
+        with self.p_get_sess, self.p_json_resp, p_ldap:
+            await swift_browser_ui.ui.api.os_list_projects(self.mock_request)
+            self.assertNotIn("project_titles", self.session_return)
+            await swift_browser_ui.ui.api.os_list_projects(self.mock_request)
+        self.assertEqual(ldap_mock.await_count, 2)
+        self.aiohttp_json_response_mock.assert_called_with(
+            [
+                {
+                    "id": "test-id-0",
+                    "title": "Test Project 0",
+                    "name": "test-name-0",
+                    "tainted": False,
+                },
+                {
+                    "id": "test-id-1",
+                    "title": "",
+                    "name": "test-name-1",
+                    "tainted": False,
+                },
+            ]
+        )
+
     def _aws_list_buckets_mocks(self, error_response):
         """Build mocks for aws_list_buckets with a failing S3 client."""
         self.setd_mock["s3api_endpoint"] = "https://test-s3-endpoint"

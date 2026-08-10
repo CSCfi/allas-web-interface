@@ -4,6 +4,7 @@ Module contains funcions for e.g. authenticating against openstack v3 identity
 API, cache manipulation, cookies etc.
 """
 
+import asyncio
 import logging
 import os
 import secrets
@@ -246,27 +247,36 @@ async def ldap_get_project_titles(projects: dict[str, dict]) -> dict[str, str]:
         logging.error("Missing envs, unable to fetch project titles info from LDAP")
         return titles
 
-    # Allow client to implicitly trust whatever cipher the server suggests
-    tls = Tls(ciphers="ALL", validate=check_certificate, version=ssl.PROTOCOL_TLS)
+    def _search() -> dict[str, str]:
+        # Allow client to implicitly trust whatever cipher the server suggests
+        tls = Tls(ciphers="ALL", validate=check_certificate, version=ssl.PROTOCOL_TLS)
 
-    server = Server(
-        host=address,
-        port=port,
-        use_ssl=True,
-        connect_timeout=5,
-        tls=tls,
-    )
-
-    with Connection(server=server, user=bind, password=password) as conn:
-
-        conn.search(
-            search_base=distinguished_name,
-            search_filter=filter.format(projects=project_numbers),
-            attributes=attributes,
+        server = Server(
+            host=address,
+            port=port,
+            use_ssl=True,
+            connect_timeout=5,
+            tls=tls,
         )
 
-        # Extract titles
-        for entry in conn.entries:
-            titles[str(entry["CSCPrjNum"])] = str(entry["CSCPrjTitle"])
+        found = {}
+        with Connection(server=server, user=bind, password=password) as conn:
+
+            conn.search(
+                search_base=distinguished_name,
+                search_filter=filter.format(projects=project_numbers),
+                attributes=attributes,
+            )
+
+            # Extract titles
+            for entry in conn.entries:
+                found[str(entry["CSCPrjNum"])] = str(entry["CSCPrjTitle"])
+
+        return found
+
+    # ldap3 does blocking socket I/O (TCP connect, TLS handshake, bind,
+    # search); run it in a worker thread so a slow LDAP server can't stall
+    # the event loop and every other in-flight request with it.
+    titles.update(await asyncio.get_running_loop().run_in_executor(None, _search))
 
     return titles

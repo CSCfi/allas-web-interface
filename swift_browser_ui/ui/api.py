@@ -37,13 +37,20 @@ async def os_list_projects(request: aiohttp.web.Request) -> aiohttp.web.Response
         "API call for project listing from "
         f"{request.remote}, sess: {session} :: {time.ctime()}"
     )
-    # Fetch project title information from ldap. A dead/unreachable LDAP must
-    # not break the project listing — degrade to empty titles instead.
-    try:
-        titles = await ldap_get_project_titles(session["projects"])
-    except Exception:
-        request.app["Log"].error("Failed to fetch project titles from LDAP")
-        titles = {}
+    # Fetch project title information from ldap. Project membership is fixed
+    # for the lifetime of the session, so the result is cached in the
+    # (Redis-backed) session — only the first listing after login pays the
+    # LDAP round trip. A dead/unreachable LDAP must not break the project
+    # listing — degrade to empty titles instead, without caching, so the
+    # lookup is retried on the next listing.
+    titles = session.get("project_titles")
+    if titles is None:
+        try:
+            titles = await ldap_get_project_titles(session["projects"])
+            session["project_titles"] = titles
+        except Exception:
+            request.app["Log"].error("Failed to fetch project titles from LDAP")
+            titles = {}
     # Filter out the tokens contained in session token
     return aiohttp.web.json_response(
         [
