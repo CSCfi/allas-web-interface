@@ -26,7 +26,7 @@
           {{ $t("message.currentProj") }}
         </p>
         <p class="project-number">
-          {{ active.name }}
+          {{ getProjectStr(active) }}
         </p>
       </div>
       <div class="nav-item">
@@ -132,7 +132,11 @@ export default {
     // C-select component handles options by name and value props
     // Append value-prop to projects
     mappedProjects() {
-      return this.projects.map(project => ({ ...project, value: project.id }));
+      return this.projects.map(project => ({
+        ...project,
+        name: this.getProjectStr(project),
+        value: project.id,
+      }));
     },
     isUploading() {
       return this.$store.state.isUploading;
@@ -171,6 +175,13 @@ export default {
     },
   },
   methods: {
+    getProjectStr: function (project) {
+      return project?.name
+        ? project?.title
+          ? project.name + " " + project.title
+          : project.name
+        : "";
+    },
     changeActive(event) {
       const itemId = event.target.value;
       const navigationParams = {
