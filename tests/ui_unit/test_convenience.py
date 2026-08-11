@@ -117,6 +117,9 @@ class TestConvenienceFunctions(
             "swift_browser_ui.ui._convenience.Server",
             return_value=self.mock_ldap_server,
         )
+        p_server_pool = unittest.mock.patch(
+            "swift_browser_ui.ui._convenience.ServerPool",
+        )
         p_connection = unittest.mock.patch(
             "swift_browser_ui.ui._convenience.Connection",
             return_value=self.mock_ldap_connection,
@@ -125,7 +128,7 @@ class TestConvenienceFunctions(
             "123abc": {"name": "project_123"},
             "987zyx": {"name": "project_456"},
         }
-        with p_server, p_connection:
+        with p_server, p_server_pool, p_connection:
             ret = await swift_browser_ui.ui._convenience.ldap_get_project_titles(
                 projects,
             )

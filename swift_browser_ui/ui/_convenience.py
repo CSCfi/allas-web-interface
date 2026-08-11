@@ -16,7 +16,7 @@ import aiohttp.web
 import aiohttp_session
 import certifi
 import redis.asyncio as redis
-from ldap3 import Connection, Server, Tls
+from ldap3 import FIRST, Connection, Server, ServerPool, Tls
 from redis.asyncio.sentinel import Sentinel
 from redis.backoff import ExponentialBackoff
 from redis.exceptions import ConnectionError, ReadOnlyError, TimeoutError
@@ -216,7 +216,12 @@ async def get_redis_client() -> redis.Redis:
 
 async def ldap_get_project_titles(projects: dict[str, dict]) -> dict[str, str]:
     """Fetch and return titles for given list of projects."""
-    address = str(os.environ.get("LDAP_SERVER_HOST", ""))
+    # Comma-separated list of hosts; the first reachable one is used
+    addresses = [
+        host.strip()
+        for host in str(os.environ.get("LDAP_SERVER_HOST", "")).split(",")
+        if host.strip()
+    ]
     port = int(os.environ.get("LDAP_SERVER_PORT", "636"))
     bind = str(os.environ.get("LDAP_SERVER_BIND", ""))
     password = str(os.environ.get("LDAP_SERVER_PASSWORD", ""))
@@ -243,7 +248,7 @@ async def ldap_get_project_titles(projects: dict[str, dict]) -> dict[str, str]:
         single_project = project_template.format(project=project_number)
         project_numbers += single_project
 
-    if not address or not port or not bind or not password or not distinguished_name:
+    if not addresses or not port or not bind or not password or not distinguished_name:
         logging.error("Missing envs, unable to fetch project titles info from LDAP")
         return titles
 
@@ -251,16 +256,21 @@ async def ldap_get_project_titles(projects: dict[str, dict]) -> dict[str, str]:
         # Allow client to implicitly trust whatever cipher the server suggests
         tls = Tls(ciphers="ALL", validate=check_certificate, version=ssl.PROTOCOL_TLS)
 
-        server = Server(
-            host=address,
-            port=port,
-            use_ssl=True,
-            connect_timeout=5,
-            tls=tls,
-        )
+        servers = [
+            Server(
+                host=address,
+                port=port,
+                use_ssl=True,
+                connect_timeout=5,
+                tls=tls,
+            )
+            for address in addresses
+        ]
+        # Tries the first server in the list.
+        pool = ServerPool(servers, FIRST, active=2, exhaust=60)
 
         found = {}
-        with Connection(server=server, user=bind, password=password) as conn:
+        with Connection(server=pool, user=bind, password=password) as conn:
 
             conn.search(
                 search_base=distinguished_name,
