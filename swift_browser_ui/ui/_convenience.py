@@ -309,9 +309,6 @@ async def ldap_get_project_titles(projects: dict[str, dict]) -> dict[str, str]:
 
         return found
 
-    # ldap3 does blocking socket I/O (TCP connect, TLS handshake, bind,
-    # search); run it in a worker thread so a slow LDAP server can't stall
-    # the event loop and every other in-flight request with it.
     titles.update(await asyncio.get_running_loop().run_in_executor(None, _search))
 
     return titles
