@@ -17,6 +17,7 @@ from swiftclient.utils import generate_temp_url
 
 from swift_browser_ui.ui._convenience import (
     get_tempurl_key,
+    ldap_get_project_titles,
     open_upload_runner_session,
     sign,
 )
@@ -42,11 +43,22 @@ async def os_list_projects(request: aiohttp.web.Request) -> aiohttp.web.Response
         "API call for project listing from "
         f"{request.remote}, sess: {session} :: {time.ctime()}"
     )
+    # Fetch project title information from ldap.
+    # Project membership is fixed for the lifetime of the session, cached in redis.
+    titles = session.get("project_titles")
+    if titles is None:
+        try:
+            titles = await ldap_get_project_titles(session["projects"])
+            session["project_titles"] = titles
+        except Exception:
+            request.app["Log"].error("Failed to fetch project titles from LDAP")
+            titles = {}
     # Filter out the tokens contained in session token
     return aiohttp.web.json_response(
         [
             {
                 "name": v["name"],
+                "title": titles.get(v["name"].split("_")[-1], ""),
                 "id": v["id"],
                 "tainted": v["tainted"],
             }

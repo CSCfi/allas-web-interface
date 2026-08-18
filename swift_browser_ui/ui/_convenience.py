@@ -4,6 +4,7 @@ Module contains funcions for e.g. authenticating against openstack v3 identity
 API, cache manipulation, cookies etc.
 """
 
+import asyncio
 import logging
 import os
 import secrets
@@ -15,6 +16,7 @@ import aiohttp.web
 import aiohttp_session
 import certifi
 import redis.asyncio as redis
+from ldap3 import FIRST, Connection, Server, ServerPool, Tls
 from redis.asyncio.sentinel import Sentinel
 from redis.backoff import ExponentialBackoff
 from redis.exceptions import ConnectionError, ReadOnlyError, TimeoutError
@@ -238,3 +240,75 @@ async def get_redis_client() -> redis.Redis:
             client_name="redis_allas_ui",
         )
     return redis_client
+
+
+async def ldap_get_project_titles(projects: dict[str, dict]) -> dict[str, str]:
+    """Fetch and return titles for given list of projects."""
+    # Comma-separated list of hosts; the first reachable one is used
+    addresses = [
+        host.strip()
+        for host in str(os.environ.get("LDAP_SERVER_HOST", "")).split(",")
+        if host.strip()
+    ]
+    port = int(os.environ.get("LDAP_SERVER_PORT", "636"))
+    bind = str(os.environ.get("LDAP_SERVER_BIND", ""))
+    password = str(os.environ.get("LDAP_SERVER_PASSWORD", ""))
+    distinguished_name = str(os.environ.get("LDAP_SERVER_DISTINGUISHED_NAME", ""))
+
+    # Allow toggling server cert check off for debug
+    check_certificate = (
+        ssl.CERT_NONE
+        if str(os.environ.get("LDAP_CHECK_CERTIFICATE", "True")) == "False"
+        else ssl.CERT_REQUIRED
+    )
+
+    attributes = ["CSCPrjTitle", "CSCPrjNum"]
+    filter = "(&(objectClass=CSCProject)(|{projects}))"
+    project_template = "(CSCPrjNum={project})"  # goes inside FILTER many times
+
+    titles = {}
+    project_numbers = ""
+
+    for _, project in projects.items():
+        # LDAP wants only the integer part, not the "project_" prefix
+        project_number = project["name"].split("_")[-1]
+        titles[project_number] = ""
+        single_project = project_template.format(project=project_number)
+        project_numbers += single_project
+
+    if not addresses or not port or not bind or not password or not distinguished_name:
+        logging.error("Missing envs, unable to fetch project titles info from LDAP")
+        return titles
+
+    def _search() -> dict[str, str]:
+        # Allow client to implicitly trust whatever cipher the server suggests
+        tls = Tls(ciphers="ALL", validate=check_certificate, version=ssl.PROTOCOL_TLS)
+
+        servers = [
+            Server(
+                host=address,
+                port=port,
+                use_ssl=True,
+                connect_timeout=5,
+                tls=tls,
+            )
+            for address in addresses
+        ]
+        # Tries the first server in the list.
+        pool = ServerPool(servers, FIRST, active=2, exhaust=60)
+
+        found = {}
+        with Connection(server=pool, user=bind, password=password) as conn:
+            conn.search(
+                search_base=distinguished_name,
+                search_filter=filter.format(projects=project_numbers),
+                attributes=attributes,
+            )
+            for entry in conn.entries:
+                found[str(entry["CSCPrjNum"])] = str(entry["CSCPrjTitle"])
+
+        return found
+
+    titles.update(await asyncio.get_running_loop().run_in_executor(None, _search))
+
+    return titles
