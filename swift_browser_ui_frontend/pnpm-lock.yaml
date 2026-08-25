@@ -8,6 +8,7 @@ overrides:
   brace-expansion@<5.0.9: '>=5.0.9'
   fast-uri@<4.1.2: '>=4.1.2'
   js-yaml@<4.3.1: '>=4.3.1'
+  nanoid@<3.3.18: '>=3.3.18 <4'
   postcss@<8.5.23: '>=8.5.23'
   swiper@<12.1.2: '>=12.1.2'
   uuid@<11.1.1: '>=11.1.1'
@@ -63,7 +64,7 @@ importers:
         version: 11.4.6(vue@3.5.39(typescript@5.6.2))
       vue-router:
         specifier: ^5.1.0
-        version: 5.1.0(@vue/compiler-sfc@3.5.39)(esbuild@0.28.1)(pinia@3.0.4(typescript@5.6.2)(vue@3.5.39(typescript@5.6.2)))(rolldown@1.1.5)(rollup@4.62.2)(vite@8.1.4(@types/node@26.1.1)(esbuild@0.28.1)(sass@1.87.0)(terser@5.49.0)(yaml@2.9.0))(vue@3.5.39(typescript@5.6.2))(webpack@5.108.4(esbuild@0.28.1)(webpack-cli@7.2.1))
+        version: 5.1.0(@vue/compiler-sfc@3.5.39)(esbuild@0.28.1)(pinia@3.0.4(typescript@5.6.2)(vue@3.5.39(typescript@5.6.2)))(rolldown@1.1.5)(rollup@4.62.2)(vite@8.1.4(@types/node@26.1.1)(esbuild@0.28.1)(sass@1.87.0)(terser@5.49.0)(yaml@2.9.0))(vue@3.5.39(typescript@5.6.2))(webpack@5.108.4)
       webpack:
         specifier: ^5.108.4
         version: 5.108.4(esbuild@0.28.1)(webpack-cli@7.2.1)
@@ -2421,8 +2422,8 @@ packages:
   muggle-string@0.4.1:
     resolution: {integrity: sha512-VNTrAak/KhO2i8dqqnqnAHOa3cYBwXEZe9h+D5h/1ZqFSTEFHdM65lR7RoIqq3tBBYavsOXV84NoHXZ0AkPyqQ==}
 
-  nanoid@3.3.17:
-    resolution: {integrity: sha512-xQLf0A3HOMlgHq0n247/LRuAOYmB7dXJ/DvAxGvsSBij45XtBSmQycu+F8ODbHwns/XyFZagyL1+J0Offw1E0g==}
+  nanoid@3.3.18:
+    resolution: {integrity: sha512-DTg4MJbGMWkfi6VZFdNt2/caMbQy4Ou+Op/hJQvGEWcnVfoA1QA+xzRKAzw9jD6+GVOOeYr/mIcuDSdug6F6+w==}
     engines: {node: ^10 || ^12 || ^13.7 || ^14 || >=15.0.1}
     hasBin: true
 
@@ -5436,7 +5437,7 @@ snapshots:
     dependencies:
       brace-expansion: 5.0.9
 
-  minimizer-webpack-plugin@5.6.1(esbuild@0.28.1)(webpack@5.108.4(esbuild@0.28.1)(webpack-cli@7.2.1)):
+  minimizer-webpack-plugin@5.6.1(esbuild@0.28.1)(webpack@5.108.4):
     dependencies:
       '@jridgewell/trace-mapping': 0.3.31
       jest-worker: 27.5.1
@@ -5461,7 +5462,7 @@ snapshots:
 
   muggle-string@0.4.1: {}
 
-  nanoid@3.3.17: {}
+  nanoid@3.3.18: {}
 
   natural-compare@1.4.0: {}
 
@@ -5629,7 +5630,7 @@ snapshots:
 
   postcss@8.5.26:
     dependencies:
-      nanoid: 3.3.17
+      nanoid: 3.3.18
       picocolors: 1.1.1
       source-map-js: 1.2.1
 
@@ -5996,7 +5997,7 @@ snapshots:
       picomatch: 4.0.5
       webpack-virtual-modules: 0.6.2
 
-  unplugin@3.3.0(esbuild@0.28.1)(rolldown@1.1.5)(rollup@4.62.2)(vite@8.1.4(@types/node@26.1.1)(esbuild@0.28.1)(sass@1.87.0)(terser@5.49.0)(yaml@2.9.0))(webpack@5.108.4(esbuild@0.28.1)(webpack-cli@7.2.1)):
+  unplugin@3.3.0(esbuild@0.28.1)(rolldown@1.1.5)(rollup@4.62.2)(vite@8.1.4(@types/node@26.1.1)(esbuild@0.28.1)(sass@1.87.0)(terser@5.49.0)(yaml@2.9.0))(webpack@5.108.4):
     dependencies:
       '@jridgewell/remapping': 2.3.5
       picomatch: 4.0.5
@@ -6087,7 +6088,7 @@ snapshots:
       '@vue/devtools-api': 6.6.4
       vue: 3.5.39(typescript@5.6.2)
 
-  vue-router@5.1.0(@vue/compiler-sfc@3.5.39)(esbuild@0.28.1)(pinia@3.0.4(typescript@5.6.2)(vue@3.5.39(typescript@5.6.2)))(rolldown@1.1.5)(rollup@4.62.2)(vite@8.1.4(@types/node@26.1.1)(esbuild@0.28.1)(sass@1.87.0)(terser@5.49.0)(yaml@2.9.0))(vue@3.5.39(typescript@5.6.2))(webpack@5.108.4(esbuild@0.28.1)(webpack-cli@7.2.1)):
+  vue-router@5.1.0(@vue/compiler-sfc@3.5.39)(esbuild@0.28.1)(pinia@3.0.4(typescript@5.6.2)(vue@3.5.39(typescript@5.6.2)))(rolldown@1.1.5)(rollup@4.62.2)(vite@8.1.4(@types/node@26.1.1)(esbuild@0.28.1)(sass@1.87.0)(terser@5.49.0)(yaml@2.9.0))(vue@3.5.39(typescript@5.6.2))(webpack@5.108.4):
     dependencies:
       '@babel/generator': 8.0.0
       '@vue-macros/common': 3.1.3(vue@3.5.39(typescript@5.6.2))
@@ -6103,7 +6104,7 @@ snapshots:
       picomatch: 4.0.5
       scule: 1.3.0
       tinyglobby: 0.2.17
-      unplugin: 3.3.0(esbuild@0.28.1)(rolldown@1.1.5)(rollup@4.62.2)(vite@8.1.4(@types/node@26.1.1)(esbuild@0.28.1)(sass@1.87.0)(terser@5.49.0)(yaml@2.9.0))(webpack@5.108.4(esbuild@0.28.1)(webpack-cli@7.2.1))
+      unplugin: 3.3.0(esbuild@0.28.1)(rolldown@1.1.5)(rollup@4.62.2)(vite@8.1.4(@types/node@26.1.1)(esbuild@0.28.1)(sass@1.87.0)(terser@5.49.0)(yaml@2.9.0))(webpack@5.108.4)
       unplugin-utils: 0.3.2
       vue: 3.5.39(typescript@5.6.2)
       yaml: 2.9.0
@@ -6184,7 +6185,7 @@ snapshots:
       graceful-fs: 4.2.11
       loader-runner: 4.3.2
       mime-db: 1.54.0
-      minimizer-webpack-plugin: 5.6.1(esbuild@0.28.1)(webpack@5.108.4(esbuild@0.28.1)(webpack-cli@7.2.1))
+      minimizer-webpack-plugin: 5.6.1(esbuild@0.28.1)(webpack@5.108.4)
       neo-async: 2.6.2
       schema-utils: 4.3.3
       tapable: 2.3.3
