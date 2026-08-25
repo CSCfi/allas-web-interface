@@ -5,22 +5,30 @@
     data-testid="create-folder-modal"
     @keydown="handleKeyDown"
   >
-    <div id="folder-modal-content" class="modal-content-wrapper">
-      <c-toasts id="folder-toasts" data-testid="folder-toasts" vertical="bottom" absolute />
+    <div
+      id="folder-modal-content"
+      class="modal-content-wrapper"
+    >
+      <c-toasts
+        id="folder-toasts"
+        data-testid="folder-toasts"
+        vertical="bottom"
+        absolute
+      />
       <h2 class="title is-4">
-        {{ $t('message.objects.createFolder') || 'Create folder' }}
+        {{ $t("message.objects.createFolder") }}
       </h2>
 
       <c-card-content>
         <p class="info-text is-size-6">
-          {{ $t('message.container_ops.foldername') }}
+          {{ $t("message.container_ops.foldername") }}
         </p>
 
         <c-text-field
           id="newFolder-input"
           v-model="folderName"
           v-csc-control
-          :label="$t('message.objects.folderName') || $t('message.container_ops.foldername')"
+          :label="$t('message.objects.folderName')"
           name="foldername"
           aria-required="true"
           data-testid="folder-name"
@@ -38,33 +46,28 @@
         outlined
         size="large"
         data-testid="cancel-save-folder"
-        @click="close(false)"
-        @keyup.enter="close(true)"
+        @click="close"
+        @keyup.enter="close"
       >
-        {{ $t('message.cancel') }}
+        {{ $t("message.cancel") }}
       </c-button>
 
       <c-button
         size="large"
         data-testid="save-folder"
-        @click="create(false)"
-        @keyup.enter="create(true)"
+        @click="create"
+        @keyup.enter="create"
       >
-        {{ $t('message.save') }}
+        {{ $t("message.save") }}
       </c-button>
     </c-card-actions>
   </c-card>
 </template>
 
 <script>
-import { swiftCreateEmptyObject } from "@/common/api";
-import { getDB } from "@/common/db";
 import { toRaw } from "vue";
-import {
-  getFocusableElements,
-  moveFocusOutOfModal,
-  keyboardNavigationInsideModal,
-} from "@/common/keyboardNavigation";
+import { awsPutObject } from "@/common/s3commands";
+import { captureKeyboardNavInsideModal } from "@/common/keyboardNavigation";
 
 export default {
   name: "FolderModal",
@@ -76,12 +79,9 @@ export default {
     };
   },
   computed: {
-    prevActiveEl() { return this.$store.state.prevActiveEl; },
-    modalVisible() { return this.$store.state.openCreateFolderModal; },
-
-    projectId()   { return this.$route.params.project; },
-    container()   { return this.$route.params.container; },
-    ownerParam()  { return this.$route.params.owner; },
+    container() {
+      return this.$route.params.container;
+    },
     currentPrefix() {
       const raw = (this.$route.query.prefix || "")
         .replace(/^\/+/, "")
@@ -91,12 +91,15 @@ export default {
   },
   watch: {
     folderName() {
-      if (!this.interacted) { this.errorMsg = ""; return; }
+      if (!this.interacted) {
+        this.errorMsg = "";
+        return;
+      }
       this.errorMsg = this.validateName(this.folderName);
     },
   },
   methods: {
-    async create(keypress) {
+    async create() {
       this.folderName = (this.folderName || "").trim();
       this.errorMsg = this.validateName(this.folderName);
       if (this.errorMsg) return;
@@ -107,59 +110,40 @@ export default {
       const objectName = `${this.currentPrefix}${name}/`;
 
       try {
-        await swiftCreateEmptyObject(
-          this.projectId,
-          this.container,
-          objectName,
-          this.ownerParam,
-        );
-
-        // refresh the object list so the folder appears
-        const cont = await getDB().containers.get({
-          projectID: this.projectId,
-          name: this.container,
-        });
-        if (cont) {
-          await this.$store.dispatch("updateObjects", {
-            projectID: this.projectId,
-            container: cont,
-            ...(this.ownerParam ? { owner: this.ownerParam } : {}),
-          });
-        }
-
-        this.close(keypress);
-      } catch (err) {
+        await awsPutObject(this.container, objectName);
+        this.close();
+      } catch {
         document.querySelector("#folder-toasts")?.addToast({
           id: "create-folder-toast",
           progress: false,
           type: "error",
-          message: this.$t("message.container_ops.createFail") || "Failed to create folder.",
+          message: this.$t("message.container_ops.folderCreateFail"),
         });
       }
     },
 
-    close(keypress) {
-      this.$store.commit("toggleCreateBucketModal", false);
+    close() {
+      this.$store.toggleCreateBucketModal(false);
       this.folderName = "";
       this.interacted = false;
       this.errorMsg = "";
       document.querySelector("#folder-toasts")?.removeToast("create-folder-toast");
-      if (keypress) moveFocusOutOfModal(this.prevActiveEl);
     },
 
     validateName(name) {
       const n = (name || "").trim();
-      if (!n) return this.$t("message.error.invalidName") || "Name is required.";
-      if (n.includes("//")) return this.$t("message.error.invalidName") || "Invalid name.";
-      if (/[\\]/.test(n)) return this.$t("message.error.invalidName") || "Invalid character.";
+      if (!n) return this.$t("message.error.invalidName");
+      if (n.includes("//")) return this.$t("message.error.invalidName");
+      if (/[\\]/.test(n)) return this.$t("message.error.invalidName");
       return "";
     },
 
     handleKeyDown(e) {
-      const focusableList = this.$refs.folderContainer
-        .querySelectorAll("input, c-link, c-button");
-      const { first, last } = getFocusableElements(focusableList);
-      keyboardNavigationInsideModal(e, first, last);
+      if (e.key === "Escape") {
+        this.close();
+      } else {
+        captureKeyboardNavInsideModal(e, this.$refs.folderContainer);
+      }
     },
   },
 };
@@ -175,18 +159,16 @@ export default {
   max-height: 75vh;
 }
 
-@media screen and (max-width: 767px), (max-height: 580px) {
-  .add-folder { top: -5rem; }
-}
-@media screen and (max-height: 580px) and (max-width: 767px),
-(max-width: 525px) {
-  .add-folder { top: -9rem; }
-}
-@media screen and (max-height: 580px) and (max-width: 525px) {
-  .add-folder { top: -13rem; }
+c-card-content {
+  color: var(--csc-dark);
+  padding: 1.5rem 0 0 0;
 }
 
-c-card-content { color: var(--csc-dark); padding: 1.5rem 0 0 0; }
-c-card-actions { padding: 0; }
-c-card-actions > c-button { margin: 0; }
+c-card-actions {
+  padding: 0;
+}
+
+c-card-actions > c-button {
+  margin: 0;
+}
 </style>

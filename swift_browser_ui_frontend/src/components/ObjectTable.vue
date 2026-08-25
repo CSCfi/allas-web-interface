@@ -5,10 +5,14 @@
     <BreadcrumbNav @breadcrumbClicked="breadcrumbClickHandler" />
     <div class="bucket-info">
       <div class="bucket-info-heading">
-        <i :class="['mdi', 'mdi-pail-outline']" />
+        <c-icon :path="mdiPailOutline" />
         <span>{{ containerName }}</span>
       </div>
       <ul class="bucket-details">
+        <li>
+            <span><b>{{ $t("message.bucketDetails.size") }}: </b>{{ bucketSize }}</span>
+            <span id="count"><b>{{ $t("message.table.items") }}: </b>{{ metadata.count }}</span>
+        </li>
         <li>
           <b>{{ $t("message.table.shared_status") }}: </b>
           {{ sharedStatus }}&nbsp;
@@ -23,21 +27,6 @@
             {{ $t("message.table.edit_sharing") }}
           </c-link>
         </li>
-        <li>
-          <b>{{ $t("message.public.public") }}: </b>
-          {{ isPublic ? $t("message.public.yes") : $t("message.public.no") }}
-
-          <c-link
-            v-if="isPublic && publicBase"
-            class="public-link"
-            :href="`${publicBase}/${encodeURIComponent(containerName)}/`"
-            target="_blank"
-            rel="noopener noreferrer"
-            underline
-          >
-            {{ $t("message.public.link") }}
-          </c-link>
-        </li>
         <li v-show="owner">
           <b>{{ $t("message.table.source_project_id") }}: </b>
           {{ ownerProject }}
@@ -46,6 +35,16 @@
           <b>{{ $t("message.table.date_of_sharing") }}: </b>
           {{ dateOfSharing }}
         </li>
+        <li v-show="!owner && bucketIsPublic !== null">
+          <b>{{ $t("message.public.public") }}: </b>
+          {{ bucketIsPublic
+            ? $t("message.public.yes")
+            : $t("message.public.no") }}
+        </li>
+        <li v-show="!owner">
+          <b>{{ $t("message.bucketDetails.created") }}: </b>{{ bucketCreated }}
+        </li>
+        <li><b>{{ $t("message.table.modified") }}: </b>{{ bucketLastModified }}</li>
       </ul>
     </div>
 
@@ -53,8 +52,7 @@
       id="optionsbar"
       justify="space-between"
     >
-    <div class="left-stack">
-      <c-text-field
+      <!--<c-text-field
         id="search"
         v-model="searchQuery"
         v-csc-control
@@ -62,9 +60,8 @@
         :placeholder="$t('message.objects.filterBy')"
         type="search"
       >
-        <i slot="pre" class="mdi mdi-filter-variant mdi-24px" />
-      </c-text-field>
-
+        <c-icon :path="mdiFilterVariant" size="24" />
+      </c-text-field>-->
       <c-button
         v-if="showGoUp"
         id="go-up-btn"
@@ -73,35 +70,34 @@
         @click="goUpOneLevel"
         @keyup.enter="goUpOneLevel"
       >
-        <i slot="icon" class="mdi mdi-arrow-up-left" />
+        <c-icon :path="mdiArrowUpLeft" size="20" />
         {{ atBucketRoot
-          ? ($t('message.objects.backToBuckets') || 'Back to all buckets')
-          : ($t('message.objects.upOneLevel') || 'Up one level') }}
+          ? $t("message.objects.backToBuckets")
+          : $t("message.objects.upOneLevel") }}
       </c-button>
-    </div>
       <div class="row-end">
-      <c-button
-      id="create-folder-btn"
-      size="small"
-      outlined
-      :disabled="owner && accessRights.length <= 1"
-      data-testid="create-folder"
-      @click="openFolderModal(false)"
-      @keyup.enter="openFolderModal(true)"
-    >
-      <i slot="icon" class="mdi mdi-folder-plus-outline" />
-      {{ $t('message.objects.createFolder') || 'Create folder' }}
-    </c-button>
-      <c-menu
-        :key="optionsKey"
-        :items.prop="tableOptions"
-        options-testid="table-options-selector"
-      >
-        <span class="menu-active display-options-menu">
-          <i class="mdi mdi-tune" />
-          {{ $t("message.tableOptions.displayOptions") }}
-        </span>
-      </c-menu>
+        <c-button
+          id="create-folder-btn"
+          size="small"
+          outlined
+          data-testid="create-folder"
+          :disabled="owner != undefined && accessRights.length <= 1"
+          @click="openFolderModal"
+          @keyup.enter="openFolderModal"
+        >
+          <c-icon :path="mdiFolderPlusOutline" size="20" />
+          {{ $t("message.objects.createFolder") }}
+        </c-button>
+        <c-menu
+          :key="optionsKey"
+          :items.prop="tableOptions"
+          data-testid="table-options-selector"
+        >
+          <c-icon :path="mdiTune" size="20" />
+          <span class="menu-active display-options-menu">
+            {{ $t("message.tableOptions.displayOptions") }}
+          </span>
+        </c-menu>
       </div>
     </c-row>
     <div
@@ -109,7 +105,7 @@
       class="selection-bar"
     >
       <div class="info">
-        <i class="mdi mdi-information-outline" />
+        <c-icon :path="mdiInformationOutline" size="20" />
         <span>
           {{ checkedRows.length }}
           {{ checkedRows.length === 1
@@ -129,26 +125,22 @@
           @click="button.action"
           @keyup.enter="button.action"
         >
-          <i
-            slot="icon"
-            :class="button.icon"
-            class="mdi"
-          /> {{ button.label }}
+          <c-icon :path="button.icon" size="20" />
+          {{ button.label }}
         </c-button>
       </div>
     </div>
     <div id="obj-table-wrapper">
       <CObjectTable
-        :key="`obj-${containerName}-${prefix || 'root'}`"
         :breadcrumb-clicked-prop="breadcrumbClicked"
         :objs="filtering ? filteredObjects : oList"
         :disable-pagination="hidePagination"
-        :hide-tags="hideTags"
         :render-folders="renderFolders"
         :show-timestamp="showTimestamp"
         :access-rights="accessRights"
         :no-data-text="filtering ?
-          $t('message.search.empty') : $t('message.emptyContainer')"
+          $t('message.search.empty') : (prefix ?
+            $t('message.emptyFolder') : $t('message.emptyContainer'))"
         @selected-rows="handleSelection"
         @delete-object="confirmDelete"
       />
@@ -163,30 +155,43 @@
 
 <script>
 import {
-  truncate,
-  parseDateTime,
+  mdiPailOutline,
+  mdiTune,
+  mdiInformationOutline,
+  mdiArrowUpLeft,
+  mdiFolderPlusOutline,
+  mdiRefresh,
+  mdiTrashCanOutline,
+} from "@mdi/js";
+import {
   DEV,
-  getMetadataForSharedContainer,
-} from "@/common/conv";
+  toggleDeleteModal,
+  toggleCreateBucketModal,
+  isFile,
+  addErrorToastOnMain,
+  checkAndAddBucketCors,
+} from "@/common/globalFunctions";
 import {
   getSharedContainers,
   getAccessDetails,
-  toggleDeleteModal,
-  updateObjectsAndObjectTags,
-} from "@/common/globalFunctions";
+} from "@/common/share";
 import {
-  setPrevActiveElement,
-  disableFocusOutsideModal,
-  addFocusClass,
-} from "@/common/keyboardNavigation";
-import { toggleCreateBucketModal } from "@/common/globalFunctions";
-import { getDB } from "@/common/db";
-import { liveQuery } from "dexie";
-import { useObservable } from "@vueuse/rxjs";
+  parseDateTime,
+  getHumanReadableSize,
+  truncate,
+} from "@/common/tableFunctions";
+import { getDB } from "@/common/idb";
+import {
+  getBucketMetadata,
+  saveBucketMetadata,
+  updateContainers,
+  getSavedDisplayOptions,
+  updateDisplayOptions,
+} from "@/common/idbFunctions";
 import CObjectTable from "@/components/CObjectTable.vue";
 import { debounce, escapeRegExp } from "lodash";
 import BreadcrumbNav from "@/components/BreadcrumbNav.vue";
-import { toRaw } from "vue";
+import { awsListObjects, getBucketPublicStatus } from "@/common/s3commands";
 
 export default {
   name: "ObjectTable",
@@ -199,6 +204,11 @@ export default {
   },
   data: function () {
     return {
+      mdiPailOutline,
+      mdiTune,
+      mdiInformationOutline,
+      mdiArrowUpLeft,
+      mdiFolderPlusOutline,
       accessRights: [],
       sharedStatus: "",
       sharedContainers: [],
@@ -208,32 +218,38 @@ export default {
       showTimestamp: false,
       hidePagination: false,
       renderFolders: true,
-      hideTags: false,
       searchQuery: "",
-      currentPage: 1,
       checkedRows: [],
       optionsKey: 1,
       abortController: null,
       filteredObjects: [],
       tableOptions: [],
       currentContainer: {},
+      bucketIsPublic: null,
       breadcrumbClicked: false,
       objsLoading: false,
       filtering: false,
-      isPublic: false,
-      publicBase: "",
+      metadata: {
+        count: 0,
+        bytes: 0,
+        created: null,
+        last_modified: null,
+      },
     };
   },
   computed: {
+    readyToFetch() {
+      return (this.active?.id && this.containerName && this.sharingClient);
+    },
     prefix () {
       return this.$route.query.prefix || "";
     },
-    atBucketRoot() { return !this.prefix; },
-    showGoUp() {
-      return this.$route.name === "ObjectsView" || this.$route.name === "SharedObjects";
+    atBucketRoot() {
+      return !this.prefix;
     },
-    queryPage () {
-      return this.$route.query.page || 1;
+    showGoUp() {
+      return this.$route.name === "ObjectsView"
+        || this.$route.name === "SharedObjects";
     },
     project () {
       return this.$route.params.project;
@@ -241,56 +257,57 @@ export default {
     containerName () {
       return this.$route.params.container;
     },
-    client () {
-      return this.$store.state.client;
+    sharingClient () {
+      return this.$store.sharingClient;
     },
     active () {
-      return this.$store.state.active;
+      return this.$store.active;
     },
     openCreateBucketModal() {
-      return this.$store.state.openCreateBucketModal;
+      return this.$store.openCreateBucketModal;
     },
     locale () {
       return this.$i18n.locale;
     },
     isBucketUploading() {
-      return this.$store.state.isUploading;
+      return this.$store.isUploading;
+    },
+    isDeletingObjects() {
+      return this.$store.isDeleting;
+    },
+    createModalOpen() {
+      return this.$store.openCreateBucketModal;
+    },
+    uploadModalOpen() {
+      return this.$store.openUploadModal;
     },
     owner() {
       return this.$route.params.owner;
     },
     shareModal() {
-      return this.$store.state.openShareModal;
+      return this.$store.openShareModal;
+    },
+    bucketSize() {
+      return getHumanReadableSize(this.metadata.bytes, this.locale);
+    },
+    bucketCreated() {
+      return parseDateTime(this.locale, this.metadata.created, this.$t, true);
+    },
+    bucketLastModified() {
+      return parseDateTime(this.locale, this.metadata.last_modified, this.$t, true);
     },
   },
   watch: {
-    active: function() {
-      this.getData();
-    },
-    client: function() {
-      this.getData();
+    readyToFetch: function() {
+      this.fetchIfReady();
     },
     containerName: function() {
-      this.objsLoading = true;
-      this.getData();
+      // For cases of navigating with upload "view destination"
+      this.fetchIfReady();
     },
     searchQuery: function () {
       // Run debounced search every time the search box input changes
       this.debounceFilter();
-    },
-    queryPage: function () {
-      this.currentPage = this.queryPage;
-    },
-    currentContainer: async function() {
-      if (this.currentContainer === undefined) return;
-      const savedDisplayOptions = toRaw(this.currentContainer.displayOptions);
-      if (savedDisplayOptions) {
-        this.renderFolders = savedDisplayOptions.renderFolders;
-        this.showTimestamp = savedDisplayOptions.showTimestamp;
-        this.hideTags = savedDisplayOptions.hideTags;
-        this.hidePagination = savedDisplayOptions.hidePagination;
-        this.setTableOptionsMenu();
-      }
     },
     locale () {
       this.setLocalizedContent();
@@ -299,8 +316,31 @@ export default {
     isBucketUploading: function () {
       if (!this.isBucketUploading) {
         setTimeout(async () => {
-          this.updateAfterUpload();
-        }, 3000);
+          await this.updateObjectsAndMetadata();
+        }, 1000);
+      }
+    },
+    isDeletingObjects: function () {
+      if (!this.isDeletingObjects) {
+        this.objsLoading = true;
+        setTimeout(async () => {
+          await this.updateObjectsAndMetadata();
+          this.objsLoading = false;
+        }, 1000);
+      }
+    },
+    createModalOpen: function () {
+      // Refresh the object list after the create-folder modal closes
+      // so a newly created folder appears immediately
+      if (!this.createModalOpen) {
+        this.updateObjectsAndMetadata();
+      }
+    },
+    uploadModalOpen: function () {
+      // Refresh after the upload modal closes; covers empty folders
+      // created without any file upload (no isUploading toggle)
+      if (!this.uploadModalOpen) {
+        this.updateObjectsAndMetadata();
       }
     },
     shareModal: async function(){
@@ -309,30 +349,21 @@ export default {
     oList() {
       if (this.objsLoading) setTimeout(() => this.objsLoading = false, 100);
     },
-    prefix(val) {
-      if (val && !val.endsWith("/")) {
-        // normalize the URL in place (doesn't add a new history entry)
-        const query = { ...this.$route.query, prefix: `${val}/` };
-        this.$router.replace({ name: this.$route.name, params: this.$route.params, query });
-        return;
-      }
-      this.breadcrumbClicked = true;
-    },
   },
 
-  created: function () {
+  created: async function () {
     // Lodash debounce to prevent the search execution from executing on
     // every keypress, thus blocking input
     this.debounceFilter = debounce(this.filter, 400);
     this.setLocalizedContent();
+    await this.setSavedDisplayOptions();
+    this.setTableOptionsMenu();
   },
   beforeMount () {
     this.abortController = new AbortController();
-    this.getDirectCurrentPage();
   },
   mounted () {
-    this.objsLoading = true;
-    this.getData();
+    this.fetchIfReady();
   },
   beforeUnmount () {
     this.abortController.abort();
@@ -341,70 +372,49 @@ export default {
     if (this.breadcrumbClicked) this.breadcrumbClicked = false;
   },
   methods: {
+    fetchIfReady: async function () {
+      this.objsLoading = true;
+      if (this.readyToFetch) {
+        if (!this.owner) await checkAndAddBucketCors(this.active.id, this.containerName);
+        await this.getData();
+      }
+    },
     getData: async function () {
-      await this.loadPublicBase();
+      // First look for bucket metadata in idb; it is updated after objects are fetched
+      const idbMetadata = await getBucketMetadata(this.active.id, this.containerName);
+      if (idbMetadata) this.metadata = {...idbMetadata};
+      if (!this.owner) {
+        try {
+          this.bucketIsPublic = (await getBucketPublicStatus(this.containerName)).public;
+        } catch {
+          this.bucketIsPublic = null;
+        }
+      }
       await this.getSharedContainers();
       await this.getBucketSharedStatus();
-      await this.updateObjects();
+      await this.updateObjectsAndMetadata();
     },
-    async loadPublicBase() {
-    const projectID = this.project;
-      if (!projectID) return;
-
-      try {
-        const base = await this.$store.dispatch("ensurePublicBase", {
-          projectID,
-          signal: this.abortController.signal,
-        });
-        this.publicBase = base || "";
-      } catch (_) {
-        this.publicBase = "";
-      }
-    },
-    async refreshPublicStatus() {
-      if (this.owner) {
-        try {
-          const meta = await getMetadataForSharedContainer(
-            this.project,
-            this.containerName,
-            this.abortController.signal,
-            this.owner,
-          );
-          this.isPublic = !!meta?.is_public;
-        } catch (e) {
-          this.isPublic = false;
-        }
-        return;
-      }
-
-      this.isPublic = !!this.currentContainer?.is_public;
-    },
-    openFolderModal(keypress) {
-      toggleCreateBucketModal();
-      if (keypress) setPrevActiveElement();
-      this.$nextTick(() => {
-        setTimeout(() => {
-          const input = document.querySelector("#newFolder-input input");
-          if (input) { input.tabIndex = "0"; input.focus(); }
-        }, 300);
-      });
+    breadcrumbClickHandler(value) {
+      this.breadcrumbClicked = value;
     },
     goUpOneLevel() {
-      const current = this.prefix || "";
+      const current = this.prefix;
 
-      // Indicate that the breadcrumb was clicked to prevent
+      // Reset table pagination the same way a breadcrumb click does
       this.breadcrumbClicked = true;
 
       if (current) {
-        // go up one pseudofolder level
+        // go up one pseudofolder level; unlike master, prefixes on
+        // this branch carry no trailing slash ("Demo/web", not "Demo/web/")
         const trimmed = current.replace(/\/+$/, "");
         const parent = trimmed.includes("/")
-          ? trimmed.slice(0, trimmed.lastIndexOf("/") + 1)
+          ? trimmed.slice(0, trimmed.lastIndexOf("/"))
           : "";
 
-        const query = { ...this.$route.query, page: 1 };
+        const query = { ...this.$route.query };
         delete query.file;
-        if (parent) query.prefix = parent; else delete query.prefix;
+        if (parent) query.prefix = parent;
+        else delete query.prefix;
 
         this.$router.push({
           name: this.$route.name,
@@ -414,36 +424,28 @@ export default {
         return;
       }
 
-      // at bucket root, go back to all buckets view
-      const user = this.$route.params.user || this.$store.state.uname;
-      let restoredQuery = { page: 1 };
-
-      try {
-        if (this.$route.query.returnQuery) {
-          restoredQuery = JSON.parse(
-            decodeURIComponent(this.$route.query.returnQuery),
-          );
-        }
-      } catch (e) {
-        restoredQuery = { page: 1 };
-      }
-
-      this.$router.push({
-        name: "AllBuckets",
-        params: { project: this.$route.params.project, user },
-        query: restoredQuery,
-      });
+      // at bucket root, go back to the bucket listing
+      this.$router.push({ name: "AllBuckets" });
     },
-    breadcrumbClickHandler(value) {
-      this.breadcrumbClicked = value;
+    openFolderModal() {
+      toggleCreateBucketModal();
+      this.$nextTick(() => {
+        setTimeout(() => {
+          const input = document.querySelector("#newFolder-input input");
+          if (input) {
+            input.tabIndex = "0";
+            input.focus();
+          }
+        }, 300);
+      });
     },
     getSharedContainers: async function () {
       this.sharedContainers =
         await getSharedContainers(this.active.id, this.abortController.signal);
     },
     getBucketSharedStatus: async function() {
-      if (this.client) {
-        await this.client.getShareDetails(
+      if (this.sharingClient) {
+        await this.sharingClient.getShareDetails(
           this.project,
           this.containerName,
           this.abortController.signal,
@@ -496,13 +498,12 @@ export default {
       }
     },
     toggleShareModal: function () {
-      this.$store.commit("toggleShareModal", true);
-      this.$store.commit("setBucketName", this.containerName);
+      this.$store.toggleShareModal(true);
+      this.$store.setBucketName(this.containerName);
     },
-    confirmDelete: function(item, keypress) {
-      // Always open the delete modal for files AND folders.
-      toggleDeleteModal([item]); // passes the selected item(s) to the modal
-      if (keypress) this.moveFocusToDeleteModal();
+    confirmDelete: function(item) {
+      const isFolder = !isFile(item.name, this.$route) && this.renderFolders;
+      toggleDeleteModal([{ ...item, isFolder }]);
     },
     getCurrentContainer: function () {
       return getDB().containers
@@ -511,20 +512,7 @@ export default {
           name: this.containerName,
         });
     },
-    updateAfterUpload: async function () {
-      const containersToUpdateObjs = {
-        key: this.currentContainer.id,
-        container: {...this.currentContainer},
-      };
-
-      await updateObjectsAndObjectTags(
-        [containersToUpdateObjs],
-        this.active.id,
-        this.abortController.signal,
-        false, // No need to update object tags in this case
-      );
-    },
-    updateObjects: async function () {
+    updateObjectsAndMetadata: async function () {
       if (
         this.containerName === undefined
         || (
@@ -534,90 +522,53 @@ export default {
       ) {
         return;
       }
-
       this.currentContainer = await this.getCurrentContainer();
-      if (!this.owner && !this.currentContainer) {
-        await this.$store.dispatch("updateContainers", {
-          projectID: this.active.id,
-          signal: this.abortController.signal,
-        });
-        this.currentContainer = await this.getCurrentContainer();
-      }
-      await this.refreshPublicStatus();
 
       if (this.currentContainer === undefined) {
         //container not in DB when clicking "view destination"
         // while / right after uploading
-        await this.$store.dispatch("updateContainers", {
-          projectID: this.active.id,
-          signal: this.abortController.signal,
-        });
+        await updateContainers(this.active.id, this.abortController.signal);
         this.currentContainer = await this.getCurrentContainer();
-        await this.refreshPublicStatus();
         if (this.currentContainer === undefined) {
           if (DEV) console.log("Error with uploaded container");
           return;
         }
-
-        await this.updateAfterUpload();
-      }
-      else {
-        let params = {
-          projectID: this.project,
-          container: this.currentContainer,
-          signal: this.abortController.signal,
-        };
-
-        if (this.owner) params.owner = this.owner;
-
-        await this.$store.dispatch("updateObjects", params);
       }
 
-      this.oList = useObservable(
-        liveQuery(() =>
-          getDB().objects
-            .where({"containerID": this.currentContainer.id})
-            .toArray(),
-        ),
+      this.oList = await awsListObjects(
+        this.containerName,
       );
+      this.$store.setLoaderVisible(false);
+
+      // Update bucket metadata if needed
+      await this.updateBucketMetadata();
     },
-    addPageToURL: function (pageNumber) {
-      if (this.$route.name == "SharedObjects") {
-        this.$router.push({
-          name: "SharedObjects",
-          params: {
-            project: this.$route.params.project,
-            owner: this.owner,
-            container: this.containerName,
-          },
-          query: {
-            page: pageNumber,
-            prefix: this.getPrefix(),
-          },
-        });
-      } else {
-        this.$router.push({
-          name: "ObjectsView",
-          params: {
-            user: this.$route.params.user,
-            project: this.project,
-            container: this.containerName,
-          },
-          query: {
-            page: pageNumber,
-            prefix: this.getPrefix(),
-          },
+    updateBucketMetadata: async function () {
+      let updated = { ...this.metadata, bytes: 0, count: 0 };
+      if (this.oList?.length) {
+        updated.count = this.oList.length;
+
+        this.oList.forEach((obj) => {
+          updated.bytes += obj.bytes;
+          if (!updated.last_modified || obj.last_modified > updated.last_modified) {
+            updated.last_modified = obj.last_modified;
+          }
         });
       }
-    },
-    getDirectCurrentPage: function () {
-      this.currentPage = this.$route.query.page ?
-        parseInt(this.$route.query.page) :
-        1;
+      if (updated.count === this.metadata.count &&
+        updated.bytes === this.metadata.bytes &&
+        updated.last_modified === this.metadata.last_modified) {
+        return;
+      }
+      await saveBucketMetadata(this.active.id, this.containerName, updated);
+      this.metadata = { ...updated } ;
     },
     getPrefix: function () {
-      const p = this.$route.query.prefix || "";
-      return p && !p.endsWith("/") ? `${p}/` : p;
+      // Get current pseudofolder prefix
+      if (this.$route.query.prefix == undefined) {
+        return "";
+      }
+      return this.$route.query.prefix;
     },
     filter: function () {
       if(this.searchQuery.length === 0) {
@@ -654,14 +605,15 @@ export default {
         item => selection.indexOf(item.name) > -1,
       );
 
-      /* Folders should also be selected and then filtered out from
-        deletableObjects later
+      /* Selections that don't match a real object are folder rows:
+        the table only carries the folder's display name, so rebuild
+        the folder key (trailing slash) and let DeleteModal expand it
       */
       if (this.checkedRows.length < selection.length) {
         for (let i = 0; i < selection.length; i++) {
           if(!this.checkedRows.some(row => row && row.name === selection[i])) {
             this.checkedRows.push({
-              name: selection[i],
+              name: `${selection[i]}/`,
               container: this.containerName,
               isFolder: true,
             });
@@ -673,12 +625,19 @@ export default {
       const dataTable = document.getElementById("obj-table");
       dataTable.clearSelections();
     },
+    setSavedDisplayOptions: async function() {
+      const savedDisplayOptions = await getSavedDisplayOptions() || {};
+      for (const key of ["renderFolders", "showTimestamp", "hidePagination"]) {
+        if (savedDisplayOptions[key] !== undefined) {
+          this[key] = savedDisplayOptions[key];
+        }
+      }
+    },
     setTableOptionsMenu() {
-      this.$store.commit("toggleRenderedFolders", this.renderFolders);
+      this.$store.toggleRenderedFolders(this.renderFolders);
       const displayOptions = {
         renderFolders: this.renderFolders,
         showTimestamp: this.showTimestamp,
-        hideTags: this.hideTags,
         hidePagination: this.hidePagination,
       };
 
@@ -690,11 +649,8 @@ export default {
           action: async () => {
             this.renderFolders = !(this.renderFolders);
 
-            const newContainer = {
-              ...toRaw(this.currentContainer),
-              displayOptions: {
-                ...displayOptions, renderFolders: this.renderFolders }};
-            await getDB().containers.put(newContainer);
+            await updateDisplayOptions({
+              ...displayOptions, renderFolders: this.renderFolders });
 
             this.setTableOptionsMenu();
           },
@@ -706,27 +662,8 @@ export default {
           action: async () => {
             this.showTimestamp = !(this.showTimestamp);
 
-            const newContainer = {
-              ...toRaw(this.currentContainer),
-              displayOptions: {
-                ...displayOptions, showTimestamp: this.showTimestamp }};
-            await getDB().containers.put(newContainer);
-
-            this.setTableOptionsMenu();
-          },
-        },
-        {
-          name: this.hideTags
-            ? this.$t("message.tableOptions.showTags")
-            : this.$t("message.tableOptions.hideTags"),
-          action: async () => {
-            this.hideTags = !(this.hideTags);
-
-            const newContainer = {
-              ...toRaw(this.currentContainer),
-              displayOptions: {
-                ...displayOptions, hideTags: this.hideTags }};
-            await getDB().containers.put(newContainer);
+            await updateDisplayOptions({
+              ...displayOptions, showTimestamp: this.showTimestamp });
 
             this.setTableOptionsMenu();
           },
@@ -738,11 +675,8 @@ export default {
           action: async () => {
             this.hidePagination = !(this.hidePagination);
 
-            const newContainer = {
-              ...toRaw(this.currentContainer),
-              displayOptions: {
-                ...displayOptions, hidePagination: this.hidePagination }};
-            await getDB().containers.put(newContainer);
+            await updateDisplayOptions({
+              ...displayOptions, hidePagination: this.hidePagination });
 
             this.setTableOptionsMenu();
           },
@@ -755,23 +689,21 @@ export default {
       this.selectionActionButtons = [
         {
           label: this.$t("message.table.clearSelected"),
-          icon: "mdi-refresh",
+          icon: mdiRefresh,
           testid: "clear-checkboxes",
           action: () => this.clearSelections(),
         },
         {
           label: this.$t("message.table.deleteSelected"),
-          icon: "mdi-trash-can-outline",
+          icon: mdiTrashCanOutline,
           testid: "delete-checked-files",
           action: () => {
-            this.onOpenDeleteModal(this.checkedRows);
-            const deleteSelectionsBtn = document
-              .querySelector("#delete-selections");
-            deleteSelectionsBtn.addEventListener("keydown", (e) =>{
-              if (e.keyCode === 13) {
-                this.onOpenDeleteModal(this.checkedRows, true);
-              }
-            });
+            const rows = this.checkedRows.map(item => ({
+              ...item,
+              isFolder: item.isFolder === true ||
+                (!isFile(item.name, this.$route) && this.renderFolders),
+            }));
+            toggleDeleteModal(rows);
           },
         },
       ];
@@ -780,34 +712,28 @@ export default {
       this.setTableOptionsMenu();
       this.setSelectionActionButtons();
     },
-    onOpenDeleteModal(checkedRows, keypress) {
-      toggleDeleteModal(checkedRows);
-      if (keypress) this.moveFocusToDeleteModal();
-    },
-    moveFocusToDeleteModal() {
-      const deleteObjsModal = document.getElementById("delete-objs-modal");
-      setPrevActiveElement();
-      disableFocusOutsideModal(deleteObjsModal);
-
-      setTimeout(() => {
-        const deleteObjsBtn = document.getElementById("delete-objs-btn");
-        deleteObjsBtn.tabIndex = "0";
-        deleteObjsBtn.focus();
-        addFocusClass(deleteObjsBtn);
-      }, 300);
-    },
   },
 };
 </script>
 
 <style scoped>
 
+#count {
+  margin-left: 1.5rem;
+}
+
 #search {
   flex: 0.4;
 }
 
+.row-end {
+  display: flex;
+  gap: 1.5rem;
+  align-items: baseline;
+}
+
 .bucket-info {
-  border: 1px solid var(--csc-primary);
+  border: 1px solid var(--c-primary-600);
   margin: 0rem 0rem;
 }
 
@@ -822,11 +748,8 @@ export default {
   font-weight: 700;
   background: var(--csc-dark-blue);
   align-items: center;
-  & .mdi {
-    font-size: 1.5rem;
-    padding-right: .5rem
-  }
   & span {
+    margin-left: 0.5rem;
     align-self: center;
     display: inline-block;
   }
@@ -858,11 +781,8 @@ export default {
     flex: 1;
     min-width: 12rem;
     padding: 1rem;
-    & .mdi {
-      font-size: 1.5rem;
-      padding-right: .5rem
-    }
     & span {
+      margin-left: 0.5rem;
       align-self: center;
       display: inline-block;
     }
@@ -878,13 +798,6 @@ export default {
 #objects-toasts {
   bottom: 40vh;
 }
-
-.row-end {
-  display: flex;
-  gap: 1.5rem;
-  align-items: baseline;
-}
-
 
 #obj-table-wrapper {
   position: relative;

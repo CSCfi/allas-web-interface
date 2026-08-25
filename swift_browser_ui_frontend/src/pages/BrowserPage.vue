@@ -79,15 +79,6 @@
       >
         <DeleteModal />
       </c-modal>
-      <c-modal
-        id="token-modal"
-        v-model="openTokenModal"
-        v-csc-control
-        disable-backdrop-blur
-        width="64vw"
-      >
-        <TokenModal />
-      </c-modal>
       <ProgressNotification
         v-if="displayUploadNotification"
         type="upload"
@@ -98,13 +89,25 @@
         type="download"
         @cancel-download="cancelDownload"
       />
-      <DownloadStartedToast v-if="$store.state.downloadStartedToastVisible" />
-      <PreviewOpenedToast v-if="$store.state.previewOpenedToastVisible" />
-      <CopyProgressToast v-if="Object.keys($store.state.copyJobs).length" />
+      <CopyProgressToast />
+      <PreviewOpenedToast v-if="$store.previewOpenedToastVisible" />
       <router-view class="content-wrapper" />
       <c-toasts
-        id="container-error-toasts"
+        id="copyBucket-toasts"
         vertical="top"
+      >
+        <div class="toasts-wrapper">
+          <h5 class="title is-5">
+            {{ $t("message.copysuccess") }}
+          </h5>
+          <p class="has-text-weight-semibold">
+            {{ $t("message.copytime") }}
+          </p>
+        </div>
+      </c-toasts>
+      <c-toasts
+        id="container-error-toasts"
+        vertical="bottom"
         horizontal="center"
       />
     </div>
@@ -113,7 +116,8 @@
 </template>
 
 <script>
-import { truncate } from "@/common/conv";
+import { truncate } from "@/common/tableFunctions";
+
 
 export default {
   name: "BrowserPage",
@@ -125,14 +129,6 @@ export default {
 </script>
 
 <style>
-
-html, body {
-  height: 100vh;
-}
-
-body {
-  overflow-y: auto;
-}
 
 #mainContainer {
   min-height: 100vh;
@@ -147,29 +143,6 @@ body {
   display: flex;
   flex-direction: column;
   z-index: 1;
-}
-
-c-modal {
-  position: relative;
-  margin: 0 auto;
-  display: inline-flex;
-}
-
-.modal-content-wrapper {
-  overflow-y: scroll;
-  scrollbar-width: 0.5rem;
-  padding-right: 0.5rem;
-
-  &::-webkit-scrollbar {
-    width: 0.5rem;
-  }
-  &::-webkit-scrollbar-thumb {
-    background: var(--csc-mid-grey);
-    border-radius: 10px;
-    &:hover {
-      background: var(--csc-dark-grey);
-    }
-  }
 }
 
 .content-wrapper {
@@ -205,7 +178,7 @@ c-modal {
 
 .menu-active,
 .menu-icon {
-  color: var(--csc-primary);
+  color: var(--c-primary-600);
 }
 
 .menu-icon {
@@ -213,7 +186,7 @@ c-modal {
 }
 
 .menu-active, .menu-icon {
-  color: var(--csc-primary);
+  color: var(--c-primary-600);
 }
 
 .hero-body #login-center{
@@ -270,6 +243,15 @@ c-modal {
   border-radius: 6px;
 }
 
+#copyBucket-toasts {
+  position: sticky;
+  bottom: 30vh;
+}
+
+.toasts-wrapper {
+  padding: 1rem;
+}
+
 .taginput-label {
   font-weight: bold;
   margin-bottom: -2rem;
@@ -280,7 +262,7 @@ c-modal {
 }
 
 .button-focus {
-  outline: 2px var(--csc-primary) solid;
+  outline: 2px var(--c-primary-600) solid;
   outline-offset: 2px;
   border-radius: 4px;
 }

@@ -1,26 +1,20 @@
 """Project functions for handling API requests from front-end."""
 
 import asyncio
-import json
-import re
 import ssl
 import time
-import typing
 import urllib.parse
-from datetime import datetime
-from urllib.parse import quote, urlparse
 
+import aioboto3
 import aiohttp.web
 import aiohttp_session
+import botocore.exceptions
 import certifi
-from swiftclient.utils import generate_temp_url
 
 from swift_browser_ui.ui._convenience import (
-    get_tempurl_key,
     ldap_get_project_titles,
-    open_upload_runner_session,
-    sign,
 )
+from swift_browser_ui.ui.replicate import ObjectReplicator
 from swift_browser_ui.ui.settings import setd
 
 ssl_context = ssl.create_default_context()
@@ -43,8 +37,12 @@ async def os_list_projects(request: aiohttp.web.Request) -> aiohttp.web.Response
         "API call for project listing from "
         f"{request.remote}, sess: {session} :: {time.ctime()}"
     )
-    # Fetch project title information from ldap.
-    # Project membership is fixed for the lifetime of the session, cached in redis.
+    # Fetch project title information from ldap. Project membership is fixed
+    # for the lifetime of the session, so the result is cached in the
+    # (Redis-backed) session — only the first listing after login pays the
+    # LDAP round trip. A dead/unreachable LDAP must not break the project
+    # listing — degrade to empty titles instead, without caching, so the
+    # lookup is retried on the next listing.
     titles = session.get("project_titles")
     if titles is None:
         try:
@@ -67,619 +65,22 @@ async def os_list_projects(request: aiohttp.web.Request) -> aiohttp.web.Response
     )
 
 
-async def swift_list_containers(
-    request: aiohttp.web.Request,
-) -> aiohttp.web.StreamResponse:
-    """Proxy Swift list buckets available to a project."""
-    session = await aiohttp_session.get_session(request)
-    client = request.app["api_client"]
-
-    project = request.match_info["project"]
-    request.app["Log"].info(
-        "API call for list buckets from "
-        f"{request.remote}, session: {session} :: {time.ctime()}"
-    )
-
-    # as of v 3.9.1 the return type of query is "MultiMapping[str]"
-    # however the actual function returns MultiDictProxy which has copy
-    # https://github.com/aio-libs/multidict/blob/master/multidict/_multidict_py.py#L146-L163
-    query = request.query.copy()  # type: ignore[attr-defined]
-    query["format"] = "json"
-    try:
-        async with client.get(
-            session["projects"][project]["endpoint"],
-            headers={"X-Auth-Token": session["projects"][project]["token"]},
-            params=query,
-        ) as ret:
-            resp = aiohttp.web.StreamResponse(status=ret.status)
-            await resp.prepare(request)
-            if ret.status == 200:
-                buffer = b""
-                async for chunk in ret.content.iter_chunked(65535):
-                    buffer += chunk
-                try:
-                    containers = json.loads(buffer)
-                    tasks = [
-                        _check_last_modified(request, container)
-                        for container in containers
-                    ]
-                    ret = await asyncio.gather(*tasks)
-                    chunk = json.dumps(ret).encode()
-                    await resp.write(chunk)
-                except json.JSONDecodeError as e:
-                    request.app["Log"].error(
-                        f"JSONDecodeError: {e} with data: {buffer[:500]}..."
-                    )
-            await resp.write_eof()
-        return resp
-    except KeyError:
-        raise aiohttp.web.HTTPForbidden(
-            reason="Account does not have access to the project."
-        )
-
-
-async def _probe_public_container(client, endpoint: str, container: str) -> bool:
-    u = urlparse(endpoint)
-    host = f"{u.scheme}://{u.netloc}"
-    base_path = u.path.rstrip("/")
-    url = f"{host}{base_path}/{quote(container, safe='')}"
-    async with client.get(url, params={"format": "json", "limit": 1}, headers={}) as r:
-        return r.status in {200, 204}
-
-
-async def _check_last_modified(
-    request: aiohttp.web.Request, container: typing.Dict[str, typing.Any]
-) -> typing.Dict[str, typing.Any]:
-    """Ensure container data includes 'last_modified' key and value.
-
-    :param request: A request instance
-    :param data: Containers basic info
-    """
-    session = await aiohttp_session.get_session(request)
-    client = request.app["api_client"]
-    request.app["Log"].info(
-        "API call for project listing from "
-        f"{request.remote}, sess: {session} :: {time.ctime()}"
-    )
-    project = request.match_info["project"]
-    endpoint = session["projects"][project]["endpoint"]
-    if "owner" in request.query:
-        endpoint = endpoint.replace(project, request.query["owner"])
-
-    # If last_modified is not part of container basic info,
-    # head request is made to check container metadata
-    # and add last modified data from there.
-    if "last_modified" not in container.keys() or "is_public" not in container:
-        try:
-            name = container["name"]
-            async with client.head(
-                f"{endpoint}/{name}",
-                headers={
-                    "X-Auth-Token": session["projects"][project]["token"],
-                },
-            ) as ret:
-                read_acl = ret.headers.get("X-Container-Read", "")
-                is_pub = _is_public_read(read_acl)
-
-                if "owner" in request.query and not read_acl:
-                    try:
-                        is_pub = await _probe_public_container(client, endpoint, name)
-                    except Exception:
-                        is_pub = False
-
-                container["is_public"] = is_pub
-
-                if "last_modified" not in container:
-                    date_str = ret.headers["Last-Modified"]
-                    # Convert the date string to the ISO 8601 format
-                    date_obj = datetime.strptime(date_str, "%a, %d %b %Y %H:%M:%S %Z")
-                    iso_8601_str = date_obj.strftime("%Y-%m-%dT%H:%M:%S.%f")
-                    container["last_modified"] = iso_8601_str
-        # we expect either the header Last Modified to be missing or
-        # the value is not what we expect for str to date conversion
-        except (KeyError, ValueError) as e:
-            # If anything goes wrong, set last_modified key anyway with null value
-            request.app["Log"].exception(
-                f"something happened when retrieving last modified/public state {e}"
-            )
-            container.setdefault("last_modified", None)
-            container.setdefault("is_public", False)
-    return container
-
-
-async def swift_create_container(request: aiohttp.web.Request) -> aiohttp.web.Response:
-    """Create a new container from name."""
-    session = await aiohttp_session.get_session(request)
-    client = request.app["api_client"]
-    project = request.match_info["project"]
-    container = request.match_info["container"]
-
-    request.app["Log"].info(
-        f"API call for container creation from {request.remote}, sess {session}"
-    )
-
-    req_json = await request.json()
-    tags = req_json.get("tags", None)
-
-    headers = {"X-Auth-Token": session["projects"][project]["token"]}
-    if tags:
-        headers["X-Container-Meta-UserTags"] = tags
-
-    # Create the ACL entry for the project to preserve access after sharing
-    headers["X-Container-Read"] = f"{project}:*"
-    headers["X-Container-Write"] = f"{project}:*"
-
-    async with client.put(
-        f"{session['projects'][project]['endpoint']}/{container}",
-        headers=headers,
-        params=request.query,
-    ) as ret:
-        resp = aiohttp.web.Response(
-            status=ret.status,
-        )
-    return resp
-
-
-async def swift_delete_container(request: aiohttp.web.Request) -> aiohttp.web.Response:
-    """Delete an empty container or batch delete objects."""
-    if "objects" in request.query:
-        return await swift_delete_objects(request)
-    session = await aiohttp_session.get_session(request)
-    client = request.app["api_client"]
-
-    project = request.match_info["project"]
-    container = request.match_info["container"]
-    request.app["Log"].info(
-        f"API call for container deletion from {request.remote}, sess {session}"
-    )
-    async with client.delete(
-        f"{session['projects'][project]['endpoint']}/{container}",
-        headers={
-            "X-Auth-Token": session["projects"][project]["token"],
-        },
-        params=request.query,
-    ) as ret:
-        resp = aiohttp.web.Response(
-            status=ret.status,
-        )
-    return resp
-
-
-async def swift_delete_objects(request: aiohttp.web.Request) -> aiohttp.web.Response:
-    """Delete objects."""
-    session = await aiohttp_session.get_session(request)
-    client = request.app["api_client"]
-    project = request.match_info["project"]
-    container = request.match_info["container"]
-
-    req_json = await request.json()
-
-    if len(req_json) > 10000:
-        raise aiohttp.web.HTTPBadRequest(reason="Too many objects (>10000)")
-    else:
-        # Bulk deletion middleware wants a list of URL-safe object names separated
-        # with newlines
-        objects = (
-            "".join([urllib.parse.quote(f"/{container}/{i}") + "\n" for i in req_json])
-        ).encode("utf-8")
-
-        async with client.post(
-            f"{session['projects'][project]['endpoint']}",
-            headers={
-                "X-Auth-Token": session["projects"][project]["token"],
-                "Accept": "application/json",
-                "Content-Type": "text/plain",
-            },
-            params={
-                "bulk-delete": "true",
-            },
-            data=objects,
-        ) as ret:
-            resp = aiohttp.web.Response(status=ret.status, body=(await ret.read()))
-        return resp
-
-
-async def swift_list_objects(request: aiohttp.web.Request) -> aiohttp.web.StreamResponse:
-    """List objects in a given bucket or container."""
-    session = await aiohttp_session.get_session(request)
-    client = request.app["api_client"]
-    project = request.match_info["project"]
-    container = request.match_info["container"]
-
-    request.app["Log"].info(
-        "API call for list objects from "
-        f"{request.remote}, sess: {session} :: {time.ctime()}"
-    )
-
-    # as of v 3.9.1 the return type of query is "MultiMapping[str]"
-    # however the actual function returns MultiDictProxy which has copy
-    # https://github.com/aio-libs/multidict/blob/master/multidict/_multidict_py.py#L146-L163
-    query = request.query.copy()  # type: ignore[attr-defined]
-    query["format"] = "json"
-
-    endpoint = session["projects"][project]["endpoint"]
-    if "owner" in request.query:
-        endpoint = endpoint.replace(project, request.query["owner"])
-
-    # TODO: MOVE UNICODE NULL HANDLING TO FRONTEND
-    async with client.get(
-        f"{endpoint}/{container}",
-        headers={
-            "X-Auth-Token": session["projects"][project]["token"],
-        },
-        params=query,
-    ) as ret:
-        resp = aiohttp.web.StreamResponse(
-            status=ret.status,
-        )
-        await resp.prepare(request)
-        async for chunk in ret.content.iter_chunked(65535):
-            await resp.write(chunk)
-        await resp.write_eof()
-
-    return resp
-
-
-async def swift_download_object(request: aiohttp.web.Request) -> aiohttp.web.Response:
-    """Point a user to a temporary pre-signed download URL."""
-    session = await aiohttp_session.get_session(request)
-    client = request.app["api_client"]
-    project = request.match_info["project"]
-    object_name = request.match_info["object"]
-    container = request.match_info["container"]
-    request.app["Log"].info(
-        f"API call for download {object_name} from {request.remote}, sess: {session} :: {time.ctime()}"
-    )
-
-    temp_url_key = await get_tempurl_key(request)
-    request.app["Log"].debug(f"Using {temp_url_key} as temporary URL key")
-
-    # Generate temporary URL with the key
-    endpoint = session["projects"][project]["endpoint"]
-    u = urlparse(endpoint)
-
-    host = f"{u.scheme}://{u.netloc}"  # https://a3s.fi
-    base_path = u.path.rstrip("/")  # /swift/v1 (new) /swift/v1/AUTH_* (old)
-
-    # encodes spaces and special chars
-    container_q = quote(container, safe="")  # "My Bucket" to My%20Bucket
-    object_q = quote(object_name, safe="/")  # "dir/a b.txt" to dir/a%20b.txt
-    signed_path = f"{base_path}/{container_q}/{object_q}"
-
-    url = host + generate_temp_url(
-        signed_path,
-        600,  # Use 10 minute lifetime
-        temp_url_key,
-        "GET",
-        digest=setd["tempurl_digest_type"],
-    )
-
-    if request.query:
-        parsed = urllib.parse.urlparse(url)
-        # existing TempURL params as list of (key, value) pairs
-        existing = urllib.parse.parse_qsl(parsed.query, keep_blank_values=True)
-        # incoming params as list of pairs. Dont overwrite temp_url_ params
-        incoming = [
-            (k, v) for k, v in request.query.items() if not k.startswith("temp_url_")
-        ]
-        merged = existing + incoming
-        parsed = parsed._replace(query=urllib.parse.urlencode(merged, doseq=True))  # type: ignore
-        url = parsed.geturl()
-
-    head_url = f"{host}{signed_path}"
-    async with client.head(
-        head_url,
-        headers={
-            "X-Auth-Token": session["projects"][project]["token"],
-        },
-    ) as ret:
-        ctype = ret.headers.get("Content-Type", "application/octet-stream")
-
-    return aiohttp.web.Response(
-        status=302,
-        headers={
-            "Location": url,
-            "Content-Type": ctype,
-        },
-    )
-
-
-async def swift_preview_object(
-    request: aiohttp.web.Request,
-) -> aiohttp.web.StreamResponse:
-    """Stream an object for in-browser preview (inline). Supports shared owner=."""
-    session = await aiohttp_session.get_session(request)
-    client = request.app["api_client"]
-
-    project = request.match_info["project"]
-    container = request.match_info["container"]
-    object_name = request.match_info["object"]
-    object_name = urllib.parse.unquote(object_name)
-
-    endpoint = session["projects"][project]["endpoint"]
-    owner = request.query.get("owner")
-    if owner:
-        endpoint = endpoint.replace(project, owner)
-
-    url = (
-        f"{endpoint}/"
-        f"{urllib.parse.quote(container, safe='')}/"
-        f"{urllib.parse.quote(object_name, safe='/')}"
-    )
-
-    # Forward Range for PDF/video seeking if present
-    headers = {"X-Auth-Token": session["projects"][project]["token"]}
-    range_hdr = request.headers.get("Range")
-    if range_hdr:
-        headers["Range"] = range_hdr
-
-    async with client.get(url, headers=headers) as upstream:
-        resp = aiohttp.web.StreamResponse(status=upstream.status)
-
-        # Content-Type from Swift
-        ctype = upstream.headers.get("Content-Type", "application/octet-stream")
-
-        # Ensure text/* types have charset
-        if ctype.startswith("text/") and "charset=" not in ctype.lower():
-            ctype = f"{ctype}; charset=utf-8"
-
-        # Set Content-Type
-        resp.headers["Content-Type"] = ctype
-
-        # Force inline preview
-        filename = object_name.split("/")[-1]
-        resp.headers["Content-Disposition"] = f'inline; filename="{filename}"'
-
-        # Pass through Range/length headers if present
-        passthrough = [
-            "Accept-Ranges",
-            "Content-Range",
-            "Content-Length",
-            "ETag",
-            "Last-Modified",
-        ]
-        for h in passthrough:
-            if h in upstream.headers:
-                resp.headers[h] = upstream.headers[h]
-
-        await resp.prepare(request)
-        async for chunk in upstream.content.iter_chunked(65536):
-            await resp.write(chunk)
-        await resp.write_eof()
-        return resp
-
-
-async def _swift_get_object_metadata_wrapper(
-    request: aiohttp.web.Request, obj: str
-) -> typing.Tuple[str, typing.Dict[str, typing.Any]]:
-    """Get metadata for a single object."""
-    session = await aiohttp_session.get_session(request)
-    client = request.app["api_client"]
-    project = request.match_info["project"]
-    container = request.match_info["container"]
-
-    if "owner" in request.query:
-        owner: str = request.query["owner"]
-    else:
-        owner = ""
-
-    endpoint = session["projects"][project]["endpoint"]
-    async with client.head(
-        f"{endpoint.replace(project, owner) if owner else endpoint}/{container}/{obj}",
-        headers={
-            "X-Auth-Token": session["projects"][project]["token"],
-        },
-    ) as ret:
-        if ret.status != 200:
-            raise aiohttp.web.HTTPInternalServerError(reason="Failed to fetch metadata.")
-
-        meta = {}
-        for k, v in ret.headers.items():
-            lk = k.lower()
-            if lk.startswith("x-object-meta-"):
-                meta_key = lk[len("x-object-meta-") :]
-                meta[meta_key] = v
-
-        if "created" in meta:
-            meta["Created"] = meta["created"]
-        if "sha256" in meta:
-            meta["Sha256"] = meta["sha256"]
-        if "s3cmd-attrs" in meta:
-            meta["s3cmd-attrs"] = dict(
-                [j.split(":") for j in meta["s3cmd-attrs"].split("/")]
-            )
-
-        etag = ret.headers.get("Etag") or ret.headers.get("ETag")
-        if etag is not None:
-            meta["etag"] = etag
-
-    return (obj, meta)
-
-
-async def swift_get_batch_object_metadata(
-    request: aiohttp.web.Request,
-) -> aiohttp.web.Response:
-    """Batch get metadata for objects."""
-    session = await aiohttp_session.get_session(request)
-    request.app["Log"].info(
-        "API call for batch object metadata listing "
-        f"{request.remote}, sess: {session} :: {time.ctime()}"
-    )
-    batch = []
-    for obj in request.query["objects"].split(","):
-        batch.append(_swift_get_object_metadata_wrapper(request, obj))
-    return aiohttp.web.json_response(
-        await asyncio.gather(*batch, return_exceptions=False)
-    )
-
-
-async def swift_get_metadata_container(
-    request: aiohttp.web.Request,
-) -> aiohttp.web.Response:
-    """Get metadata for a container."""
-    if "objects" in request.query:
-        return await swift_get_batch_object_metadata(request)
-    session = await aiohttp_session.get_session(request)
-    client = request.app["api_client"]
-    request.app["Log"].info(
-        "API call for project listing from "
-        f"{request.remote}, sess: {session} :: {time.ctime()}"
-    )
-    project = request.match_info["project"]
-    container = request.match_info["container"]
-    if "owner" in request.query:
-        owner: str = request.query["owner"]
-    else:
-        owner = ""
-
-    endpoint = session["projects"][project]["endpoint"]
-    async with client.head(
-        f"{endpoint.replace(project, owner) if owner else endpoint}/{container}",
-        headers={
-            "X-Auth-Token": session["projects"][project]["token"],
-        },
-    ) as ret:
-
-        headers = ret.headers
-        read_acl = headers.get("X-Container-Read", "")
-        meta = {k.replace("X-Container-Meta-", ""): v for k, v in headers.items()}
-        meta["X-Container-Read"] = read_acl
-        is_pub = _is_public_read(read_acl)
-
-        if owner and not read_acl:
-            try:
-                is_pub = await _probe_public_container(client, endpoint, container)
-            except Exception:
-                is_pub = False
-
-        meta["is_public"] = is_pub
-    return aiohttp.web.json_response([container, meta])
-
-
-async def _swift_update_object_meta_wrapper(
-    request: aiohttp.web.Request,
-    obj: str,
-    meta: typing.List[typing.Tuple[typing.Any, typing.Any]],
-) -> int:
-    """Update metadata for a single object."""
-    session = await aiohttp_session.get_session(request)
-    client = request.app["api_client"]
-    project = request.match_info["project"]
-    container = request.match_info["container"]
-
-    headers = {(f"X-Object-Meta-{k}"): v for k, v in meta}
-    headers.update(
-        {
-            "X-Auth-Token": session["projects"][project]["token"],
-        }
-    )
-
-    async with client.post(
-        f"{session['projects'][project]['endpoint']}/{container}/{obj}",
-        headers=headers,
-    ) as ret:
-        return int(ret.status)
-
-
-async def swift_batch_update_object_metadata(
-    request: aiohttp.web.Request,
-) -> aiohttp.web.Response:
-    """Update metadata for an object."""
-    session = await aiohttp_session.get_session(request)
-    request.app["Log"].info(
-        "API call for updating container metadata from "
-        f"{request.remote}, sess: {session} :: {time.ctime()}"
-    )
-    objects = await request.json()
-    if not objects:
-        raise aiohttp.web.HTTPBadRequest
-    batch: typing.List[typing.Any] = [
-        _swift_update_object_meta_wrapper(
-            request,
-            name,
-            [(key, value) for key, value in meta.items() if value],
-        )
-        for name, meta in objects
-    ]
-    batch = await asyncio.gather(*batch, return_exceptions=False)
-    for ret in batch:
-        if ret not in {202, 204}:
-            raise aiohttp.web.HTTPNotFound
-    return aiohttp.web.HTTPNoContent()
-
-
-async def swift_update_container_metadata(
-    request: aiohttp.web.Request,
-) -> aiohttp.web.Response:
-    """Update metadata for a container."""
-    if "objects" in request.query:
-        return await swift_batch_update_object_metadata(request)
-    session = await aiohttp_session.get_session(request)
-    client = request.app["api_client"]
-    request.app["Log"].info(
-        "API call for updating container metadata from "
-        f"{request.remote}, sess: {session} :: {time.ctime()}"
-    )
-    project = request.match_info["project"]
-    container = request.match_info["container"]
-    meta = await request.json()
-    meta = {f"X-Container-Meta-{k}": v for k, v in meta.items()}
-    headers = {
-        "X-Auth-Token": session["projects"][project]["token"],
-    }
-    headers.update(meta)
-    async with client.post(
-        f"{session['projects'][project]['endpoint']}/{container}",
-        headers=headers,
-    ) as ret:
-        return aiohttp.web.Response(status=ret.status)
-
-
-async def swift_get_project_metadata(
-    request: aiohttp.web.Request,
-) -> aiohttp.web.Response:
-    """Get the bare minimum required project metadata from Openstack."""
-    session = await aiohttp_session.get_session(request)
-    client = request.app["api_client"]
-    project = request.match_info["project"]
-    request.app["Log"].info(
-        f"Api call for project metadata check from {request.remote}, sess: {session}"
-    )
-
-    async with client.head(
-        session["projects"][project]["endpoint"],
-        headers={
-            "X-Auth-Token": session["projects"][project]["token"],
-        },
-    ) as ret:
-        # Empty projects return 200, otherwise 204
-        if ret.status not in {200, 204}:
-            raise aiohttp.web.HTTPUnauthorized(
-                reason="Project is not valid for Object Storage"
-            )
-        return aiohttp.web.json_response(
-            {
-                "Account": project,
-                "Containers": ret.headers["X-Account-Container-Count"],
-                "Objects": ret.headers["X-Account-Object-Count"],
-                "Bytes": ret.headers["X-Account-Bytes-Used"],
-            }
-        )
-
-
-async def get_shared_container_address(
-    request: aiohttp.web.Request,
-) -> aiohttp.web.Response:
-    """Get the project specific object storage address."""
-    session = await aiohttp_session.get_session(request)
-    project = request.match_info["project"]
-    request.app["Log"].info(
-        "API call for project specific storage from "
-        f"{request.remote}, sess: {session} :: {time.ctime()}"
-    )
-    return aiohttp.web.json_response(session["projects"][project]["endpoint"])
-
-
+# TODO(swift-deprecation): this whole section (helpers +
+# swift_get_container_public + swift_set_container_public) is
+# transitional glue that only exists to keep the public toggle in sync
+# with the Swift UI. When Swift is deprecated, delete the section and
+# its two routes in server.py — public access itself is granted by the
+# bucket policy and keeps working. The frontend counterpart to update
+# is getBucketPublicStatus/setBucketPublic in s3commands.js.
+#
+# Public read access lives in the Swift container read ACL as the
+# ".r:*,.rlistings" tokens — the same markers the Swift UI uses. This is
+# deliberate: RGW maps Swift ACL tokens to internal permission bits
+# (READ_OBJS + referer grants) that the S3 ACL API can neither produce
+# nor see, so the only way to stay in sync with the Swift UI is to edit
+# the container ACL through the Swift API. The frontend additionally
+# mirrors the state into a bucket policy, which is what actually grants
+# anonymous object reads on the S3 endpoint.
 PUBLIC_READ_TOKENS = [".r:*", ".rlistings"]
 
 
@@ -706,7 +107,7 @@ def _enable_public_read(read_acl: str) -> str:
     parts = _split_acl(read_acl)
     for tok in PUBLIC_READ_TOKENS:
         if tok not in parts:
-            parts.append(tok)  # appended to end
+            parts.append(tok)
     return _join_acl(parts)
 
 
@@ -722,30 +123,78 @@ def _is_public_read(read_acl: str) -> bool:
     return all(tok in parts for tok in PUBLIC_READ_TOKENS)
 
 
-async def set_container_public(request: aiohttp.web.Request) -> aiohttp.web.Response:
+async def swift_get_container_public(
+    request: aiohttp.web.Request,
+) -> aiohttp.web.Response:
+    """Get the public read access status and public address of a container."""
+    session = await aiohttp_session.get_session(request)
+    client = request.app["api_client"]
+    project = request.match_info["project"]
+    container = request.match_info["container"]
+    request.app["Log"].info(
+        "API call for container public status from "
+        f"{request.remote}, sess: {session} :: {time.ctime()}"
+    )
+
+    try:
+        endpoint = session["projects"][project]["endpoint"]
+        token = session["projects"][project]["token"]
+    except KeyError:
+        raise aiohttp.web.HTTPForbidden(
+            reason="Account does not have access to the project."
+        )
+
+    async with client.head(
+        f"{endpoint}/{container}",
+        headers={"X-Auth-Token": token},
+    ) as ret:
+        if ret.status == 404:
+            raise aiohttp.web.HTTPNotFound(reason=f"Container not found: {container}")
+        if ret.status not in {200, 204}:
+            raise aiohttp.web.HTTPForbidden(
+                reason=f"Failed to read container ACL: {container}"
+            )
+        read_acl = ret.headers.get("X-Container-Read", "")
+
+    # The trailing slash matters: without it RGW redirects to a URL
+    # missing the AUTH_ segment, which breaks the anonymous listing
+    return aiohttp.web.json_response(
+        {
+            "public": _is_public_read(read_acl),
+            "address": f"{endpoint}/{urllib.parse.quote(container)}/",
+        }
+    )
+
+
+async def swift_set_container_public(
+    request: aiohttp.web.Request,
+) -> aiohttp.web.Response:
     """Set the public read access for a container."""
     session = await aiohttp_session.get_session(request)
     client = request.app["api_client"]
-
     project = request.match_info["project"]
     container = request.match_info["container"]
+    request.app["Log"].info(
+        "API call for setting container public status from "
+        f"{request.remote}, sess: {session} :: {time.ctime()}"
+    )
 
     enabled_str = request.query.get("enabled", "").lower()
     if enabled_str not in {"true", "false"}:
         raise aiohttp.web.HTTPBadRequest(reason="Missing or invalid ?enabled=true|false")
     enabled = enabled_str == "true"
 
-    async def _apply(name: str, *, allow_missing: bool) -> None:
-        await _ensure_owner_access_to_container(
-            request, name, allow_missing=allow_missing
+    try:
+        endpoint = session["projects"][project]["endpoint"]
+        token = session["projects"][project]["token"]
+    except KeyError:
+        raise aiohttp.web.HTTPForbidden(
+            reason="Account does not have access to the project."
         )
 
-        headers = {"X-Auth-Token": session["projects"][project]["token"]}
-
-        async with client.head(
-            f"{session['projects'][project]['endpoint']}/{name}",
-            headers=headers,
-        ) as ret:
+    async def _apply(name: str, *, allow_missing: bool) -> None:
+        headers = {"X-Auth-Token": token}
+        async with client.head(f"{endpoint}/{name}", headers=headers) as ret:
             if ret.status == 404:
                 if allow_missing:
                     return
@@ -756,819 +205,574 @@ async def set_container_public(request: aiohttp.web.Request) -> aiohttp.web.Resp
                 )
             read_acl = ret.headers.get("X-Container-Read", "")
 
-        new_read = (
+        headers["X-Container-Read"] = (
             _enable_public_read(read_acl) if enabled else _disable_public_read(read_acl)
         )
-        headers["X-Container-Read"] = new_read
 
-        async with client.post(
-            f"{session['projects'][project]['endpoint']}/{name}",
-            headers=headers,
-        ) as ret:
+        async with client.post(f"{endpoint}/{name}", headers=headers) as ret:
             if ret.status != 204:
                 raise aiohttp.web.HTTPForbidden(reason="Failed to update container ACL")
 
     await _apply(container, allow_missing=False)
+    # Legacy Swift large objects keep their data in a twin segments
+    # bucket; mirror the state there like the Swift UI does
     await _apply(f"{container}_segments", allow_missing=True)
 
     return aiohttp.web.Response(status=204)
 
 
-async def list_public_containers(request: aiohttp.web.Request) -> aiohttp.web.Response:
-    """List all containers with public read access."""
-    session = await aiohttp_session.get_session(request)
-    client = request.app["api_client"]
-    project = request.match_info["project"]
-
-    containers = []
-    while True:
-        params = {"limit": 10000, "format": "json"}
-        if containers:
-            params["marker"] = containers[-1]["name"]
-        async with client.get(
-            f"{session['projects'][project]['endpoint']}",
-            params=params,
-            headers={"X-Auth-Token": session["projects"][project]["token"]},
-        ) as ret:
-            if ret.status == 204:
-                break
-            page = await ret.json()
-            containers += page
-            if not page:
-                break
-
-    async def _check(name: str) -> tuple[str, bool]:
-        async with client.head(
-            f"{session['projects'][project]['endpoint']}/{name}",
-            headers={"X-Auth-Token": session["projects"][project]["token"]},
-        ) as ret:
-            read_acl = ret.headers.get("X-Container-Read", "")
-            return (name, _is_public_read(read_acl))
-
-    results = await asyncio.gather(*[_check(c["name"]) for c in containers])
-    public = [
-        name for (name, is_pub) in results if is_pub and not name.endswith("_segments")
-    ]
-    return aiohttp.web.json_response({"public": public})
-
-
-async def get_public_base_address(request: aiohttp.web.Request) -> aiohttp.web.Response:
-    """Get the base address for public access to containers."""
-    session = await aiohttp_session.get_session(request)
-    project = request.match_info["project"]
-
-    endpoint = session["projects"][project]["endpoint"]
-    u = urlparse(endpoint)
-    host = f"{u.scheme}://{u.netloc}"
-    base_path = u.path.rstrip("/")
-    return aiohttp.web.json_response({"base": f"{host}{base_path}"})
-
-
-async def _swift_get_container_acl_wrapper(
+async def aws_list_buckets(
     request: aiohttp.web.Request,
-    container: str,
-) -> typing.Tuple[str, typing.Dict[str, typing.Any]]:
-    """Return container access control headers."""
+) -> aiohttp.web.Response:
+    """Proxy bucket list request to a compatible AWS API."""
     session = await aiohttp_session.get_session(request)
     client = request.app["api_client"]
+    logger = request.app["Log"]
     project = request.match_info["project"]
 
-    async with client.head(
-        f"{session['projects'][project]['endpoint']}/{container}",
-        headers={
-            "X-Auth-Token": session["projects"][project]["token"],
-        },
-    ) as ret:
-        acl = {}
-        if "X-Container-Read" in ret.headers:
-            r_meta = ret.headers["X-Container-Read"]
-            # Filter non-keystone ACL information out as unnecessary
-            r_meta = r_meta.replace(".r:*", "").replace(".rlistings", "")
-            r_meta = re.sub(
-                ",,",
-                "",
-                r_meta,
+    continuation_token = request.query.get("continuation_token", "")
+    max_buckets = int(request.query.get("max_buckets", 1000))
+
+    logger.info(
+        f"API call to list buckets in {project} from "
+        f"{request.remote}, sess: {session} :: {time.ctime()}"
+    )
+    logger.debug(
+        f"Using {max_buckets} as max buckets and {continuation_token} "
+        "as the continuation token."
+    )
+
+    creds = await _get_ec2_credentials(session, client, project)
+    s3session = aioboto3.Session(
+        aws_access_key_id=creds["access"],
+        aws_secret_access_key=creds["secret"],
+    )
+
+    async with s3session.client(
+        "s3",
+        region_name="us-east-1",
+        endpoint_url=setd["s3api_endpoint"],
+        verify=setd["check_certificate"],
+    ) as s3_client:
+        try:
+            bucket_page = await s3_client.list_buckets(
+                MaxBuckets=max_buckets,
+                ContinuationToken=continuation_token,
             )
-            r_meta = r_meta.lstrip(",").rstrip(",").split(",")
-            try:
-                acl = {k: {"read": v} for k, v in [i.split(":") for i in r_meta]}
-            except ValueError:
-                acl = {}
-        if "X-Container-Write" in ret.headers:
-            # No need for write ACL filtering as it's project scope only
-            w_acl = {
-                k: {"write": v}
-                for k, v in [
-                    i.split(":") for i in ret.headers["X-Container-Write"].split(",")
-                ]
-            }
-            for k, v in w_acl.items():
-                try:
-                    acl[k].update(v)
-                except KeyError:
-                    acl[k] = v
-    return (container, acl)
+        except botocore.exceptions.ClientError as e:
+            error_code = e.response["Error"]["Code"]
+            http_status = e.response.get("ResponseMetadata", {}).get("HTTPStatusCode")
+            logger.info(
+                f"ListBuckets failed for {project} with error code "
+                f"{error_code} (HTTP {http_status})."
+            )
+            if error_code == "404" or http_status == 404:
+                raise aiohttp.web.HTTPNotFound(
+                    text="Project doesn't have any buckets or storage access."
+                )
+            # RGW rejects a suspended or otherwise inaccessible tenant with a
+            # symbolic error code and HTTP 401/403 — not a literal "401".
+            if error_code in {
+                "401",
+                "AccessDenied",
+                "UserSuspended",
+                "InvalidAccessKeyId",
+                "SignatureDoesNotMatch",
+            } or http_status in {401, 403}:
+                raise aiohttp.web.HTTPUnauthorized(
+                    text="Unauthorized. Project storage might be suspended "
+                    "or credentials stale."
+                )
+            raise aiohttp.web.HTTPInternalServerError(
+                text="Couldn't retrieve the bucket page from storage."
+            )
 
-
-async def get_access_control_metadata(
-    request: aiohttp.web.Request,
-) -> aiohttp.web.Response:
-    """Fetch a compilation of ACL information for sharing discovery."""
-    session = await aiohttp_session.get_session(request)
-    request.app["Log"].info(
-        "API call for project ACL info from "
-        f"{request.remote}, sess: {session} :: {time.ctime()}"
-    )
-    client = request.app["api_client"]
-    project = request.match_info["project"]
-
-    containers: typing.List[typing.Dict[str, typing.Any]] = []
-    while True:
-        params = {
-            "limit": 10000,
-            "format": "json",
+    bucket_page["Buckets"] = [
+        {
+            "Name": bucket["Name"],
+            "CreationDate": bucket["CreationDate"].isoformat(),
         }
-        if len(containers) > 0:
-            params["marker"] = containers[-1]["name"]
-        async with client.get(
-            f"{session['projects'][project]['endpoint']}",
-            params=params,
-            headers={
-                "X-Auth-Token": session["projects"][project]["token"],
-            },
-        ) as ret:
-            if ret.status == 204:
-                break
-            page = await ret.json()
-            containers = containers + page
-            # If no items are returned, we've reached the end
-            if not len(page) > 0:
-                break
-    tasks = [
-        _swift_get_container_acl_wrapper(request, container["name"])
-        for container in containers
+        for bucket in bucket_page["Buckets"]
     ]
-    ret = await asyncio.gather(*tasks)
-    return aiohttp.web.json_response(
-        {
-            "address": session["projects"][project]["endpoint"],
-            "access": dict(
-                filter(
-                    lambda i: len(i[1]) > 0,
-                    ret,
-                )
-            ),
-        }
-    )
+
+    return aiohttp.web.json_response(bucket_page)
 
 
-async def _ensure_owner_access_to_container(
+async def aws_preview_object(
     request: aiohttp.web.Request,
-    container: str,
-    *,
-    allow_missing: bool = False,
-):
-    """Ensure that owner project will retain access to all files."""
+) -> aiohttp.web.StreamResponse:
+    """Stream an object inline for in-browser preview.
+
+    Session-authenticated: the URL only works for logged-in members of
+    the project, it is not a public link.
+    """
     session = await aiohttp_session.get_session(request)
     client = request.app["api_client"]
-
+    logger = request.app["Log"]
     project = request.match_info["project"]
-
-    request.app["Log"].info(
-        f"Ensuring project {project} retains access to container"
-        f"{container} :: {time.ctime()}"
-    )
-
-    headers = {"X-Auth-Token": session["projects"][project]["token"]}
-
-    read_acl = ""
-    write_acl = ""
-    changed = False
-
-    async with client.head(
-        f"{session['projects'][project]['endpoint']}/{container}",
-        headers=headers,
-    ) as ret:
-        if ret.status == 404:
-            if allow_missing:
-                return
-            raise aiohttp.web.HTTPNotFound(reason=f"Container not found: {container}")
-
-        if ret.status not in {200, 204}:
-            raise aiohttp.web.HTTPForbidden(reason="Failed to read container ACL")
-
-        read_acl = ret.headers.get("X-Container-Read", "")
-        write_acl = ret.headers.get("X-Container-Write", "")
-
-    read_parts = _split_acl(read_acl)
-    write_parts = _split_acl(write_acl)
-
-    owner_token = f"{project}:*"
-
-    if owner_token not in read_parts:
-        read_parts.append(owner_token)
-        changed = True
-    if owner_token not in write_parts:
-        write_parts.append(owner_token)
-        changed = True
-
-    if changed:
-        headers["X-Container-Read"] = _join_acl(read_parts)
-        headers["X-Container-Write"] = _join_acl(write_parts)
-
-        async with client.post(
-            f"{session['projects'][project]['endpoint']}/{container}",
-            headers=headers,
-        ) as ret:
-            if ret.status == 204:
-                return
-            else:
-                raise aiohttp.web.HTTPForbidden(
-                    reason="Could not retain object access in container"
-                )
-
-
-async def _head_container_acls(session, client, project, container, headers):
-    """Return the read and write ACL strings for a container."""
-    async with client.head(
-        f"{session['projects'][project]['endpoint']}/{container}",
-        headers=headers,
-    ) as ret:
-        if ret.status == 404:
-            return None, None  # container does not exist
-        if ret.status not in {200, 204}:
-            raise aiohttp.web.HTTPForbidden(reason="Failed to read container ACL")
-        return (
-            ret.headers.get("X-Container-Read", ""),
-            ret.headers.get("X-Container-Write", ""),
-        )
-
-
-async def _post_container_acls(
-    session, client, project, container, headers, read_acl, write_acl
-):
-    """Update the container ACLs with the provided read and write ACL strings."""
-    headers["X-Container-Read"] = read_acl
-    headers["X-Container-Write"] = write_acl
-    async with client.post(
-        f"{session['projects'][project]['endpoint']}/{container}",
-        headers=headers,
-    ) as ret:
-        return ret.status
-
-
-async def remove_project_container_acl(
-    request: aiohttp.web.Request,
-) -> aiohttp.web.Response:
-    """Remove access from a project in container acl."""
-    container = request.match_info["container"]
-    segments = f"{container}_segments"
-
-    await _ensure_owner_access_to_container(request, container, allow_missing=False)
-    await _ensure_owner_access_to_container(request, segments, allow_missing=True)
-
-    session = await aiohttp_session.get_session(request)
-    client = request.app["api_client"]
-    project = request.match_info["project"]
-    receiver = request.match_info["receiver"]
-
-    async def apply(name: str, *, allow_missing: bool):
-        headers = {"X-Auth-Token": session["projects"][project]["token"]}
-
-        read_acl, write_acl = await _head_container_acls(
-            session, client, project, name, headers
-        )
-
-        if read_acl is None:
-            if allow_missing:
-                return 204
-            raise aiohttp.web.HTTPNotFound(reason=f"Container not found: {name}")
-
-        read_acl = read_acl or ""
-        write_acl = write_acl or ""
-
-        read_parts = [p for p in _split_acl(read_acl) if p != f"{receiver}:*"]
-        write_parts = [p for p in _split_acl(write_acl) if p != f"{receiver}:*"]
-
-        read_acl = _join_acl(read_parts)
-        write_acl = _join_acl(write_parts)
-
-        status = await _post_container_acls(
-            session, client, project, name, headers, read_acl, write_acl
-        )
-        return status
-
-    st1 = await apply(container, allow_missing=False)
-    st2 = await apply(segments, allow_missing=True)
-
-    if st1 == 204 and st2 == 204:
-        return aiohttp.web.Response(status=200)
-    raise aiohttp.web.HTTPNotFound()
-
-
-async def remove_container_acl(request: aiohttp.web.Request) -> aiohttp.web.Response:
-    """Remove all allowed projects from container acl."""
-    session = await aiohttp_session.get_session(request)
-    client = request.app["api_client"]
-    project = request.match_info["project"]
-    container = request.match_info["container"]
-    segments = f"{container}_segments"
-
-    async def clear(name: str, *, allow_missing: bool):
-        headers = {
-            "X-Auth-Token": session["projects"][project]["token"],
-        }
-        async with client.head(
-            f"{session['projects'][project]['endpoint']}/{name}",
-            headers=headers,
-        ) as ret:
-            if ret.status == 404:
-                if allow_missing:
-                    return
-                raise aiohttp.web.HTTPNotFound(reason=f"Container not found: {name}")
-            if ret.status not in {200, 204}:
-                raise aiohttp.web.HTTPForbidden(reason="Failed to read container ACL")
-
-            read_acl = ret.headers.get("X-Container-Read", "")
-
-        public_only_read = _join_acl(
-            [p for p in _split_acl(read_acl) if p in PUBLIC_READ_TOKENS]
-        )
-
-        async with client.post(
-            f"{session['projects'][project]['endpoint']}/{name}",
-            headers={
-                "X-Auth-Token": session["projects"][project]["token"],
-                "X-Container-Read": public_only_read,
-                "X-Container-Write": "",
-            },
-        ) as ret:
-            if ret.status == 404:
-                if allow_missing:
-                    return
-                raise aiohttp.web.HTTPNotFound(reason=f"Container not found: {name}")
-            if ret.status != 204:
-                raise aiohttp.web.HTTPNotFound()
-        await _ensure_owner_access_to_container(
-            request, name, allow_missing=allow_missing
-        )
-
-    await clear(container, allow_missing=False)
-    await clear(segments, allow_missing=True)
-
-    return aiohttp.web.Response(status=200)
-
-
-async def modify_container_write_acl(
-    request: aiohttp.web.Request,
-) -> aiohttp.web.Response:
-    """Modify write access for projects in container acl."""
-    container = request.match_info["container"]
-    segments = f"{container}_segments"
-
-    await _ensure_owner_access_to_container(request, container, allow_missing=False)
-    await _ensure_owner_access_to_container(request, segments, allow_missing=True)
-
-    session = await aiohttp_session.get_session(request)
-    client = request.app["api_client"]
-    project = request.match_info["project"]
-    receivers = request.query["projects"].split(",")
-    rights = request.query["rights"]
-
-    async def apply(name: str, *, allow_missing: bool):
-        headers = {"X-Auth-Token": session["projects"][project]["token"]}
-
-        read_acl, write_acl = await _head_container_acls(
-            session, client, project, name, headers
-        )
-
-        if read_acl is None:
-            if allow_missing:
-                return 204
-            raise aiohttp.web.HTTPNotFound(reason=f"Container not found: {name}")
-
-        read_acl = read_acl or ""
-        write_acl = write_acl or ""
-
-        write_parts = _split_acl(write_acl)
-
-        # remove old write entries
-        for r in receivers:
-            token = f"{r}:*"
-            if token in write_parts:
-                write_parts.remove(token)
-
-        # add write rights if requested
-        if "w" in rights:
-            for r in receivers:
-                write_parts.append(f"{r}:*")
-
-        write_acl = _join_acl(write_parts)
-
-        status = await _post_container_acls(
-            session, client, project, name, headers, read_acl, write_acl
-        )
-        return status
-
-    st1 = await apply(container, allow_missing=False)
-    st2 = await apply(segments, allow_missing=True)
-
-    if st1 == 204 and st2 == 204:
-        return aiohttp.web.Response(status=200)
-    raise aiohttp.web.HTTPNotFound()
-
-
-async def add_project_container_acl(
-    request: aiohttp.web.Request,
-) -> aiohttp.web.Response:
-    """Add access for a project in container acl."""
-    container = request.match_info["container"]
-    segments = f"{container}_segments"
-
-    session = await aiohttp_session.get_session(request)
-    client = request.app["api_client"]
-    project = request.match_info["project"]
-    receivers = request.query["projects"].split(",")
-
-    await _ensure_owner_access_to_container(request, container, allow_missing=False)
-    await _ensure_owner_access_to_container(request, segments, allow_missing=True)
-
-    rights = request.query["rights"]
-
-    async def apply(name: str, *, allow_missing: bool):
-        headers = {"X-Auth-Token": session["projects"][project]["token"]}
-
-        read_acl, write_acl = await _head_container_acls(
-            session, client, project, name, headers
-        )
-
-        if read_acl is None:
-            if allow_missing:
-                return 204
-            raise aiohttp.web.HTTPNotFound(reason=f"Container not found: {name}")
-
-        read_acl = read_acl or ""
-        write_acl = write_acl or ""
-
-        read_parts = _split_acl(read_acl)
-        write_parts = _split_acl(write_acl)
-
-        if "r" in rights:
-            for receiver in receivers:
-                read_parts.append(f"{receiver}:*")
-
-        if "w" in rights:
-            for receiver in receivers:
-                write_parts.append(f"{receiver}:*")
-
-        read_acl = _join_acl(read_parts)
-        write_acl = _join_acl(write_parts)
-
-        status = await _post_container_acls(
-            session, client, project, name, headers, read_acl, write_acl
-        )
-        return status
-
-    st1 = await apply(container, allow_missing=False)
-    st2 = await apply(segments, allow_missing=True)
-
-    if st1 == 204 and st2 == 204:
-        return aiohttp.web.Response(status=201)
-    raise aiohttp.web.HTTPNotFound()
-
-
-async def swift_download_shared_object(
-    request: aiohttp.web.Request,
-) -> aiohttp.web.Response:
-    """Point a user to the shared download runner."""
-    session = await aiohttp_session.get_session(request)
-    request.app["Log"].info(
-        "API call for shared download runner "
-        f"from {request.remote}, sess: {session} :: {time.ctime()}"
-    )
-
-    project = ""
-    if "project" in request.query:
-        project = request.query["project"]
-
-    path = (
-        f"/{request.match_info['project']}/"
-        + f"{request.match_info['container']}/"
-        + request.match_info["object"]
-    )
-    runner_id = await open_upload_runner_session(request, project=project)
-    signature = await sign(3600, path)
-    path += (
-        f"?session={runner_id}"
-        + f"&signature={signature['signature']}"
-        + f"&valid={signature['valid']}"
-    )
-    return aiohttp.web.Response(
-        status=307,
-        headers={
-            "Location": f"{setd['upload_external_endpoint']}{path}",
-        },
-    )
-
-
-async def swift_download_container(
-    request: aiohttp.web.Request,
-) -> aiohttp.web.Response:
-    """Point a user to the container download runner."""
-    session = await aiohttp_session.get_session(request)
-    request.app["Log"].info(
-        "API call for container download runner from "
+    bucket = request.match_info["bucket"]
+    object_name = urllib.parse.unquote(request.match_info["object"])
+
+    logger.info(
+        f"API call to preview object in bucket {bucket} in {project} from "
         f"{request.remote}, sess: {session} :: {time.ctime()}"
     )
 
-    project = ""
-    if "project" in request.query:
-        project = request.query["project"]
-
-    path = f"/{request.match_info['project']}/" + f"{request.match_info['container']}"
-    runner_id = await open_upload_runner_session(request, project=project)
-    signature = await sign(3600, path)
-    path += (
-        f"?session={runner_id}"
-        + f"&signature={signature['signature']}"
-        + f"&valid={signature['valid']}"
-    )
-    return aiohttp.web.Response(
-        status=303,
-        headers={
-            "Location": f"{setd['upload_external_endpoint']}{path}",
-        },
+    creds = await _get_ec2_credentials(session, client, project)
+    s3session = aioboto3.Session(
+        aws_access_key_id=creds["access"],
+        aws_secret_access_key=creds["secret"],
     )
 
+    async with s3session.client(
+        "s3",
+        region_name="us-east-1",
+        endpoint_url=setd["s3api_endpoint"],
+        verify=setd["check_certificate"],
+    ) as s3_client:
+        get_kwargs = {"Bucket": bucket, "Key": object_name}
+        # Forward Range for PDF/video seeking if present
+        range_hdr = request.headers.get("Range")
+        if range_hdr:
+            get_kwargs["Range"] = range_hdr
 
-async def swift_replicate_container(
-    request: aiohttp.web.Request,
-) -> aiohttp.web.Response:
-    """Point the user to container replication endpoint."""
-    session = await aiohttp_session.get_session(request)
-    request.app["Log"].info(
-        "API call for replication endpoint from "
-        f"{request.remote}, sess: {session} :: {time.ctime()}"
-    )
-    runner_id = await open_upload_runner_session(request)
-    path = f"/{request.match_info['project']}/{request.match_info['container']}"
-    signature = await sign(3600, path)
-    path += (
-        f"?session={runner_id}"
-        + f"&signature={signature['signature']}"
-        + f"&valid={signature['valid']}"
-    )
-    for i in request.query.keys():
-        path += f"&{i}={request.query[i]}"
-    return aiohttp.web.Response(
-        status=307,
-        headers={
-            "Location": f"{setd['upload_external_endpoint']}{path}",
-        },
-    )
+        try:
+            obj = await s3_client.get_object(**get_kwargs)
+        except botocore.exceptions.ClientError as e:
+            error_code = e.response["Error"]["Code"]
+            http_status = e.response.get("ResponseMetadata", {}).get("HTTPStatusCode")
+            if error_code in {"NoSuchKey", "NoSuchBucket", "404"} or http_status == 404:
+                raise aiohttp.web.HTTPNotFound(text="Object not found.")
+            if error_code in {
+                "AccessDenied",
+                "401",
+                "InvalidAccessKeyId",
+                "SignatureDoesNotMatch",
+            } or http_status in {401, 403}:
+                raise aiohttp.web.HTTPUnauthorized(text="No access to the object.")
+            raise aiohttp.web.HTTPInternalServerError(
+                text="Could not fetch the object for preview."
+            )
 
-
-async def swift_replicate_status(request: aiohttp.web.Request) -> aiohttp.web.Response:
-    """Proxy replication status from upload-runner back to UI."""
-    session = await aiohttp_session.get_session(request)
-    request.app["Log"].info(
-        "API call for replication status from "
-        f"{request.remote}, sess: {session} :: {time.ctime()}"
-    )
-
-    project = request.query.get("project") or request.query.get("runner_project")
-    if not project:
-        raise aiohttp.web.HTTPBadRequest(reason="Missing ?project=<projectId>")
-
-    runner_id = await open_upload_runner_session(request, project=project)
-
-    job_id = request.match_info["job_id"]
-    path = f"/replicate/status/{job_id}"
-    signature = await sign(3600, path)
-
-    client = request.app["api_client"]
-    url = f"{setd['upload_internal_endpoint']}{path}"
-
-    async with client.get(
-        url,
-        cookies={"RUNNER_SESSION_ID": runner_id},
-        params=signature,
-        ssl=ssl_context,
-    ) as upstream:
-        body = await upstream.read()
-
-        # aiohttp.web.Response(content_type=...) cannot include charset
-        ctype = upstream.headers.get("Content-Type", "application/json")
-        if ";" in ctype:
-            ctype = ctype.split(";", 1)[0].strip()
-
-        return aiohttp.web.Response(
-            status=upstream.status,
-            body=body,
-            content_type=ctype,
+        resp = aiohttp.web.StreamResponse(
+            status=206 if "ContentRange" in obj else 200,
         )
 
+        ctype = obj.get("ContentType") or "application/octet-stream"
+        # Ensure text/* types have charset
+        if ctype.startswith("text/") and "charset=" not in ctype.lower():
+            ctype = f"{ctype}; charset=utf-8"
+        resp.headers["Content-Type"] = ctype
 
-async def swift_replicate_cancel(request: aiohttp.web.Request) -> aiohttp.web.Response:
-    """Proxy replication cancel from UI to upload-runner."""
-    session = await aiohttp_session.get_session(request)
-    request.app["Log"].info(
-        "API call for replication cancel from "
-        f"{request.remote}, sess: {session} :: {time.ctime()}"
-    )
+        # Force inline preview
+        filename = object_name.split("/")[-1].replace('"', "")
+        resp.headers["Content-Disposition"] = f'inline; filename="{filename}"'
 
-    project = request.query.get("project") or request.query.get("runner_project")
-    if not project:
-        raise aiohttp.web.HTTPBadRequest(reason="Missing ?project=<projectId>")
+        if "ContentLength" in obj:
+            resp.headers["Content-Length"] = str(obj["ContentLength"])
+        if "ContentRange" in obj:
+            resp.headers["Content-Range"] = obj["ContentRange"]
+        if "AcceptRanges" in obj:
+            resp.headers["Accept-Ranges"] = obj["AcceptRanges"]
+        if "ETag" in obj:
+            resp.headers["ETag"] = obj["ETag"]
 
-    runner_id = await open_upload_runner_session(request, project=project)
-
-    job_id = request.match_info["job_id"]
-    path = f"/replicate/cancel/{job_id}"
-    signature = await sign(3600, path)
-
-    client = request.app["api_client"]
-    url = f"{setd['upload_internal_endpoint']}{path}"
-
-    async with client.post(
-        url,
-        cookies={"RUNNER_SESSION_ID": runner_id},
-        params=signature,
-        ssl=ssl_context,
-    ) as upstream:
-        body = await upstream.read()
-
-        ctype = upstream.headers.get("Content-Type", "application/json")
-        if ";" in ctype:
-            ctype = ctype.split(";", 1)[0].strip()
-
-        return aiohttp.web.Response(
-            status=upstream.status,
-            body=body,
-            content_type=ctype,
-        )
-
-
-async def get_upload_session(
-    request: aiohttp.web.Request,
-) -> aiohttp.web.Response:
-    """Return a pre-signed upload runner session for upload target."""
-    session = await aiohttp_session.get_session(request)
-    request.app["Log"].info(
-        "API call for object upload runner info request from "
-        f"{request.remote}, sess: {session} :: {time.ctime()}"
-    )
-    project = ""
-    if "project" in request.query:
-        project = request.query["project"]
-    runner_id = await open_upload_runner_session(request, project=project)
-    path = f"/{request.match_info['project']}/{request.match_info['container']}"
-    signature = await sign(3600, path)
-    return aiohttp.web.json_response(
-        {
-            "id": runner_id,
-            "url": f"{setd['upload_external_endpoint']}{path}",
-            "host": setd["upload_external_endpoint"],
-            "signature": signature,
-        }
-    )
-
-
-async def get_crypted_upload_session(
-    request: aiohttp.web.Request,
-) -> aiohttp.web.Response:
-    """Return a pre-signed upload runner session for upload target."""
-    session = await aiohttp_session.get_session(request)
-    request.app["Log"].info(
-        "API call for object upload runner info request from "
-        f"{request.remote}, sess: {session} :: {time.ctime()}"
-    )
-    project = ""
-    if "project" in request.query:
-        project = request.query["project"]
-    runner_id = await open_upload_runner_session(request, project=project)
-    path = (
-        f"/cryptic/{request.match_info['project']}/{request.match_info['container']}"
-        + f"/{request.match_info['object_name']}"
-    )
-    signature = await sign(3600, path)
-    ws_path = (
-        f"/cryptic/{request.match_info['project']}/{request.match_info['container']}"
-        + f"/{request.match_info['object_name']}"
-    )
-    ws_sign_path = (
-        f"/cryptic/{request.match_info['project']}/{request.match_info['container']}"
-        + f"/{request.match_info['object_name']}"
-    )
-    ws_signature = await sign(3600, ws_sign_path)
-    return aiohttp.web.json_response(
-        {
-            "id": runner_id,
-            "url": f"{setd['upload_external_endpoint']}{path}",
-            "wsurl": f"{setd['upload_external_endpoint']}{ws_path}".replace(
-                "https", "wss"
-            ),
-            "host": setd["upload_external_endpoint"],
-            "signature": signature,
-            "wssignature": ws_signature,
-        }
-    )
-
-
-async def get_crypted_upload_socket_info(
-    request: aiohttp.web.Request,
-) -> aiohttp.web.Response:
-    """Return a pre-signed upload socket for specified project."""
-    session = await aiohttp_session.get_session(request)
-    request.app["Log"].info(
-        "API call for upload socket signature from "
-        f"{request.remote}, sess: {session} :: {time.ctime()}"
-    )
-
-    project = ""
-    if "project" in request.query:
-        project = request.query["project"]
-
-    runner_id = await open_upload_runner_session(request, project=project)
-    path = f"/cryptic/{request.match_info['project']}"
-    signature = await sign(28800, path)
-
-    return aiohttp.web.json_response(
-        {
-            "id": runner_id,
-            "wsurl": f"{setd['upload_external_endpoint']}{path}".replace("https", "wss"),
-            "host": setd["upload_external_endpoint"],
-            "wssignature": signature,
-        }
-    )
-
-
-async def close_upload_session(
-    request: aiohttp.web.Request,
-    project: str = "",
-) -> aiohttp.web.Response:
-    """Close the upload session opened for the token."""
-    session = await aiohttp_session.get_session(request)
-    status = 204
-    if not project:
-        project = request.match_info["project"]
-    if "runner" in session["projects"][project]:
-        runner = session["projects"][project]["runner"]
-        client = request.app["api_client"]
-        path = f"{setd['upload_internal_endpoint']}/{project}"
-        signature = await sign(3600, f"/{project}")
-        async with client.delete(
-            path,
-            cookies={"RUNNER_SESSION_ID": runner},
-            params=signature,
-            ssl=ssl_context,
-        ) as resp:
-            status = resp.status
-        session["projects"][project].pop("runner")
-        session.changed()
-    return aiohttp.web.Response(status=status)
-
-
-async def swift_put_object(request: aiohttp.web.Request) -> aiohttp.web.Response:
-    """Proxy a Swift object PUT (used for creating folder markers)."""
-    session = await aiohttp_session.get_session(request)
-    client = request.app["api_client"]
-
-    project = request.match_info["project"]
-    container = request.match_info["container"]
-    obj_path = request.match_info["object"]
-
-    # Avoid double-encoding (frontend may already encode the path)
-    obj_path = urllib.parse.unquote(obj_path)
-
-    endpoint = session["projects"][project]["endpoint"]
-    owner = request.query.get("owner")
-    if owner:
-        endpoint = endpoint.replace(project, owner)
-
-    url = (
-        f"{endpoint}/"
-        f"{urllib.parse.quote(container, safe='')}/"
-        f"{urllib.parse.quote(obj_path, safe='/')}"
-    )
-
-    body = await request.read()
-
-    # Base headers
-    headers = {
-        "X-Auth-Token": session["projects"][project]["token"],
-    }
-    # Help UIs treat zero-byte trailing-slash objects as directories
-    if not body and obj_path.endswith("/"):
-        headers["Content-Type"] = "application/directory"
-
-    # Forward all query params except 'owner'
-    params = request.query.copy()
-    params.pop("owner", None)
-
-    async with client.put(url, headers=headers, data=body, params=params) as upstream:
-        resp = aiohttp.web.Response(status=upstream.status, body=await upstream.read())
-        # Forward ETag for client-side checks/caching if present
-        if "ETag" in upstream.headers:
-            resp.headers["ETag"] = upstream.headers["ETag"]
+        await resp.prepare(request)
+        body = obj["Body"]
+        while True:
+            chunk = await body.read(65536)
+            if not chunk:
+                break
+            await resp.write(chunk)
+        await resp.write_eof()
         return resp
+
+
+async def aws_create_bucket(
+    request: aiohttp.web.Request,
+) -> aiohttp.web.Response:
+    """Proxy bucket creation request to a compatible AWS API."""
+    session = await aiohttp_session.get_session(request)
+    client = request.app["api_client"]
+    logger = request.app["Log"]
+    project = request.match_info["project"]
+    bucket = request.match_info["bucket"]
+
+    logger.info(
+        f"API call to create bucket {bucket} in {project} from "
+        f"{request.remote}, sess: {session} :: {time.ctime()}"
+    )
+
+    creds = await _get_ec2_credentials(session, client, project)
+    s3session = aioboto3.Session(
+        aws_access_key_id=creds["access"],
+        aws_secret_access_key=creds["secret"],
+    )
+
+    async with s3session.client(
+        "s3",
+        region_name="us-east-1",
+        endpoint_url=setd["s3api_endpoint"],
+        verify=setd["check_certificate"],
+    ) as s3_client:
+        try:
+            await s3_client.create_bucket(Bucket=bucket)
+        except botocore.exceptions.ClientError as e:
+            error_code = e.response["Error"]["Code"]
+            http_status = e.response.get("ResponseMetadata", {}).get("HTTPStatusCode")
+            logger.info(
+                f"CreateBucket failed for {bucket} in {project} with error code "
+                f"{error_code} (HTTP {http_status})."
+            )
+            # RGW/S3 report the error as a symbolic string code, not an int.
+            if (
+                error_code in {"BucketAlreadyExists", "BucketAlreadyOwnedByYou"}
+                or http_status == 409
+            ):
+                raise aiohttp.web.HTTPConflict(text="Bucket already exists")
+            if error_code in {
+                "AccessDenied",
+                "UserSuspended",
+                "InvalidAccessKeyId",
+                "SignatureDoesNotMatch",
+            } or http_status in {401, 403}:
+                raise aiohttp.web.HTTPUnauthorized(
+                    text="Unauthorized. Project storage might be suspended "
+                    "or credentials stale."
+                )
+            if http_status == 400:
+                raise aiohttp.web.HTTPBadRequest(
+                    text="Could not create requested bucket."
+                )
+            raise aiohttp.web.HTTPInternalServerError(
+                text="Could not create requested bucket."
+            )
+
+    # Add CORS entries for the newly created bucket to allow access via browser
+    await _update_bucket_cors(logger, s3session, bucket)
+
+    return aiohttp.web.Response(status=204, body="")
+
+
+async def _update_bucket_cors(
+    logger,
+    s3session: aioboto3.Session,
+    bucket: str,
+):
+    """Update single bucket cors entry."""
+    async with s3session.client(
+        "s3",
+        region_name="us-east-1",
+        endpoint_url=setd["s3api_endpoint"],
+        verify=setd["check_certificate"],
+    ) as s3_client:
+        # Fetch the existing bucket CORS information
+        cors_list = []
+        try:
+            cors_response = await s3_client.get_bucket_cors(Bucket=bucket)
+            cors_list = cors_response.get("CORSRules", [])
+        except botocore.exceptions.ClientError as e:
+            error_code = e.response["Error"]["Code"]
+            if error_code == 404 or error_code == "NoSuchCORSConfiguration":
+                # 404 means there's no existing CORS
+                logger.debug(f"No existing CORS in {bucket}, creating from scratch.")
+                pass
+            elif error_code == 400:
+                raise aiohttp.web.HTTPClientError
+            else:
+                raise aiohttp.web.HTTPInternalServerError
+        except botocore.exceptions.ParamValidationError:
+            # We don't need to care about the bucket name validation errors for old buckets.
+            return
+
+        # Skip immediately if the required CORS entry already exists
+        for cors in cors_list:
+            if setd["web_app_cors_origin"] in cors["AllowedOrigins"]:
+                return
+
+        # Append the SD Connect UI to the CORS listing
+        try:
+            cors_list.append(
+                {
+                    "AllowedHeaders": [
+                        "*",
+                    ],
+                    "AllowedMethods": [
+                        "PUT",
+                        "GET",
+                        "DELETE",
+                        "POST",
+                        "HEAD",
+                    ],
+                    "AllowedOrigins": [
+                        setd["web_app_cors_origin"],
+                        f"{setd['web_app_cors_origin']}/",
+                    ],
+                    "ExposeHeaders": [
+                        "*",
+                    ],
+                    "MaxAgeSeconds": 3600,
+                }
+            )
+            await s3_client.put_bucket_cors(
+                Bucket=bucket,
+                CORSConfiguration={
+                    "CORSRules": cors_list,
+                },
+            )
+        except botocore.exceptions.ClientError as e:
+            error_code = e.response["Error"]["Code"]
+            raise aiohttp.web.HTTPInternalServerError(
+                text=f"Could not add the CORS entry to bucket {bucket}, status {error_code}"
+            )
+
+
+async def aws_head_bucket(
+    request: aiohttp.web.Request,
+) -> aiohttp.web.Response:
+    """Proxy a head bucket request to check bucket existence."""
+    session = await aiohttp_session.get_session(request)
+    client = request.app["api_client"]
+    logger = request.app["Log"]
+    project = request.match_info["project"]
+    bucket = request.match_info["bucket"]
+
+    logger.info(
+        f"API call to head bucket {bucket} from project {project}"
+        f"{request.remote}, sess: {session} :: {time.ctime()}"
+    )
+
+    creds = await _get_ec2_credentials(session, client, project)
+    s3session = aioboto3.Session(
+        aws_access_key_id=creds["access"],
+        aws_secret_access_key=creds["secret"],
+    )
+
+    async with s3session.client(
+        "s3",
+        region_name="us-east-1",
+        endpoint_url=setd["s3api_endpoint"],
+        verify=setd["check_certificate"],
+    ) as s3_client:
+        try:
+            await s3_client.head_bucket(Bucket=bucket)
+            return aiohttp.web.Response(status=200)
+        except botocore.exceptions.ClientError as e:
+            status = e.response["ResponseMetadata"]["HTTPStatusCode"]
+            return aiohttp.web.Response(status=status)
+
+
+async def aws_update_bucket_cors(
+    request: aiohttp.web.Request,
+) -> aiohttp.web.Response:
+    """Update a bucket acl to allow access from the configured UI address."""
+    session = await aiohttp_session.get_session(request)
+    client = request.app["api_client"]
+    logger = request.app["Log"]
+    project = request.match_info["project"]
+    bucket = request.match_info["bucket"]
+
+    logger.info(
+        f"API call to update {bucket} CORS in {project} from "
+        f"{request.remote}, sess: {session} :: {time.ctime()}"
+    )
+
+    creds = await _get_ec2_credentials(session, client, project)
+    s3session = aioboto3.Session(
+        aws_access_key_id=creds["access"],
+        aws_secret_access_key=creds["secret"],
+    )
+
+    await _update_bucket_cors(logger, s3session, bucket)
+
+    return aiohttp.web.Response(status=204, body="")
+
+
+async def aws_bulk_update_bucket_cors(
+    request: aiohttp.web.Request,
+) -> aiohttp.web.Response:
+    """Update project buckets with project UI cors."""
+    session = await aiohttp_session.get_session(request)
+    client = request.app["api_client"]
+    logger = request.app["Log"]
+    project = request.match_info["project"]
+
+    buckets = [b for b in request.query.get("buckets", "").split(";") if b]
+
+    logger.info(
+        f"API call to allow CORS for all buckets in {project} from "
+        f"{request.remote}, sess: {session} :: {time.ctime()}"
+    )
+
+    creds = await _get_ec2_credentials(session, client, project)
+    s3session = aioboto3.Session(
+        aws_access_key_id=creds["access"],
+        aws_secret_access_key=creds["secret"],
+    )
+
+    async with s3session.client(
+        "s3",
+        region_name="us-east-1",
+        endpoint_url=setd["s3api_endpoint"],
+        verify=setd["check_certificate"],
+    ) as s3_client:
+        # If we got a list of buckets, just use that instead of paging
+        # through the whole project
+        if buckets:
+            for bucket in buckets:
+                try:
+                    await _update_bucket_cors(logger, s3session, bucket)
+                except Exception as e:
+                    request.app["Log"].error(
+                        f"Failed to bulk add CORS to bucket {bucket} for reason {e}",
+                    )
+
+            return aiohttp.web.Response(status=204, body="")
+
+        continuation_token = ""  # nosec
+        try:
+            # Using the anti-pattern while since we need to check the continuation token
+            # in the end of loop execution, not start
+            while True:
+                bucket_page = await s3_client.list_buckets(
+                    MaxBuckets=100,
+                    ContinuationToken=continuation_token,
+                )
+
+                # Immediately apply new cors to the bucket
+                for aws_bucket in bucket_page["Buckets"]:
+                    try:
+                        await _update_bucket_cors(logger, s3session, aws_bucket["Name"])
+                    except Exception as e:
+                        request.app["Log"].error(
+                            f"Failed to bulk add CORS to bucket "
+                            f"{aws_bucket['Name']} for reason {e}",
+                        )
+
+                # End execution if API tells us there's no more pages
+                if (
+                    "ContinuationToken" in bucket_page
+                    and bucket_page["ContinuationToken"]
+                ):
+                    continuation_token = bucket_page["ContinuationToken"]
+                else:
+                    break
+
+        except botocore.exceptions.ClientError as e:
+            error_code = e.response["Error"]["Code"]
+            raise aiohttp.web.HTTPInternalServerError(
+                text=f"Could not retrieve bucket page for {project}, status {error_code}"
+            )
+
+    return aiohttp.web.Response(status=204, body="")
+
+
+async def _get_ec2_credentials(session, client, project) -> dict:
+    """Return access key and secret key for the given project."""
+    # Return credentials from cache if they exist
+    if "ec2" in session["projects"][project]:
+        return session["projects"][project]["ec2"]
+
+    # Check if there are existing credentials, use the first one
+    async with client.get(
+        f"{setd['auth_endpoint_url']}/users/{session['uid']}/credentials/OS-EC2",
+        headers={
+            "X-Auth-Token": session["projects"][project]["token"],
+        },
+    ) as ret:
+        creds = await ret.json()
+        keys = list(
+            filter(
+                lambda key: key["tenant_id"] == project,
+                creds["credentials"],
+            )
+        )
+
+    if len(keys) > 0:
+        return keys[0]
+
+    # Create new credentials if there are no existing ones
+    async with client.post(
+        f"{setd['auth_endpoint_url']}/users/{session['uid']}/credentials/OS-EC2",
+        headers={
+            "X-Auth-Token": session["projects"][project]["token"],
+        },
+        json={
+            "tenant_id": project,
+        },
+    ) as ret:
+        session["projects"][project]["ec2"] = (await ret.json())["credential"]
+        session.changed()
+        return session["projects"][project]["ec2"]
+
+
+async def keystone_gen_ec2(request: aiohttp.web.Request) -> aiohttp.web.Response:
+    """Acquire and serve EC2 credentials for the given project."""
+    session = await aiohttp_session.get_session(request)
+    client = request.app["api_client"]
+    project = request.match_info["project"]
+
+    request.app["Log"].info(
+        f"API call for fetching ec2 credentials from {request.remote}, sess {session}"
+    )
+
+    # Fetch the ec2 credentials if they're not already cached in the session.
+    return aiohttp.web.json_response(await _get_ec2_credentials(session, client, project))
+
+
+async def replicate_bucket(
+    request: aiohttp.web.Request,
+) -> aiohttp.web.Response:
+    """Replicate bucket using ec2 credentials."""
+    session = await aiohttp_session.get_session(request)
+    client = request.app["api_client"]
+    logger = request.app["Log"]
+
+    project = request.match_info["project"]
+    bucket = request.match_info["bucket"]
+    source_bucket = request.query["from_bucket"]
+    source_project = request.query["from_project"]
+
+    logger.info(
+        f"API call to replicate bucket {source_bucket} to {bucket} from "
+        f"{request.remote}, sess: {session} :: {time.ctime()}"
+    )
+
+    creds = await _get_ec2_credentials(session, client, project)
+
+    s3session = aioboto3.Session(
+        aws_access_key_id=creds["access"],
+        aws_secret_access_key=creds["secret"],
+    )
+
+    s3_client_context = s3session.client(
+        "s3",
+        region_name="us-east-1",
+        endpoint_url=setd["s3api_endpoint"],
+        verify=setd["check_certificate"],
+    )
+
+    s3_client = await s3_client_context.__aenter__()
+
+    replicator = ObjectReplicator(
+        s3_client,
+        project,
+        bucket,
+        source_project,
+        source_bucket,
+    )
+
+    # Create destination bucket
+    await replicator.create_destination_bucket()
+    # Add CORS entries for the newly created bucket to allow access via browser
+    await _update_bucket_cors(logger, s3session, bucket)
+
+    async def run_replication() -> None:
+        try:
+            await replicator.replicate_objects()
+        finally:
+            await s3_client_context.__aexit__(None, None, None)
+
+    asyncio.create_task(run_replication())
+
+    return aiohttp.web.HTTPAccepted(text="Replication started")

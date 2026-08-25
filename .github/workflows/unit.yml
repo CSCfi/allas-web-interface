@@ -1,0 +1,52 @@
+name: Python Unit Tests
+
+on:
+  pull_request:
+
+jobs:
+  unit_test:
+    strategy:
+      max-parallel: 4
+      matrix:
+        os: [ubuntu-latest]
+        python-version: ["3.12"]
+        node: ["20"]
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install tox tox-gh-actions coverage
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 8
+      - name: Use Node.js ${{ matrix.node }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: "pnpm"
+          cache-dependency-path: swift_browser_ui_frontend/pnpm-lock.yaml
+      - name: Install frontend
+        run: |
+          pushd swift_browser_ui_frontend
+          pnpm install --prod
+          pnpm run docker-build
+      - name: Run unit tests
+        run: |
+          tox -e pytest
+          coverage lcov -o lcov.info
+      - name: Send coverage to coveralls
+        # Coverage upload is informational; a coveralls.io outage must not
+        # fail the test job (the tests themselves have already passed here)
+        continue-on-error: true
+        uses: coverallsapp/github-action@master
+        with:
+          github-token: ${{ secrets.github_token }}
+          path-to-lcov: lcov.info

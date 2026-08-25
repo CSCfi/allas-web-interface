@@ -10,12 +10,22 @@
             finished
               ? type === "upload"
                 ? $t("message.upload.complete")
-                : $t("message.download.complete")
+                : usingServiceWorker
+                  ? $t("message.download.startedInBrowser")
+                  : $t("message.download.complete")
               : type === "upload"
                 ? $t("message.upload.inProgress")
-                : isProgressing
-                  ? $t("message.download.inProgress")
-                  : $t("message.download.gathering")
+                : usingServiceWorker
+                  ? $t("message.download.startedInBrowser")
+                  : isProgressing
+                    ? $t("message.download.inProgress")
+                    : $t("message.download.gathering")
+          }} {{
+            !finished
+              ? type === "upload"
+                ? ""
+                : ""
+              : ""
           }}
         </h3>
         <c-icon-button
@@ -99,14 +109,14 @@ export default {
   computed: {
     otherNotification() {
       return this.type === "upload"
-        ? this.$store.state.downloadNotification
-        : this.$store.state.uploadNotification;
+        ? this.$store.downloadNotification
+        : this.$store.uploadNotification;
     },
     otherNotificationType() {
       return this.type === "upload" ? "download" : "upload";
     },
     isProgressing() {
-      return this.$store.state.downloadProgress !== undefined;
+      return this.$store.downloadProgress !== undefined;
     },
     usingServiceWorker() {
       return "serviceWorker" in navigator
@@ -202,5 +212,9 @@ h3 {
   display: inherit;
   flex-direction: inherit;
   gap: 0.5rem;
+}
+
+c-button {
+  width: max-content;
 }
 </style>

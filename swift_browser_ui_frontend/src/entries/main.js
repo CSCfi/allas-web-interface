@@ -1,5 +1,6 @@
 // Project main imports
 import { createApp } from "vue";
+import { createPinia } from "pinia";
 import BrowserPage from "@/pages/BrowserPage.vue";
 import router from "@/common/router";
 
@@ -14,50 +15,46 @@ import EditTagsModal from "@/components/EditTagsModal.vue";
 import ShareModal from "@/components/ShareModal.vue";
 import CopyBucketModal from "@/components/CopyBucketModal.vue";
 import DeleteModal from "@/components/DeleteModal.vue";
-import TokenModal from "@/components/TokenModal.vue";
-import CopyProgressToast from "@/components/CopyProgressToast.vue";
 import ObjectInfoModal from "@/components/ObjectInfoModal.vue";
 import PreviewOpenedToast from "@/components/PreviewOpenedToast.vue";
 
-
-
-
 // CSC UI things
-import { applyPolyfills, defineCustomElements } from "allas-ui/dist/loader";
-import { vControl } from "@/common/csc-ui-vue-directive";
+import { defineCustomElements } from "@cscfi/csc-ui/loader";
+import { vControl } from "@cscfi/csc-ui-vue";
 
 // Project JS functions
 import { i18n } from "@/common/i18n";
-import { getUser, setProjectSuspendedHandler } from "@/common/api";
-import { getProjects } from "@/common/api";
+import {
+  getUser,
+  getProjects,
+  setProjectSuspendedHandler,
+} from "@/common/api";
 
 // Import SharingView and Request API
 import SwiftXAccountSharing from "@/common/swift_x_account_sharing_bind";
-import SwiftSharingRequest from "@/common/swift_sharing_request_bind";
 
 // Import container ACL sync
-import { syncContainerACLs, DEV } from "@/common/conv";
-import checkIDB from "@/common/idb_support";
+import { syncBucketPolicies } from "@/common/share";
+import { DEV } from "@/common/globalFunctions";
 
 // Import project state
-import store from "@/common/store";
+import useStore from "@/common/store";
 
 // Import project css
 import "@/assets/main.css";
 
 // Upload and direct download notification handler
 import ProgressNotification from "@/components/ProgressNotification.vue";
-import DownloadStartedToast from "@/components/DownloadStartedToast.vue";
-
+import CopyProgressToast from "@/components/CopyProgressToast.vue";
 
 //Custom footer element
 import CFooter from "@/components/CFooter.vue";
 
-import { getDB } from "@/common/db";
-import UploadSocket from "@/common/socket";
+import { getDB, checkIDB } from "@/common/idb";
+import { updateProjectSharingSyncTime } from "@/common/idbFunctions";
 
 // Import global functions
-import { removeFocusClass } from "@/common/keyboardNavigation";
+import { initS3 } from "@/common/s3init";
 
 checkIDB().then(result => {
   if (!result) {
@@ -80,10 +77,9 @@ window.addEventListener("rejectionhandled", function (event) {
 });
 
 // Configure csc-ui
-applyPolyfills().then(() => {
-  defineCustomElements();
-});
+defineCustomElements();
 
+const pinia = createPinia();
 const app = createApp({
   components: {
     CFooter,
@@ -94,13 +90,11 @@ const app = createApp({
     FolderModal,
     UploadModal,
     ProgressNotification,
+    CopyProgressToast,
     EditTagsModal,
     ShareModal,
     CopyBucketModal,
     DeleteModal,
-    TokenModal,
-    DownloadStartedToast,
-    CopyProgressToast,
     ObjectInfoModal,
     PreviewOpenedToast,
   },
@@ -111,98 +105,98 @@ const app = createApp({
   },
   computed: {
     projects() {
-      return this.$store.state.projects;
+      return this.$store.projects;
     },
     multipleProjects() {
-      return this.$store.state.multipleProjects;
+      return this.$store.multipleProjects;
     },
     langs() {
-      return this.$store.state.langs;
+      return this.$store.langs;
     },
     active() {
-      return this.$store.state.active;
+      return this.$store.active;
     },
     user() {
-      return this.$store.state.uname;
+      return this.$store.uname;
     },
     isUploading() {
-      return this.$store.state.isUploading;
+      return this.$store.isUploading;
     },
     displayUploadNotification() {
-      return this.$store.state.uploadNotification.visible;
+      return this.$store.uploadNotification.visible;
     },
     displayDownloadNotification() {
-      return this.$store.state.downloadNotification.visible;
+      return this.$store.downloadNotification.visible;
     },
     openConfirmRouteModal: {
       get() {
-        return this.$store.state.openConfirmRouteModal;
+        return this.$store.openConfirmRouteModal;
       },
       set(newState) {
-        return newState;
+        this.$store.toggleConfirmRouteModal(newState);
       },
     },
     openCreateBucketModal: {
       get() {
-        return this.$store.state.openCreateBucketModal;
+        return this.$store.openCreateBucketModal;
       },
       set(newState) {
-        return newState;
+        this.$store.toggleCreateBucketModal(newState);
       },
     },
     openUploadModal: {
       get() {
-        return this.$store.state.openUploadModal;
+        return this.$store.openUploadModal;
       },
       set(newState) {
-        return newState;
+        this.$store.toggleUploadModal(newState);
       },
     },
     openEditTagsModal: {
       get() {
-        return this.$store.state.openEditTagsModal;
+        return this.$store.openEditTagsModal;
       },
       set(newState) {
-        return newState;
+        this.$store.toggleEditTagsModal(newState);
       },
     },
     openCopyBucketModal: {
       get() {
-        return this.$store.state.openCopyBucketModal;
+        return this.$store.openCopyBucketModal;
       },
       set(newState) {
-        return newState;
+        this.$store.toggleCopyBucketModal(newState);
       },
     },
     openDeleteModal: {
       get() {
-        return this.$store.state.openDeleteModal;
+        return this.$store.openDeleteModal;
       },
       set(newState) {
-        return newState;
+        this.$store.toggleDeleteModal(newState);
+      },
+    },
+    openObjectInfoModal: {
+      get() {
+        return this.$store.openObjectInfoModal;
+      },
+      set(newState) {
+        this.$store.toggleObjectInfoModal(newState);
       },
     },
     openShareModal: {
       get() {
-        return this.$store.state.openShareModal;
+        return this.$store.openShareModal;
       },
-      set() { },
-    },
-    openTokenModal: {
-      get() {
-        return this.$store.state.openTokenModal;
+      set(newState) {
+        this.$store.toggleShareModal(newState);
       },
-      set() { },
     },
-    prevActiveEl() {
-      return this.$store.state.prevActiveEl;
+    s3download() {
+      return this.$store.s3download;
     },
-    socket() {
-      return this.$store.state.socket;
-    },
-    openObjectInfoModal: {
-      get() { return this.$store.state.openObjectInfoModal; },
-      set() {},
+    s3upload() {
+      return this.$store.s3upload;
     },
   },
   watch: {
@@ -221,42 +215,37 @@ const app = createApp({
       }
     },
   },
-  created() {
+  async created() {
     document.title = this.$t("message.program_name");
 
     setProjectSuspendedHandler(suspended => {
-      this.$store.commit("setProjectSuspended", suspended);
+      this.$store.setProjectSuspended(suspended);
     });
 
     let initialize = async () => {
       let active;
       let user = await getUser();
       let projects = await getProjects();
-      this.$store.commit("setUname", user);
-      this.$store.commit("setProjects", projects);
+      this.$store.setUname(user);
+      this.$store.setProjects(projects);
 
-      const existingProjects = await getDB().projects
+      // Sync projects instead of bulkPut to preserve last share sync data
+      const existingProjectIDs = await getDB().projects
         .toCollection()
         .primaryKeys();
-      await getDB().projects.bulkPut(projects);
 
+      const toPut = projects.filter(proj => !existingProjectIDs.includes(proj.id));
+      const toDelete = existingProjectIDs.filter(id => !projects.some(proj => proj.id === id));
 
-      const toDelete = [];
-      existingProjects.map(async oldProj => {
-        if (!projects.find(proj => proj.id === oldProj)) {
-          toDelete.push(oldProj);
-        }
-      });
+      if (toPut.length) {
+        await getDB().projects.bulkPut(toPut);
+      }
+
       if (toDelete.length) {
         await getDB().projects.bulkDelete(toDelete);
-        const containersCollection = await getDB().containers
+        await getDB().containers
           .where("projectID")
-          .anyOf(toDelete);
-        const containers = await containersCollection.primaryKeys();
-        await containersCollection.delete();
-        await getDB().objects
-          .where("containerID")
-          .anyOf(containers)
+          .anyOf(toDelete)
           .delete();
       }
 
@@ -273,7 +262,7 @@ const app = createApp({
             )
           ];
       }
-      this.$store.commit("setActive", active);
+      this.$store.setActive(active);
 
       if (document.location.pathname == "/browse") {
         this.$router.replace({
@@ -287,8 +276,7 @@ const app = createApp({
       let discovery = await fetch("/discover");
       discovery = await discovery.json();
       if (discovery.sharing_endpoint) {
-        this.$store.commit(
-          "setSharingClient",
+        this.$store.setSharingClient(
           new SwiftXAccountSharing(
             discovery.sharing_endpoint,
             document.location.origin,
@@ -296,87 +284,45 @@ const app = createApp({
         );
 
         // Cache id information
-        await this.$store.state.client.projectCacheIDs(
-          this.$store.state.active.id,
-          this.$store.state.active.name,
+        await this.$store.sharingClient.projectCacheIDs(
+          this.$store.active.id,
+          this.$store.active.name,
         );
       }
-      if (discovery.request_endpoint) {
-        this.$store.commit(
-          "setRequestClient",
-          new SwiftSharingRequest(
-            discovery.request_endpoint,
-            document.location.origin,
-          ),
-        );
-      }
-      this.initSocket().then(
-        () => {if (DEV) console.log("Initialized the websocket.");},
-      );
+      await initS3(this.active.id, this.active.name, this.$store, this.$t);
     };
-    initialize().then(() => {
-      if(DEV) console.log("Initialized successfully.");
-    });
-    setTimeout(this.containerSyncWrapper, 10000);
-  },
-  mounted() {
-    document
-      .getElementById("mainContainer")
-      .addEventListener("keydown", this.onKeydown);
+    await initialize();
+    if (DEV) console.log("Initialized successfully.");
+
+    await this.syncSharingIfStale();
   },
   methods: {
-    initSocket: async function () {
-      // Open the upload and download webworkers
-      let available = await navigator.storage.estimate();
-      // If there's less than 50GiB of storage available, try getting more.
-      // We're probably on Firefox, persisting should grant us more.
-      if (available.quota < 53687091200) {
-        await navigator.storage.persist();
-        if (await navigator.storage.persisted()) {
-          if (DEV) console.log("Storage persisted.");
-          // Update the quotas
-          available = await navigator.storage.estimate();
-        } else {
-          if (DEV) console.log(
-            "Couldn't persist storage, "
-            + "possible limited save space for downloads.",
-          );
-        }
+    /**
+     * Run project share sync and update last_share_sync time in IDB after a delay
+     * if project data in IDB shows that it hasn't been done in the past hour
+     */
+    syncSharingIfStale: async function () {
+      const staleAfterMs = 60 * 60 * 1000; // 1 hour
+      const delayMs = 10000;
+
+      const project = await getDB().projects.get(this.active.id);
+      const needsSync = !project.last_share_sync ||
+        Date.now() - project.last_share_sync.getTime() > staleAfterMs;
+      if (needsSync) {
+        setTimeout(async () => {
+          const synced = await syncBucketPolicies(project.id);
+          if (synced) {
+            await updateProjectSharingSyncTime(project.id);
+            this.$store.setSharingUpdated(true);
+          }
+        }, delayMs);
       }
-
-      if (DEV) console.log(
-        `${available.usage}/${available.quota} of available storage used.`,
-      );
-      if (DEV) console.log(
-        "Any downloads need to fit under this size when downloading.",
-      );
-
-      let workers = new UploadSocket(
-        this.$store.state.active,
-        this.$store.state.active.id,
-        this.$store,
-        this.$t,
-      );
-      workers.openSocket();
-      this.$store.commit("setSocket", workers);
     },
-    containerSyncWrapper: function () {
-      syncContainerACLs(this.$store).catch(() => {});
-    },
-    cancelUpload: function(container) {
-      this.socket.cancelUpload(container);
+    cancelUpload: function(bucket) {
+      this.s3upload.cancelUpload(bucket);
     },
     cancelDownload: function() {
-      this.socket.cancelDownload();
-    },
-    onKeydown: function (e) {
-      if (e.key === "Tab" && this.prevActiveEl &&
-        e.target === this.prevActiveEl) {
-        if(this.prevActiveEl.classList.contains("button-focus")) {
-          removeFocusClass(this.prevActiveEl);
-          this.$store.commit("setPreviousActiveEl", null);
-        }
-      }
+      this.s3download.cancelDownload();
     },
   },
   ...BrowserPage,
@@ -384,8 +330,11 @@ const app = createApp({
 
 app.use(i18n);
 app.use(router);
-app.use(store);
+app.use(pinia);
 app.directive("csc-control", vControl);
+
+// Pinia is geared toward multiple stores: ease migration and enforce single global store like Vuex
+app.config.globalProperties.$store = useStore();
 
 app.config.errorHandler = function (err, vm, info) {
   if (DEV) console.log("Vue error: ", err, vm, info);

@@ -1,0 +1,491 @@
+// Functions for handling s3 upload worker communication
+
+/*
+Upload cache schema:
+[bucket]: {
+  [key]: {
+    size: number,
+    isMultipart: bool,
+    multipartSession: string,
+    f: File,
+    finished: bool,
+    multipartParts: {
+      [orderNumber]: {
+        offset: number,
+        size: number,
+        done: bool,
+      }
+    }
+  }
+}
+*/
+
+/*
+Parts cache schema:
+{
+  bucket: string,
+  key: string,
+    orderNumber: number,
+    size: number,
+    offset: number,
+}
+*/
+
+import { toRaw } from "vue";
+import { DEV, timeout } from "./globalFunctions";
+import { awsCreateBucket, awsAddBucketCors } from "./api";
+import {
+  checkBucketAccessible,
+  awsCreateMultipartUpload,
+  awsCompleteMultipartUpload,
+  awsAbortMultipartUpload,
+} from "./s3commands";
+import { getContentType } from "../../wasm/js/mimeTypes";
+
+const MAX_UPLOAD_WORKERS = 8;
+const FILE_PART_SIZE = 52428800;
+
+export default class S3UploadSocket {
+  constructor(
+    active, // project id
+    project = "", // project name
+    store, // shared pinia store
+    t, // i18n bindings
+    s3access,
+    s3secret,
+    s3endpoint,
+  ) {
+    this.active = active;
+    this.project = project;
+    this.$store = store;
+    this.$t = t;
+    this.s3access = s3access;
+    this.s3secret = s3secret;
+    this.s3endpoint = s3endpoint;
+
+    this.inputFiles = {};
+    this.outputFiles = {};
+
+    this.uploads = {};
+    this.parts = [];
+    this.toInit = [];
+
+    this.downloadFinished = true;
+
+    this.totalSize = 0;
+    this.totalCompleted = 0;
+
+    // Initialize the workers.
+    // Upload workers will use each available logical thread, maximum
+    // of MAX_UPLOAD_WORKERS (Default: 8) threads will be used.
+    // One download worker should suffice.
+    this.upWorkers = [];
+    // Keep track of initialized workers to be able to block uploads until properly inited
+    this.workersInited = 0;
+    for (
+      let i = 0;
+      i < window.navigator.hardwareConcurrency && i < MAX_UPLOAD_WORKERS;
+      i++
+    ) {
+      this.upWorkers.push(new Worker("/s3upworker.js"));
+    }
+    if (DEV) {
+      console.log(`${this.upWorkers.length} upload worker threads were created`);
+      console.log(this.upWorkers);
+    }
+
+    this.toastMessage = {
+      duration: 6000,
+      persistent: false,
+      progress: false,
+    };
+
+    // Create message handlers for upload workers.
+    // createS3Client is sent per-worker only after runtimeInitialized fires,
+    // because the WASM-based worker's message listener isn't ready until then.
+    for (const worker of this.upWorkers) {
+      worker.onmessage = this.getUploadWorkerHandler(worker);
+      worker.onerror = (e) => {
+        console.error("Upload worker error:", e.message, e.filename, e.lineno);
+      };
+    }
+  }
+
+  getUploadWorkerHandler(worker) {
+    return (e) => {
+      switch(e.data.eventType) {
+        case "uploadPartComplete":
+          if (DEV) {
+            console.log(
+              `A segment for ${e.data.bucket}/${e.data.key} was finished.`,
+            );
+          }
+          if (this.uploads[e.data.bucket][e.data.key].isMultipart) {
+            if (DEV) {
+              console.log(
+                `Multipart chunk ${e.data.orderNumber} for object ${e.data.key} was completed. ETag was ${e.data.ETag}`,
+              );
+            }
+
+            this.uploads[e.data.bucket][e.data.key].multipartParts[e.data.orderNumber].ETag =
+            e.data.ETag;
+            this.uploads[e.data.bucket][e.data.key].multipartParts[e.data.orderNumber].done = true;
+
+            this.checkFinishedFile(e.data.bucket, e.data.key).then(() => {
+              if (DEV) console.log(`Checked if file ${e.data.bucket}/${e.data.key} is finished.`);
+            });
+          } else {
+            if (DEV) {
+              console.log(`Flagging regular object ${e.data.bucket}/${e.data.key} as finished.`);
+            }
+            this.uploads[e.data.bucket][e.data.key].finished = true;
+          }
+
+          // Schedule next part if there's more to process,
+          // otherwise check if we're done.
+          if (this.parts.length > 0) {
+            if (DEV) console.log("Sending next part to worker.");
+            this.getNextPart(worker);
+          } else {
+            this.checkFinished().then(
+              () => {
+                if (DEV) console.log("Checked if all the parts are finished.");
+              },
+            );
+          }
+          break;
+        case "filesAdded":
+          if (DEV) console.log("Files added to WorkerFS");
+          break;
+        case "progress":
+          if (DEV) console.log(`Incrementing completed amount by ${e.data.amount}`);
+          this.totalCompleted += e.data.amount;
+          this.updateProgress();
+          break;
+        case "filesRemoved":
+          if (DEV) console.log("File handles closed in the WorkerFS");
+          break;
+        case "abort":
+          if (DEV) console.log(`Upload worker aborted: ${e.data.reason}`);
+          this.$store.setUploadAbortReason(e.data.reason);
+          this.finalizeUpload();
+          break;
+        case "runtimeInitialized":
+          if (DEV) console.log("Worker initialized Webassembly runtime.");
+          // Worker's message listener is now ready — send S3 credentials
+          worker.postMessage({
+            command: "createS3Client",
+            access: this.s3access,
+            secret: this.s3secret,
+            endpoint: this.s3endpoint,
+          });
+          // Intentionally omit break to flow to next block
+        case "s3ClientCreated":
+          if (DEV && e.data.eventType === "s3ClientCreated") {
+            console.log("Worker created an S3 client session.");
+          }
+          // Bump init count and check if ready
+          this.workersInited++;
+          // We need two init steps per worker, for s3 and wasm
+          if (this.workersInited >= this.upWorkers.length * 2) {
+            if (DEV) console.log("Flagging upload workers as initialized");
+            this.$store.setWorkersInitializing(false);
+          }
+          break;
+      }
+    };
+  }
+
+  // Wrapper for updating upload progress
+  updateProgress() {
+    if (DEV) {
+      `Updating progress to ${this.totalCompleted / this.totalSize}`;
+    }
+
+    this.$store.updateProgress(this.totalCompleted / this.totalSize);
+  }
+
+  // Check if all the parts are done
+  async checkFinished() {
+    let finished = true;
+    for (const bucket of Object.keys(this.uploads)) {
+      for (const key of Object.keys(this.uploads[bucket])) {
+        if (!this.uploads[bucket][key].finished) {
+          finished = false;
+          break;
+        }
+      }
+    }
+
+    if (finished) {
+      if (DEV) {
+        console.log("Upload has finished.");
+      }
+      this.finalizeUpload();
+    }
+  }
+
+  async checkFinishedFile(bucket, key) {
+    let finished = true;
+    for (const part of Object.keys(this.uploads[bucket][key].multipartParts)) {
+      if (!this.uploads[bucket][key].multipartParts[part].done) {
+        finished = false;
+        break;
+      }
+    }
+
+    if (finished) {
+      if (DEV) console.log(`File ${bucket}/${key} is finished, completing multipart.`);
+      this.uploads[bucket][key].finished = true;
+
+      let parts = [];
+      for (const entry of Object.entries(
+        this.uploads[bucket][key].multipartParts,
+      )) {
+        parts.push({
+          PartNumber: Number(entry[0]),
+          ETag: entry[1].ETag.replaceAll("\"", ""),
+        });
+      }
+
+      const response = await awsCompleteMultipartUpload(
+        bucket,
+        key,
+        parts,
+        this.uploads[bucket][key].multipartSession,
+      );
+      if (DEV) {
+        console.log(`Got following response when completing multipart upload ${this.uploads[bucket][key]}: ${response}`);
+      }
+    }
+  }
+
+  async getNextPart(worker) {
+    let nextPart = this.parts.pop();
+
+    if (nextPart === undefined) {
+      return;
+    }
+
+    if (this.uploads[nextPart.bucket][nextPart.key].multipartKeyPending){
+      while (
+        this.uploads[nextPart.bucket][nextPart.key].multipartSession === ""
+      ) {
+        await timeout(250);
+      }
+    }
+
+    if (
+      this.uploads[nextPart.bucket][nextPart.key].isMultipart
+      && this.uploads[nextPart.bucket][nextPart.key].multipartSession === ""
+    ) {
+      this.uploads[nextPart.bucket][nextPart.key].multipartKeyPending = true;
+
+      const response = await awsCreateMultipartUpload(
+        nextPart.bucket,
+        nextPart.key,
+        "bucket-owner-full-control",
+        getContentType(
+          toRaw(this.uploads[nextPart.bucket][nextPart.key].f),
+          nextPart.key,
+        ),
+        { created: `${Math.floor(Date.now() / 1000)}` },
+      );
+
+      this.uploads[nextPart.bucket][nextPart.key].multipartSession = response.UploadId;
+
+      if (DEV) {
+        console.log(`Starting upload for ${nextPart.bucket}/${nextPart.key} with upload id ${response.UploadId}`);
+      }
+    }
+    worker.postMessage({
+      command: "nextPart",
+      part: toRaw(nextPart),
+      session: this.uploads[nextPart.bucket][nextPart.key].multipartSession,
+    });
+  }
+
+  // Start the parts queue consumption
+  async beginUpload() {
+    for (const worker of this.upWorkers) {
+      await this.getNextPart(worker);
+    }
+  }
+
+  // Queue a file for uploading
+  async processFile(bucket, key) {
+    if (this.uploads[bucket][key].isMultipart) {
+      let partsTotal = Math.floor(
+        this.uploads[bucket][key].size / FILE_PART_SIZE,
+      );
+      let finalPart = this.uploads[bucket][key].size % FILE_PART_SIZE;
+
+      for (let i = 0; i < partsTotal; i++) {
+        this.parts.push({
+          bucket: bucket,
+          key: key,
+          orderNumber: i + 1,
+          size: FILE_PART_SIZE,
+          offset: i * FILE_PART_SIZE,
+        });
+        this.uploads[bucket][key].multipartParts[i + 1] = {
+          offset: i * FILE_PART_SIZE,
+          size: FILE_PART_SIZE,
+          done: false,
+        };
+      }
+
+      if (finalPart > 0) {
+        this.parts.push({
+          bucket: bucket,
+          key: key,
+          orderNumber: partsTotal + 1,
+          size: finalPart,
+          offset: partsTotal * FILE_PART_SIZE,
+        });
+        this.uploads[bucket][key].multipartParts[partsTotal + 1] = {
+          offset: partsTotal * FILE_PART_SIZE,
+          size: finalPart,
+          done: false,
+        };
+      }
+    } else {
+      this.parts.push({
+        bucket: bucket,
+        key: key,
+        orderNumber: 0,
+        size: this.uploads[bucket][key].size,
+        offset: 0,
+      });
+    }
+  }
+
+  // Add files for upload
+  async addUploads(bucket, files) {
+    // If the upload is already defined, we're adding files to an ongoing
+    // upload – no need to check existence or initialization.
+    if (this.uploads[bucket] === undefined) {
+      // Check that the bucket exists and can be accessed
+      const accessible = await checkBucketAccessible(bucket);
+      if (!accessible) {
+        // If there's no metadata, we're likely running into a CORS
+        // error. It may mean that the bucket doesn't exist, or that
+        // the bucket CORS doesn't exist. Let's try implicitly creating
+        // the bucket, and fixing CORS if that doesn't help.
+        try {
+          let resp = await awsCreateBucket(this.active, bucket);
+          switch (resp.status) {
+            case 400:
+              if (DEV) {
+                console.log(`Couldn't create bucket ${bucket} due to a client error.`);
+              }
+              return;
+            case 403:
+              if (DEV) {
+                console.log(
+                  `Couldn't create bucket ${bucket} due to it being forbidden.`,
+                );
+                console.log(
+                  "The bucket is probably owned by some other project.",
+                );
+              }
+              return;
+          }
+        } catch (e) {
+          if (DEV) console.log("Coudln't start upload, reason: ", e);
+          return;
+        }
+
+        // After creating the bucket, ensure we have CORS access
+        try {
+          await awsAddBucketCors(this.active, bucket);
+        } catch (e) {
+          if (DEV) {
+            console.error(`Couldn't add CORS for bucket ${bucket}`);
+          }
+          return;
+        }
+      }
+
+      this.uploads[bucket] = {};
+    }
+    this.totalSize = 0;
+    this.totalCompleted = 0;
+    if (DEV) console.log("Adding the listed files to the worker filesystems.");
+    // Preserve file paths
+    const filesWithPath = files.map((file) => ({ file: file, relativePath: file.relativePath }));
+    for (const worker of this.upWorkers) {
+      if (DEV) console.log(worker);
+      worker.postMessage({
+        command: "mountFiles",
+        bucket: bucket,
+        files: filesWithPath,
+      });
+    }
+
+    for (const file of files) {
+      if (DEV) console.log(`Adding file ${file.relativePath}`);
+      this.uploads[bucket][file.relativePath] = {
+        size: file.size,
+        isMultipart: file.size > 100 * 1024 * 1024,
+        multipartSession: "",
+        multipartKeyPending: false,
+        multipartParts: {},
+        finished: false,
+        f: file,
+      };
+
+      if (DEV) console.log(this.uploads[bucket][file.relativePath]);
+
+      await this.processFile(bucket, file.relativePath);
+      this.totalSize += file.size;
+    }
+    if (DEV) console.log(`Scheduled files for uploading in bucket ${bucket}`);
+    this.$store.eraseProgress();
+    this.$store.setUploading();
+    this.$store.updateProgress(0);
+    this.beginUpload().then(() => {
+      if (DEV) console.log("Upload started successfully.");
+    }).catch((err) => {
+      if (DEV) console.error("Upload failed to start:", err);
+      this.$store.setUploadAbortReason("error");
+      this.finalizeUpload();
+    });
+  }
+
+  // Cancel the ongoing upload in bucket
+  async cancelUpload(bucket) {
+    // Remove the ongoing parts in bucket
+    this.parts = this.parts.filter(part => part.bucket == bucket);
+
+    // Cancel each file that's being uploaded
+    if (DEV) console.log(`Terminating uploads in ${bucket}`);
+    for (const key in this.uploads[bucket]) {
+      // Cancel the multipart process
+      await awsAbortMultipartUpload(
+        bucket,
+        key,
+        this.uploads[bucket][key].multipartSession,
+      ).catch((err) => {
+        if (DEV) {
+          console.log("Failed to abort multipart on cancel.");
+          console.log(err);
+        }
+      });
+    }
+    this.finalizeUpload();
+  }
+
+  finalizeUpload() {
+    if (DEV) console.log("Erasing files from storage");
+    for (const worker of this.upWorkers) {
+      for (const bucket of Object.keys(this.uploads)) {
+        this.uploads[bucket] = {};
+        worker.postMessage({ command: "uploadFinished", bucket: bucket });
+      }
+    }
+    this.$store.eraseDropFiles();
+    this.$store.stopUploading();
+    this.$store.eraseProgress();
+  }
+}

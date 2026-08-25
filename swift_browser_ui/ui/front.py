@@ -10,22 +10,36 @@ from swift_browser_ui.ui.settings import setd
 
 
 async def up_swjs(_: aiohttp.web.Request) -> aiohttp.web.FileResponse:
-    """Serve worker js in worker scope."""
+    """Serve upload worker js in worker scope."""
     return aiohttp.web.FileResponse(
-        str(setd["static_directory"]) + "/upworker.js",
+        str(setd["static_directory"]) + "/s3upworker.js",
         headers={
             "Cache-Control": "no-cache, no-store, must-revalidate",
             "Pragma": "no-cache",
             "Expires": "0",
             "Service-Worker-Allowed": "/",
+            "Content-Type": "application/javascript",
         },
     )
 
 
 async def up_swasm(_: aiohttp.web.Request) -> aiohttp.web.FileResponse:
-    """Serve worker wasm in worker scope."""
+    """Serve upload worker wasm in worker scope."""
     return aiohttp.web.FileResponse(
-        str(setd["static_directory"]) + "/upworker.wasm",
+        str(setd["static_directory"]) + "/s3upworker.wasm",
+        headers={
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache",
+            "Expires": "0",
+            "Content-Type": "application/wasm",
+        },
+    )
+
+
+async def map_up_swjs(_: aiohttp.web.Request) -> aiohttp.web.FileResponse:
+    """Serve upload worker js dev map in worker scope."""
+    return aiohttp.web.FileResponse(
+        str(setd["static_directory"]) + "/crypt-post-s3upload.js.map",
         headers={
             "Cache-Control": "no-cache, no-store, must-revalidate",
             "Pragma": "no-cache",
@@ -36,61 +50,36 @@ async def up_swasm(_: aiohttp.web.Request) -> aiohttp.web.FileResponse:
 
 
 async def down_swjs(_: aiohttp.web.Request) -> aiohttp.web.FileResponse:
-    """Serve worker js in worker scope."""
+    """Serve download worker js in worker scope."""
     return aiohttp.web.FileResponse(
-        str(setd["static_directory"]) + "/downworker.js",
+        str(setd["static_directory"]) + "/s3downworker.js",
         headers={
             "Cache-Control": "no-cache, no-store, must-revalidate",
             "Pragma": "no-cache",
             "Expires": "0",
             "Service-Worker-Allowed": "/",
+            "Content-Type": "application/javascript",
         },
     )
 
 
 async def down_swasm(_: aiohttp.web.Request) -> aiohttp.web.FileResponse:
-    """Serve worker wasm in worker scope."""
+    """Serve download worker wasm in worker scope."""
     return aiohttp.web.FileResponse(
-        str(setd["static_directory"]) + "/downworker.wasm",
+        str(setd["static_directory"]) + "/s3downworker.wasm",
         headers={
             "Cache-Control": "no-cache, no-store, must-revalidate",
             "Pragma": "no-cache",
             "Expires": "0",
-            "Service-Worker-Allowed": "/",
+            "Content-Type": "application/wasm",
         },
     )
 
 
 async def map_down_swjs(_: aiohttp.web.Request) -> aiohttp.web.FileResponse:
-    """Serve worker js in worker scope."""
+    """Serve download worker js dev map in worker scope."""
     return aiohttp.web.FileResponse(
-        str(setd["static_directory"]) + "/downworker-post.js.map",
-        headers={
-            "Cache-Control": "no-cache, no-store, must-revalidate",
-            "Pragma": "no-cache",
-            "Expires": "0",
-            "Service-Worker-Allowed": "/",
-        },
-    )
-
-
-async def map_up_swjs(_: aiohttp.web.Request) -> aiohttp.web.FileResponse:
-    """Serve worker js in worker scope."""
-    return aiohttp.web.FileResponse(
-        str(setd["static_directory"]) + "/upworker-post.js.map",
-        headers={
-            "Cache-Control": "no-cache, no-store, must-revalidate",
-            "Pragma": "no-cache",
-            "Expires": "0",
-            "Service-Worker-Allowed": "/",
-        },
-    )
-
-
-async def agg_swjs(_: aiohttp.web.Request) -> aiohttp.web.FileResponse:
-    """Serve worker js in worker scope."""
-    return aiohttp.web.FileResponse(
-        str(setd["static_directory"]) + "/aggregatorsw.js",
+        str(setd["static_directory"]) + "/crypt-post-s3download.js.map",
         headers={
             "Cache-Control": "no-cache, no-store, must-revalidate",
             "Pragma": "no-cache",

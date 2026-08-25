@@ -58,12 +58,6 @@ setd: Dict[str, Union[str, int, bool, None]] = {
     "sharing_internal_endpoint": environ.get(
         "BROWSER_START_SHARING_INT_ENDPOINT_URL", None
     ),
-    "request_endpoint": environ.get("BROWSER_START_REQUEST_ENDPOINT_URL", None),
-    "request_internal_endpoint": environ.get(
-        "BROWSER_START_REQUEST_INT_ENDPOINT_URL", None
-    ),
-    "upload_internal_endpoint": environ.get("BROWSER_START_RUNNER_ENDPOINT", None),
-    "upload_external_endpoint": environ.get("BROWSER_START_RUNNER_EXT_ENDPOINT", None),
     "sharing_request_token": environ.get("SWIFT_UI_SHARING_REQUEST_TOKEN", None),
     "has_trust": environ.get("BROWSER_START_HAS_TRUST", False),
     "set_origin_address": environ.get("BROWSER_START_SET_ORIGIN_ADDRESS", None),
@@ -86,6 +80,13 @@ setd: Dict[str, Union[str, int, bool, None]] = {
     "oidc_client_secret": environ.get("OIDC_CLIENT_SECRET", None),
     "oidc_redirect_uris": environ.get("OIDC_REDIRECT_URIS", ""),
     "sdconnect_enabled": environ.get("SDCONNECT_ENABLED", "False") == "True",
+    "s3api_endpoint": environ.get("S3_ENDPOINT", "http://localhost:8080"),
+    "check_certificate": (
+        False if environ.get("SWIFT_UI_CHECK_CERTIFICATES", "True") == "False" else True
+    ),
+    "web_app_cors_origin": environ.get(
+        "WEB_APP_CORS_ORIGIN", "https://sd-connect.devenv"
+    ),
 }
 
 

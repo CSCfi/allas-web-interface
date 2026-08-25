@@ -9,8 +9,9 @@ import typing
 # aiohttp
 import aiohttp.web
 import aiohttp_session
+from idpyoidc.client.exception import OidcServiceError
+from idpyoidc.exception import OidcMsgError
 from multidict import MultiDictProxy
-from oidcrp.exception import OidcServiceError
 
 from swift_browser_ui.ui._convenience import (
     disable_cache,
@@ -32,7 +33,7 @@ HAKA_OIDC_ENDPOINT = (
 async def oidc_start(request: aiohttp.web.Request) -> aiohttp.web.Response:
     """Redirect to OpenID Connect provider."""
     try:
-        oidc = request.app["oidc_client"].begin("oidc")
+        oidc_url = request.app["oidc_client"].begin("default")
     except Exception as e:
         # This can be caused if config is improperly configured, and
         # oidcrp is unable to fetch oidc configuration from the given URL
@@ -42,7 +43,7 @@ async def oidc_start(request: aiohttp.web.Request) -> aiohttp.web.Response:
         )
 
     response = aiohttp.web.Response(status=302, reason="Redirection to login")
-    response.headers["Location"] = oidc["url"]
+    response.headers["Location"] = oidc_url["url"]
     return response
 
 
@@ -66,16 +67,16 @@ async def oidc_end(
         request.app["Log"].error(f"OIDC not initialised: {e}")
         raise aiohttp.web.HTTPForbidden(reason="Bad OIDC session.")
 
-    oidc_session["auth_request"]["code"] = params["code"]
+    oidc_session["code"] = params["code"]
     # finalize requests id_token and access_token with code, validates them and requests userinfo data
     try:
         oidc_result = request.app["oidc_client"].finalize(
-            oidc_session["iss"], oidc_session["auth_request"]
+            oidc_session["iss"], oidc_session
         )
     except KeyError as e:
         request.app["Log"].error(f"Issuer {oidc_session['iss']} not found: {e}.")
         raise aiohttp.web.HTTPBadRequest(reason="Token issuer not found.")
-    except OidcServiceError as e:
+    except (OidcMsgError, OidcServiceError) as e:
         # This exception is raised if RPHandler encounters an error due to:
         # 1. "code" is wrong, so token request failed
         # 2. token validation failed
@@ -131,9 +132,18 @@ async def handle_login(
     response: typing.Union[aiohttp.web.Response, aiohttp.web.FileResponse]
     response = aiohttp.web.Response(status=302, reason="Redirection to login")
 
-    # Add a cookie for navigating
-    if "navto" in request.query.keys():
-        response.set_cookie("NAV_TO", request.query["navto"], expires=str(3600))
+    # Add a cookie for navigating. Only accept a same-site relative path to
+    # avoid cookie/header injection from the user-controlled query value.
+    navto = request.query.get("navto")
+    if (
+        navto
+        and navto.startswith("/")
+        and not navto.startswith("//")
+        and "\\" not in navto
+        and "\r" not in navto
+        and "\n" not in navto
+    ):
+        response.set_cookie("NAV_TO", navto, expires=str(3600))
 
     if setd["oidc_enabled"]:
         session = await aiohttp_session.get_session(request)
@@ -206,7 +216,7 @@ async def sso_query_begin_oidc(
 
 
 def test_token(
-    formdata: MultiDictProxy[typing.Union[str, bytes, aiohttp.web.FileField]],
+    formdata: MultiDictProxy[typing.Union[str, bytes, bytearray, aiohttp.web.FileField]],
     request: aiohttp.web.Request,
 ) -> str:
     """Validate unscoped token."""
@@ -370,6 +380,7 @@ async def login_with_token(
 
     session["referer"] = request.url.host
     uname = ""
+    uid = ""
 
     taint = True if setd["force_restricted_mode"] else False
 
@@ -435,6 +446,9 @@ async def login_with_token(
             if not uname:
                 uname = ret["token"]["user"]["name"]
 
+            if not uid:
+                uid = ret["token"]["user"]["id"]
+
             session["projects"][project["id"]] = {
                 "id": project["id"],
                 "name": project["name"],
@@ -445,6 +459,7 @@ async def login_with_token(
 
     session["token"] = token
     session["uname"] = uname
+    session["uid"] = uid
 
     # the intersection of sdConnectProjects and Allas projects is empty
     # in practice this might happen if there are sd connect projects that

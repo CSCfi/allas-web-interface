@@ -3,11 +3,10 @@
     <c-link
       :href="user ? '/browse' : '/'"
       target="_self"
-      color="dark-grey"
       weight="400"
     >
       <c-csc-logo />
-      <span>Allas</span>
+      <span>{{ $t('message.program_name') }} </span>
     </c-link>
     <c-spacer />
     <LanguageSelector />
@@ -25,6 +24,11 @@ export default {
 </script>
 
 <style scoped>
+c-link {
+  --_c-link-color: var(--c-tertiary-700);
+  --_c-link-hover: none;
+}
+
 c-toolbar span {
   display: inline-flex;
   align-items: center;

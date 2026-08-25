@@ -1,11 +1,9 @@
-all: upload download
+all: s3
 
-upload: build/upworker.js build/upworker.wasm
+s3: build/s3upworker.js build/s3downworker.js
 
-download: build/downworker.js build/downworker.wasm
-
-build/upworker.js:
-	emcc -O3 \
+build/s3upworker.js:
+	emcc -O0 \
 		-s WASM=1 \
 		-s TOTAL_MEMORY=268435456 \
 		-s ALLOW_MEMORY_GROWTH=1 \
@@ -13,11 +11,11 @@ build/upworker.js:
 		-s LLD_REPORT_UNDEFINED \
 		-s FORCE_FILESYSTEM=1 \
 		-o $@ \
-		--post-js build/upworker-post.js \
-		--pre-js js/crypt-pre.js
+		--post-js build/s3upworker-post.js \
+		--pre-js js/worker-pre.js
 
-build/downworker.js:
-	emcc -O3 \
+build/s3downworker.js:
+	emcc -O0 \
 		-s WASM=1 \
 		-s TOTAL_MEMORY=268435456 \
 		-s ALLOW_MEMORY_GROWTH=1 \
@@ -25,8 +23,8 @@ build/downworker.js:
 		-s LLD_REPORT_UNDEFINED \
 		-s FORCE_FILESYSTEM=1 \
 		-o $@ \
-		--post-js build/downworker-post.js \
-		--pre-js js/crypt-pre.js
+		--post-js build/s3downworker-post.js \
+		--pre-js js/worker-pre.js
 
 clean:
 	rm -rf build

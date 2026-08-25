@@ -106,14 +106,14 @@ Cypress.Commands.add("switchProject", () => {
 
 /* CONTAINER ACTIONS */
 
-Cypress.Commands.add("addbucket", (bucketName) => {
+Cypress.Commands.add("addBucket", (bucketName) => {
   cy.get("[data-testid='create-bucket']").click();
   cy.wait(1000);
   cy.get("[data-testid='bucket-name']").type(bucketName);
   cy.get("[data-testid='save-bucket']").click();
 });
 
-Cypress.Commands.add("searchbucket", (bucketName) => {
+Cypress.Commands.add("searchBucket", (bucketName) => {
   cy.get("[data-testid='search-box']")
     .find("input")
     .eq(0)
@@ -123,7 +123,7 @@ Cypress.Commands.add("searchbucket", (bucketName) => {
 
 /* DELETE */
 
-Cypress.Commands.add("deletebucket", (bucketName) => {
+Cypress.Commands.add("deleteBucket", (bucketName) => {
   cy.get("c-data-table")
       .contains(bucketName)
       .parent() //div
@@ -182,7 +182,7 @@ Cypress.Commands.add("deleteFilesOnPageCheckbox", () => {
 
 /* UPLOAD */
 
-Cypress.Commands.add("uploadFileFrombucket", (fileName) => {
+Cypress.Commands.add("uploadFileFromBucket", (fileName) => {
   //open upload modal
   cy.get("[data-testid='upload-file']").click({ force: true });
   cy.wait(3000);
@@ -297,10 +297,10 @@ Cypress.Commands.add("generateFixture", (name) => {
 Cypress.Commands.add("deleteFixtures", () => {
   //add command because config allows assets to be trashed with "cypress run"
   //but not "cypress open"
-  const downloaded = Cypress.config("downloadsbucket");
+  const downloaded = Cypress.config("downloadsFolder");
   const generated = Cypress.config("textFileLocation");
-  cy.task("deletebucket", downloaded);
-  cy.task("deletebucket", generated);
+  cy.task("deleteBucket", downloaded);
+  cy.task("deleteBucket", generated);
 })
 
 /*OTHER */

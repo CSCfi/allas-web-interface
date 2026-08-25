@@ -8,7 +8,7 @@
         :to="{ name: 'AllBuckets'}"
         @click="onClickBreadcrumb"
       >
-        <i class="mdi mdi-home" />
+        <c-icon :path="mdiHome" size="16" />
         <span>&nbsp;{{ $t("message.bucketTabs.all") }}</span>
       </router-link>
       <router-link
@@ -16,8 +16,8 @@
         :to="{name: currentRoute}"
         @click="onClickBreadcrumb"
       >
-        <i class="mdi mdi-chevron-right" />
-        <span :class="folders.length === 0 ? 'last' : 'default'">
+        <c-icon :path="mdiChevronRight" size="16" />
+        <span :class="folders === '' ? 'last' : 'default'">
           &nbsp;{{ bucket }}
         </span>
       </router-link>
@@ -28,7 +28,7 @@
         :to="getPath(i)"
         @click="onClickBreadcrumb"
       >
-        <i class="mdi mdi-chevron-right" />
+        <c-icon :path="mdiChevronRight" size="16" />
         <span :class="i === folders.length-1 ? 'last': 'default'">
           &nbsp;{{ item }}
         </span>
@@ -39,17 +39,23 @@
 
 <script>
 
+import { mdiHome, mdiChevronRight } from "@mdi/js";
+
 export default {
   name: "BreadcrumbNav",
+  data() {
+    return {
+      mdiHome,
+      mdiChevronRight,
+    };
+  },
   computed: {
     bucket() {
       return this.$route.params.container;
     },
-    folders() { // array of folder titles
-      const raw = this.$route.query.prefix || "";
-      if (!raw) return [];
-      // strip trailing slashes and remove empty segments
-      return raw.replace(/\/+$/, "").split("/").filter(Boolean);
+    folders() { //array of folder titles
+      return this.$route.query.prefix != undefined ?
+        this.$route.query.prefix.split("/") : "";
     },
     currentRoute() {
       return this.$route.name;
@@ -60,17 +66,15 @@ export default {
       this.$emit("breadcrumbClicked", true);
     },
     getPath(index) {
-      // construct route object for router-link
-      const parts = ((this.$route.query.prefix || "").replace(/\/+$/, ""))
-        .split("/")
-        .filter(Boolean);
+      if (index === this.folders.length-1) {
 
-      // last item is current folder, so link to it without prefix
-      if (index === this.folders.length - 1) {
-        return { name: this.currentRoute, query: { prefix: parts.join("/") } };
+        return { name: this.currentRoute, query:
+          { prefix: this.$route.query.prefix }};
       } else {
-        const prefix = parts.slice(0, index + 1).join("/");
-        return { name: this.currentRoute, query: { prefix } };
+        let prefixes = this.$route.query.prefix.split("/");
+        prefixes = prefixes.slice(0, index+1).join("/");
+        return { name: this.currentRoute, query:
+          { prefix: prefixes }};
       }
     },
   },
@@ -80,9 +84,8 @@ export default {
 
 <style scoped>
 
-i, p {
-    color: var(--csc-primary);
-
+p {
+  color: var(--c-primary-600);
 }
 
 .breadcrumb {
@@ -91,7 +94,7 @@ i, p {
 
 .breadcrumb a {
   align-items: center;
-  color: var(--csc-primary);
+  color: var(--c-primary-600);
   display: flex;
   justify-content: center;
   padding: 0;

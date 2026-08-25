@@ -13,17 +13,17 @@ describe("Create a container", function () {
     const bucketName = Math.random().toString(36).substring(2, 7);
 
     // add new bucket with a unique name and show it
-    cy.addbucket(bucketName);
+    cy.addBucket(bucketName);
     cy.wait(3000);
 
     //check the bucket exists with search field
-    cy.searchbucket(bucketName);
+    cy.searchBucket(bucketName);
     cy.get("[data-testid='search-result']")
       .contains(bucketName)
       .should("exist");
 
     //then delete container
-    cy.deletebucket(bucketName);
+    cy.deleteBucket(bucketName);
     cy.wait(1000);
 
     cy.get("[data-testid='container-toasts']")
@@ -41,20 +41,20 @@ describe("Create a container", function () {
     const nameOne = Math.random().toString(36).substring(2, 7);
     const nameTwo = Math.random().toString(36).substring(2, 7);
 
-    cy.addbucket(nameOne);
+    cy.addBucket(nameOne);
     cy.wait(3000);
 
     //check the bucket 1 exists with search field
-    cy.searchbucket(nameOne);
+    cy.searchBucket(nameOne);
     cy.wait(3000);
     cy.get("[data-testid='search-result']").contains(nameOne).should("exist");
 
-    cy.addbucket(nameTwo);
+    cy.addBucket(nameTwo);
     cy.reload();
     cy.wait(3000);
 
     //check the bucket 2 exists with search field
-    cy.searchbucket(nameTwo);
+    cy.searchBucket(nameTwo);
     cy.wait(3000);
     cy.get("[data-testid='search-result']").contains(nameTwo).should("exist");
 
@@ -64,7 +64,7 @@ describe("Create a container", function () {
       .should("have.length.gte", 2); //check
   });
 
-  it("Creating more than 1 container with the same name is not possible in a project", () => {
+  it("Creating more than 1 bucket with the same name is not possible in a project", () => {
     cy.visit(Cypress.config().baseUrl);
     cy.login(Cypress.env("username"), Cypress.env("password"));
 
@@ -72,12 +72,12 @@ describe("Create a container", function () {
     const bucketName = Math.random().toString(36).substring(2, 7);
 
     // add new bucket with a unique name and show it
-    cy.addbucket(bucketName);
+    cy.addBucket(bucketName);
     cy.wait(3000);
 
-    cy.addbucket(bucketName);
+    cy.addBucket(bucketName);
 
-    //bucket name input field should have a validation error
-    cy.get("#error-newbucket-input_1").should("be.visible");
+    //bucket name input field should have one validation error
+    cy.get("[data-testid='name-validation-error']").should("have.length", 1);
   });
 });

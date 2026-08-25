@@ -1,5 +1,5 @@
 <template>
-  <c-container>
+  <div class="container">
     <h3 class="title is-5">
       {{ $t("message.share.shared_table_title") }}
     </h3>
@@ -15,7 +15,7 @@
         nowrap
       >
         <p>
-          <b>{{ getPermObj(newPerms).name }}</b>{{ getPermObj(newPerms).desc }}
+          <b>{{ getPermObj(newPerms)?.name }}</b>{{ getPermObj(newPerms)?.desc }}
         </p>
         <c-card-actions>
           <c-button
@@ -63,19 +63,17 @@
       data-testid="share-modal-table"
       :data.prop="tableData"
       :headers.prop="headers"
-      :no-data-text="$t('message.encrypt.empty')"
+      :no-data-text="$t('message.uploadDialog.empty')"
       :pagination.prop="pagination"
       :footerOptions.prop="footer"
       horizontal-scrolling
     />
-  </c-container>
+  </div>
 </template>
 
 <script>
-import {
-  modifyAccessControlMeta,
-  removeAccessControlMeta,
-} from "@/common/api";
+import { DEV } from "@/common/globalFunctions";
+import { addAccessControlBucketPolicy, removeAccessControlBucketPolicy } from "@/common/s3commands";
 import { mdiDelete } from "@mdi/js";
 
 export default {
@@ -94,21 +92,34 @@ export default {
   },
   computed: {
     projectId () {
-      return this.$store.state.active.id;
+      return this.$store.active.id;
     },
     shareModalOpen () {
-      return this.$store.state.openShareModal;
+      return this.$store.openShareModal;
     },
     headers () {
       return [
         {
+          key: "projectName",
+          value: this.$t("message.share.project_name"),
+          sortable: true,
+          align: "center",
+          component: {
+            tag: "span",
+            params: {
+              style: {
+                fontSize: "0.875rem",
+              },
+            },
+          },
+        },
+        {
           key: "projectId",
           value: this.$t("message.share.share_id"),
-          width: "50%",
           sortable: true,
-          align: "start",
+          align: "center",
           component: {
-            tag: "div",
+            tag: "span",
             params: {
               style: {
                 fontSize: "0.875rem",
@@ -128,14 +139,12 @@ export default {
           sortable: false,
           children: [
             {
-              value: this.$t("message.delete"),
+              value: "",
               component: {
                 tag: "c-button",
                 params: {
                   text: true,
                   size: "small",
-                  title: this.$t("message.delete"),
-                  path: mdiDelete,
                   onClick: ({ data }) => {
                     this.toDelete = data;
                     this.clickedDelete = true;
@@ -159,6 +168,24 @@ export default {
                   },
                 },
               },
+              children: [
+                {
+                  value: "",
+                  component: {
+                    tag: "c-icon",
+                    params: {
+                      path: mdiDelete,
+                      size: "18",
+                    },
+                  },
+                },
+                {
+                  value: this.$t("message.delete"),
+                  component: {
+                    tag: "span",
+                  },
+                },
+              ],
             },
           ],
         },
@@ -192,6 +219,7 @@ export default {
   methods: {
     getTableData: function () {
       this.tableData = this.sharedDetails.map(item => ({
+        projectName: {value: item.sharedToName || ""},
         projectId: {value: item.sharedTo},
         permissions: {
           value: null,
@@ -200,22 +228,29 @@ export default {
               component: {
                 tag: "c-select",
                 params: {
+                  // v3 c-select renders blank for an object `value` unless
+                  // return-object is set; it also then emits the object via
+                  // changeValue.detail (which onChangeValue reads as .value).
+                  returnObject: true,
                   style: {
                     width: "100%",
                     fontSize: "0.875rem",
-                    marginTop: "1rem",
+                    marginBottom: "-1.5rem",
                   },
                   items: this.accessRights,
+                  // Legacy view-only shares (empty access list) have no
+                  // matching option anymore; show an empty selection the
+                  // owner can upgrade from
                   value: item.access.length > 0
                     ? (
                       item.access.length > 1
                         ? this.accessRights[1]
                         : this.accessRights[0])
-                    : this.accessRights[2],
+                    : null,
                   onChangeValue: (e) =>  {
                     this.newPerms = this.getPermArray(e.detail.value);
-                    if (this.getPermObj(this.newPerms).name
-                      !== this.getPermObj(item.access).name) {
+                    if (this.getPermObj(this.newPerms)?.name
+                      !== this.getPermObj(item.access)?.name) {
                       //if different than current perms chosen
                       this.sharedTo = item.sharedTo;
                       this.clickedPermChange = true;
@@ -225,21 +260,6 @@ export default {
                       this.clearPermChange();
                     }
                   },
-                  onClick: ({ event }) => {
-                    const wrapper =
-                      document.getElementById("share-card-modal-content");
-                    let wrapperPosition = wrapper.getBoundingClientRect();
-                    let targetPosition = event.target.getBoundingClientRect();
-                    let diff = wrapperPosition.bottom - targetPosition.bottom;
-                    const ul = event.target.shadowRoot.
-                      activeElement.parentNode.nextSibling.querySelector("ul");
-                    setTimeout(() => {
-                      const ulPosition = ul.getBoundingClientRect();
-                      if (diff < ulPosition.height) {
-                        wrapper.scrollBy(0, ulPosition.height - diff);
-                      }
-                    }, 150);
-                  },
                 },
               },
             },
@@ -248,11 +268,12 @@ export default {
       }));
     },
     getPermObj(permArray) {
+      // Legacy view-only shares have an empty access list and no
+      // corresponding option
+      if (permArray.length === 0) return null;
       return permArray.length > 1
         ? this.accessRights[1]
-        : (this.accessRights[0].value[0] === permArray[0]
-          ? this.accessRights[0]
-          : this.accessRights[2]);
+        : this.accessRights[0];
     },
     clearPermChange() {
       this.clickedPermChange = false;
@@ -265,34 +286,42 @@ export default {
     },
     getPermArray(val) {
       if (!val) return [];
-      if (val === "view") return ["v"];
-      else if (val === "read") return ["r"];
+      if (val === "read") return ["r"];
       else return ["r", "w"];
     },
     editAccessRight: async function (sharedProjectId) {
+      // Delete the old access rights and replace them with new ones.
+      // Don't bother with editing on S3 API since in the frontend
+      // the operations will end up being identical.
+      await removeAccessControlBucketPolicy(
+        this.bucketName,
+        [sharedProjectId],
+      );
+      await addAccessControlBucketPolicy(
+        this.bucketName,
+        this.newPerms,
+        [sharedProjectId],
+      );
+      try {
+        await removeAccessControlBucketPolicy(
+          `${this.bucketName}_segments`,
+          [sharedProjectId],
+        );
+        await addAccessControlBucketPolicy(
+          `${this.bucketName}_segments`,
+          this.newPerms,
+          [sharedProjectId],
+        );
+      } catch {}
 
-      await modifyAccessControlMeta(
+      await this.$store.sharingClient.shareEditAccess(
         this.projectId,
         this.bucketName,
         [sharedProjectId],
         this.newPerms,
       );
 
-      await modifyAccessControlMeta(
-        this.projectId,
-        `${this.bucketName}_segments`,
-        [sharedProjectId],
-        this.newPerms,
-      );
-
-      await this.$store.state.client.shareEditAccess(
-        this.projectId,
-        this.bucketName,
-        [sharedProjectId],
-        this.newPerms,
-      );
-
-      await this.$store.state.client.shareEditAccess(
+      await this.$store.sharingClient.shareEditAccess(
         this.projectId,
         `${this.bucketName}_segments`,
         [sharedProjectId],
@@ -305,34 +334,36 @@ export default {
       this.$emit("removeSharedBucket", this.toDelete);
       await this.deleteBucketShare(this.toDelete);
       this.clearDelete();
-      this.$store.commit("setSharingUpdated", true);
+      this.$store.setSharingUpdated(true);
     },
     clearDelete: function () {
       this.clickedDelete = false;
       this.toDelete = {};
     },
     deleteBucketShare: async function (bucketData) {
-      await removeAccessControlMeta(
-        this.projectId,
+      await removeAccessControlBucketPolicy(
         this.bucketName,
+        [bucketData.projectId.value],
       );
+      try {
+        await removeAccessControlBucketPolicy(
+          `${this.bucketName}_segments`,
+          [bucketData.projectId.value],
+        );
+      } catch {}
 
-      await removeAccessControlMeta(
-        this.projectId,
-        `${this.bucketName}_segments`,
-      );
-
-      await this.$store.state.client.shareDeleteAccess(
+      await this.$store.sharingClient.shareDeleteAccess(
         this.projectId,
         this.bucketName,
         [bucketData.projectId.value],
       );
-
-      await this.$store.state.client.shareDeleteAccess(
+      await this.$store.sharingClient.shareDeleteAccess(
         this.projectId,
         `${this.bucketName}_segments`,
         [bucketData.projectId.value],
       );
+
+      if (DEV) console.log(`Share deletion for ${bucketData.projectId.value} finished.`);
     },
   },
 };
@@ -350,7 +381,7 @@ c-data-table {
   padding-bottom: 4rem;
 }
 
-c-container {
+div.container {
   min-width: 0;
 }
 </style>

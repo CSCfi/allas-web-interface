@@ -25,11 +25,11 @@ describe("A bucket is shared from project A to project B", function () {
 
       //add bucket
       const bucketName = Math.random().toString(36).substring(2, 7);
-      cy.addbucket(bucketName);
+      cy.addBucket(bucketName);
       cy.wait(3000);
 
       //access bucket
-      cy.searchbucket(bucketName);
+      cy.searchBucket(bucketName);
       cy.get("[data-testid='search-result']")
         .contains(bucketName)
         .click({ force: true });
@@ -54,7 +54,7 @@ describe("A bucket is shared from project A to project B", function () {
       cy.generateFixture(fileName);
 
       cy.fixture("text-files/" + fileName + ".txt", "utf-8").then(($contentOnUpload) => {
-        cy.uploadFileFrombucket(fileName);
+        cy.uploadFileFromBucket(fileName);
 
         //Switch user and check the bucket is visible
 
@@ -64,7 +64,7 @@ describe("A bucket is shared from project A to project B", function () {
         cy.wait(5000);
 
         //go to shared bucket
-        cy.searchbucket(bucketName);
+        cy.searchBucket(bucketName);
         cy.get("[data-testid='search-result']")
           .contains(bucketName)
           .click({ force: true });
@@ -82,7 +82,7 @@ describe("A bucket is shared from project A to project B", function () {
           //create a fixture file from OPFS file content
           cy.getFileContentFromOPFS(fileName + ".txt").then(($contentOnDownload) => {
             cy.writeFile(
-              Cypress.config("downloadsbucket") + "/" + fileName + ".txt",
+              Cypress.config("downloadsFolder") + "/" + fileName + ".txt",
               $contentOnDownload
             );
           });
@@ -119,11 +119,11 @@ describe("A bucket cannot be shared without Share ID or if rights are not select
 
       //add bucket
       const bucketName = Math.random().toString(36).substring(2, 7);
-      cy.addbucket(bucketName);
+      cy.addBucket(bucketName);
       cy.wait(3000);
 
       //access bucket
-      cy.searchbucket(bucketName);
+      cy.searchBucket(bucketName);
       cy.get("[data-testid='search-result']")
         .contains(bucketName)
         .click({ force: true });
@@ -154,11 +154,11 @@ describe("A bucket cannot be shared without Share ID or if rights are not select
 
       //add bucket
       const bucketName = Math.random().toString(36).substring(2, 7);
-      cy.addbucket(bucketName);
+      cy.addBucket(bucketName);
       cy.wait(3000);
 
       //access bucket
-      cy.searchbucket(bucketName);
+      cy.searchBucket(bucketName);
       cy.get("[data-testid='search-result']")
         .contains(bucketName)
         .click({ force: true });
@@ -199,11 +199,11 @@ describe("A bucket cannot be shared with the same Share ID twice", function () {
 
       //add bucket
       const bucketName = Math.random().toString(36).substring(2, 7);
-      cy.addbucket(bucketName);
+      cy.addBucket(bucketName);
       cy.wait(3000);
 
       //access bucket
-      cy.searchbucket(bucketName);
+      cy.searchBucket(bucketName);
       cy.get("[data-testid='search-result']")
         .contains(bucketName)
         .click({ force: true });
@@ -246,11 +246,11 @@ describe("A bucket cannot be shared with an invalid ID", function () {
 
     //add bucket
     const bucketName = Math.random().toString(36).substring(2, 7);
-    cy.addbucket(bucketName);
+    cy.addBucket(bucketName);
     cy.wait(3000);
 
     //access bucket
-    cy.searchbucket(bucketName);
+    cy.searchBucket(bucketName);
     cy.get("[data-testid='search-result']")
       .contains(bucketName)
       .click({ force: true });

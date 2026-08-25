@@ -180,9 +180,20 @@ class SwiftXAccountSharing {
         if (resp.status == 409) {
           throw new Error("Container already shared.");
         }
+        if (!resp.ok) {
+          throw new Error(`Failed to record the share (HTTP ${resp.status}).`);
+        }
         return resp.json();
       },
-    );
+    ).then((ret) => {
+      // The sharing service no-ops (returns false) when its database
+      // is unavailable — a share that isn't recorded must not look
+      // like a success
+      if (ret !== true) {
+        throw new Error("The sharing service did not record the share.");
+      }
+      return ret;
+    });
     return shared;
   }
 
@@ -209,7 +220,12 @@ class SwiftXAccountSharing {
     let shared = fetch(
       url, { method: "PATCH" },
     ).then(
-      (resp) => { return resp.json(); },
+      (resp) => {
+        if (!resp.ok) {
+          throw new Error(`Failed to update the share (HTTP ${resp.status}).`);
+        }
+        return resp.json();
+      },
     );
     return shared;
   }
@@ -330,6 +346,29 @@ class SwiftXAccountSharing {
       },
     );
 
+    return check;
+  }
+
+  async projectBatchCheckIDs(projects) {
+    const url = new URL(this.address.concat("/ids"));
+    const signed = await this._getSignature(60, "/ids");
+
+    if (projects[0].startsWith("project_")) {
+      url.searchParams.append("names", projects.join(","));
+    } else {
+      url.searchParams.append("ids", projects.join(","));
+    }
+
+    url.searchParams.append("valid", signed.valid);
+    url.searchParams.append("signature", signed.signature);
+    const check = fetch(url, { method: "GET" }).then(
+      (resp) => {
+        if (resp.status == 200) {
+          return resp.json();
+        }
+        else return undefined;
+      },
+    );
     return check;
   }
 }

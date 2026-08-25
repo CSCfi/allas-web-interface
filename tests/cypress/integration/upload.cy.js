@@ -23,17 +23,17 @@ describe("Upload a file", function () {
 
     //create a bucket and go inside it
     const bucketName = Math.random().toString(36).substring(2, 7);
-    cy.addbucket(bucketName);
+    cy.addBucket(bucketName);
     cy.wait(3000);
 
-    cy.searchbucket(bucketName);
+    cy.searchBucket(bucketName);
     cy.get("[data-testid='search-result']")
       .contains(bucketName)
       .click({ force: true });
     cy.wait(5000);
 
     //upload file from destination bucket
-    cy.uploadFileFrombucket(file1);
+    cy.uploadFileFromBucket(file1);
 
     //close upload toast
     cy.get("[data-testid='close-upload-toast']")
@@ -69,7 +69,7 @@ describe("Upload a file", function () {
     cy.wait(3000);
 
     //check if the file name is on the bucket page
-    cy.searchbucket(bucketName);
+    cy.searchBucket(bucketName);
     cy.get("[data-testid='search-result']")
       .contains(bucketName)
       .click({ force: true });
@@ -124,18 +124,18 @@ describe("Upload a file", function () {
 
     //create a unique name
     const bucketName = Math.random().toString(36).substring(2, 7);
-    cy.addbucket(bucketName);
+    cy.addBucket(bucketName);
     cy.wait(3000);
 
     //access bucket
-    cy.searchbucket(bucketName);
+    cy.searchBucket(bucketName);
     cy.get("[data-testid='search-result']")
       .contains(bucketName)
       .click({ force: true });
     cy.wait(5000);
 
     //upload first file
-    cy.uploadFileFrombucket(file1);
+    cy.uploadFileFromBucket(file1);
 
     //close toast
     cy.get("[data-testid='close-upload-toast']")
@@ -143,7 +143,7 @@ describe("Upload a file", function () {
       .click();
 
     //upload second file
-    cy.uploadFileFrombucket(file2);
+    cy.uploadFileFromBucket(file2);
 
     //close toast
     cy.get("[data-testid='close-upload-toast']")

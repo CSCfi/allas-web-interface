@@ -1,0 +1,221 @@
+// Functions for managing sharing
+import useStore from "@/common/store";
+import { DEV } from "./globalFunctions";
+import { getDB } from "./idb";
+import { getBucketPolicyStatements } from "./s3commands";
+import { updateCorsFlag } from "./idbFunctions";
+import { awsBulkAddBucketListCors } from "./api";
+
+function getSharingClient() {
+  const store = useStore();
+  return store.sharingClient;
+}
+
+export async function getSharingContainers (projectId, signal) {
+  const sharingClient = getSharingClient();
+  // Get buckets a project has shared
+  return sharingClient && projectId
+    ? await sharingClient.getShare(projectId, signal)
+    : [];
+}
+
+export async function getSharedContainers (projectId, signal) {
+  const sharingClient = getSharingClient();
+  // Get buckets shared to a project
+  let ret = sharingClient
+    ? await sharingClient.getAccess(projectId, signal)
+    : [];
+
+  return ret.filter(accessEntry => {
+    return accessEntry.owner != projectId;
+  });
+}
+
+export async function getAccessDetails (
+  projectId,
+  bucketName,
+  sourceProjectId,
+  signal)
+{
+  const sharingClient = getSharingClient();
+  return sharingClient
+    ? await sharingClient.getAccessDetails(
+      projectId,
+      bucketName,
+      sourceProjectId,
+      signal)
+    : [];
+}
+
+export async function deleteStaleShares(project, bucket) {
+  // Delete share entries of a deleted bucket in DB
+  const client = getSharingClient();
+
+  async function deleteShareEntries(bucketName) {
+    const shareDetails = await client.getShareDetails(project, bucketName);
+    const shares = shareDetails.map(item => item.sharedTo);
+    if (shares.length) await client.shareDeleteAccess(project, bucketName, shares);
+  }
+
+  await deleteShareEntries(bucket);
+  // Delete corresponding _segments shares
+  await deleteShareEntries(`${bucket}_segments`);
+}
+
+export async function syncBucketPolicies(project) {
+  if (DEV) console.log("Starting sharing sync...");
+  const client = getSharingClient();
+  // Add CORS and sync bucket policies to sharing DB according to s3 bucket policies
+
+  const buckets = await getDB()
+    .containers
+    .where({ projectID : project })
+    .toArray();
+
+  const bucketsByName = new Map(buckets.map((bucket) => [bucket.name, bucket]));
+
+  // Check CORS flag and add CORS in batches
+  let toAddCors = [];
+  const batchSize = 20;
+
+  async function processBatch(buckets) {
+    if (toAddCors.length) {
+      try {
+        await awsBulkAddBucketListCors(project, buckets);
+        await updateCorsFlag(project, buckets, true);
+      } catch (err) {
+        if (DEV) console.log("Error adding CORS", err);
+      }
+    }
+  }
+
+  for (let [bucketName, bucket] of bucketsByName) {
+    if (bucket?.cors_added === false) {
+      toAddCors.push(bucketName);
+    }
+    if (toAddCors.length >= batchSize) {
+      await processBatch(toAddCors);
+      toAddCors = [];
+    }
+  }
+  await processBatch(toAddCors);
+
+  // Refresh current sharing information
+  let currentSharingDB = await client.getShare(project);
+  // Prune any entries outside of current up-to-date bucket list
+  for (let container of currentSharingDB) {
+    if (!bucketsByName.get(container)) {
+      const shareDetails = await client.getShareDetails(project, container);
+      const shares = shareDetails.map(item => item.sharedTo);
+      await client.shareDeleteAccess(project, container, shares);
+    }
+  }
+
+  // Check bucket policies and sync sharing db
+  for (let [bucket, bucketMeta] of bucketsByName) {
+    // Buckets shared to us carry an `owner` field. Only the owning project
+    // can read a bucket policy (GetBucketPolicy returns AccessDenied for
+    // everyone else) and only the owner's grants live in the sharing DB,
+    // so there is nothing to sync for them here.
+    if (bucketMeta?.owner) {
+      continue;
+    }
+    // Get sharing information for bucket
+    const shareDetails = await client.getShareDetails(project, bucket);
+    let statements = [];
+    try {
+      statements = (await getBucketPolicyStatements(bucket))
+        .filter(statement => statement?.Sid === "GrantAllasUISharedAccessToProject");
+    } catch (e) {
+      // Don't delete shares if statements cannot be retrieved
+      console.error(`Failed to fetch bucket policy for ${bucket}:`, e);
+      continue;
+    }
+    // Build dict of current share recipients and their access rights (from db)
+    let currentPolicies = {};
+    for (let shareDetail of shareDetails) {
+      const shareRecipient = shareDetail.sharedTo;
+      const sharePolicy = shareDetail?.access;
+      // View not listed, add for comparison
+      if (sharePolicy) {
+        sharePolicy.unshift("v");
+      }
+      currentPolicies[shareRecipient] = sharePolicy;
+    }
+    // Keep track of unused shares
+    let toBeDeleted = Object.keys(currentPolicies);
+
+    // compare current sharing db data with s3 bucketpolicy data, prune old data
+    for (let statement of statements) {
+      const principal = statement.Principal.AWS;
+      if (principal === undefined) {
+        continue;
+      }
+      const shareID = principal.match(/::([0-9a-fA-F]+):root$/)[1];
+      const currentPolicy = currentPolicies[shareID];
+      const actions = Array.isArray(statement.Action)
+        ? statement.Action
+        : [statement.Action];
+      const bucketPolicy = {
+        view: actions.includes("s3:ListBucket"),
+        read: actions.includes("s3:GetObject"),
+        write: actions.includes("s3:PutObject"),
+      };
+
+      toBeDeleted = toBeDeleted.filter(item => item !== shareID);
+
+      const accesslist = [];
+      if (bucketPolicy.view || bucketPolicy.read || bucketPolicy.write) {
+        accesslist.push("v");
+      }
+      if (bucketPolicy.read || bucketPolicy.write) {
+        accesslist.push("r");
+      }
+      if (bucketPolicy.write) {
+        accesslist.push("w");
+      }
+
+      if (currentPolicy) {
+        // Compare and update if needed
+        const policiesMatch = accesslist.length === currentPolicy.length &&
+          accesslist.every((p) => currentPolicy.includes(p));
+        if (policiesMatch) {
+          // Sharing DB matches bucket policies
+          continue;
+        } else {
+          try {
+            await client.shareEditAccess(
+              project,
+              bucket,
+              [shareID],
+              accesslist,
+              "none",
+            );
+            if (DEV) console.log("Updated a sharing entry for", bucket);
+          } catch(e) {
+            console.error(`Failed to update a sharing entry for ${bucket}:`, e);
+          }
+        }
+      } else {
+        try {
+          await client.shareNewAccess(
+            project,
+            bucket,
+            [shareID],
+            accesslist,
+            "none",
+          );
+          if (DEV) console.log("Added a new sharing entry for", bucket);
+        } catch(e) {
+          console.error(`Failed to update a sharing entry for ${bucket}:`, e);
+        }
+      }
+    }
+    // delete unused shares
+    if (toBeDeleted.length !== 0) {
+      await client.shareDeleteAccess(project, bucket, toBeDeleted);
+    }
+  }
+  if (DEV) console.log("Sharing sync done.");
+  return true;
+}

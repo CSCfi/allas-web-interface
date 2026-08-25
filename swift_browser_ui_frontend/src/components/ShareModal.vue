@@ -1,7 +1,7 @@
 <template>
   <c-card
     ref="shareContainer"
-    class="share-card"
+    class="modal-card"
     @keydown="handleKeyDown"
   >
     <c-card-actions
@@ -30,23 +30,21 @@
       id="share-card-modal-content"
       class="modal-content-wrapper"
     >
-      <c-container>
-        <c-flex
-          class="toggle-instructions"
-        >
+      <div class="container">
+        <div class="flex toggle-instructions">
           <c-link
             underline
             tabindex="0"
-            :path="mdiInformationOutline"
             :aria-label="$t('label.shareid_instructions')"
             @click="toggleShareGuide"
             @keyup.enter="toggleShareGuide"
           >
+            <c-icon :path="mdiInformationOutline" size="16" />
             {{ openShareGuide ? $t("message.share.close_instructions")
               : $t("message.share.instructions")
             }}
           </c-link>
-        </c-flex>
+        </div>
         <div
           v-show="openShareGuide"
           class="content guide-content"
@@ -79,10 +77,6 @@
               <b>{{ $t("message.share.write_perm") }}</b>{{
                 $t("message.share.write_perm_desc") }}
             </li>
-            <li>
-              <b>{{ $t("message.share.view_perm") }}</b>{{
-                $t("message.share.view_perm_desc") }}
-            </li>
           </ul>
         </div>
         <TagInput
@@ -91,8 +85,8 @@
           :tags="tags"
           aria-label="label.list_of_shareids"
           placeholder="message.share.field_placeholder"
-          @addTag="addingTag"
-          @deleteTag="deletingTag"
+          @addTag="addTag"
+          @deleteTag="deleteTag"
         />
         <div id="share-select">
           <c-select
@@ -103,9 +97,8 @@
             :label="$t('message.share.permissions')"
             :placeholder="$t('message.share.permissions')"
             hide-details
+            return-object
             @changeValue="onSelectPermission($event)"
-            @mouseenter="calculateSelectPosition(false)"
-            @mouseleave="calculateSelectPosition(true)"
           >
             <c-option
               v-for="(perm, i) in accessRights"
@@ -114,7 +107,9 @@
               :name="perm.name"
               :value="perm.value"
             >
-              <b>{{ perm.name }}</b>{{ perm.desc }}
+              <span style="white-space: normal;">
+                <b>{{ perm.name }}</b>{{ perm.desc }}
+              </span>
             </c-option>
           </c-select>
         </div>
@@ -127,7 +122,7 @@
         >
           {{ $t('message.share.confirm') }}
         </c-button>
-      </c-container>
+      </div>
       <c-alert
         v-show="isShared || isPermissionRemoved || isPermissionUpdated"
         type="success"
@@ -169,20 +164,9 @@
 </template>
 
 <script>
-import {
-  addAccessControlMeta,
-  getSharedContainerAddress,
-} from "@/common/api";
-
-import {
-  addNewTag,
-  deleteTag,
-} from "@/common/globalFunctions";
-import {
-  addFocusClass,
-  removeFocusClass,
-  moveFocusOutOfModal,
-} from "@/common/keyboardNavigation";
+import { taginputConfirmKeys } from "@/common/globalFunctions";
+import { captureKeyboardNavInsideModal } from "@/common/keyboardNavigation";
+import { addAccessControlBucketPolicy } from "@/common/s3commands";
 import ShareModalTable from "@/components/ShareModalTable.vue";
 import TagInput from "@/components/TagInput.vue";
 import { mdiClose, mdiInformationOutline } from "@mdi/js";
@@ -194,7 +178,6 @@ export default {
     return {
       tags: [],
       openShareGuide: false,
-      view: false,
       read: false,
       write: false,
       loading: false,
@@ -211,19 +194,22 @@ export default {
   },
   computed: {
     active() {
-      return this.$store.state.active;
+      return this.$store.active;
     },
     bucketName() {
-      return this.$store.state.selectedBucketName;
+      return this.$store.selectedBucketName;
     },
     locale () {
       return this.$i18n.locale;
     },
     visible() {
-      return this.$store.state.openShareModal;
+      return this.$store.openShareModal;
     },
-    prevActiveEl() {
-      return this.$store.state.prevActiveEl;
+    s3endpoint() {
+      return this.$store.s3endpoint;
+    },
+    shareIDs() {
+      return this.tags.map((item) => item.shareID);
     },
   },
   watch: {
@@ -249,39 +235,20 @@ export default {
   },
   methods: {
     onSelectPermission: function(e) {
-      const val = e.target.value.value;
+      // v3 c-select emits the selected value via event.detail
+      // (a CSelectItem { name, value }); older csc-ui exposed it on
+      // e.target.value. Support both, preferring detail.
+      const detail = e?.detail;
+      const val = detail && typeof detail === "object"
+        ? detail.value
+        : detail ?? e?.target?.value?.value;
       switch (val) {
-        case "view":
-          this.giveViewAccess();
-          break;
         case "read":
           this.giveReadAccess();
           break;
         case "read and write":
           this.giveReadWriteAccess();
           break;
-      }
-    },
-    calculateSelectPosition: function(reset) {
-      const div = document.getElementById("share-select");
-      const divWidth = div.getBoundingClientRect().width;
-      const cselect = document.getElementById("select-share-access");
-      const cselectHeight = cselect.getBoundingClientRect().height;
-
-      if (reset) {
-        cselect.style.position = "relative";
-        cselect.style.maxWidth = "none";
-        div.style.minHeight  = "none";
-      }
-      else {
-        const content = document.getElementById("share-card-modal-content");
-        if (content.scrollTop <= 0) {
-          // don't apply fixed position if scrolled on modal
-          cselect.style.position = "fixed";
-          // fixed element leaves normal flow, adjust for it
-          div.style.minHeight = cselectHeight + "px";
-          cselect.style.maxWidth = divWidth + "px";
-        }
       }
     },
     setAccessRights: function () {
@@ -296,48 +263,44 @@ export default {
           value: "read and write",
           desc: this.$t("message.share.write_perm_desc"),
         },
-        {
-          name: this.$t("message.share.view_perm"),
-          value: "view",
-          desc: this.$t("message.share.view_perm_desc"),
-        },
       ];
     },
-    giveViewAccess: function () {
-      this.view = true;
-      this.read = false;
-      this.write = false;
-    },
     giveReadAccess: function () {
-      this.view = true;
       this.read = true;
       this.write = false;
     },
     giveReadWriteAccess: function () {
-      this.view = true;
       this.read = true;
       this.write = true;
     },
     shareSubmit: function () {
       this.loading = true;
-      this.shareContainer(this.bucketName).then(
-        (ret) => {
-          if (ret) {
-            this.getSharedDetails();
-            this.closeSharedNotification();
-            this.isShared = true;
-            this.closeSharedNotificationWithTimeout();
-          }
-          this.loading = false;
-          this.sharedAccessRight = null;
-        },
-      );
+      this.shareContainer(this.bucketName).then((ret) => {
+        if (ret) {
+          this.getSharedDetails();
+          this.closeSharedNotification();
+          this.isShared = true;
+          this.closeSharedNotificationWithTimeout();
+        }
+        this.sharedAccessRight = null;
+      }).catch(() => {
+        // In case of uncaught errors, show generic error
+        document.querySelector("#shareModal-toasts").addToast(
+          {
+            id: "error-fail",
+            type: "error",
+            duration: 5000,
+            persistent: false,
+            progress: false,
+            message: this.$t("message.share.fail_generic"),
+          },
+        );
+      }).finally(() => {
+        this.loading = false;
+      });
     },
     shareContainer: async function (bucket) {
       let rights = [];
-      if (this.view) {
-        rights.push("v");
-      }
       if (this.read) {
         rights.push("r");
       }
@@ -357,7 +320,7 @@ export default {
         );
         return false;
       }
-      if (this.tags.length < 1) {
+      if (this.shareIDs.length < 1) {
         document.querySelector("#shareModal-toasts").addToast(
           {
             id: "error-noid",
@@ -370,13 +333,13 @@ export default {
         );
         return false;
       }
-      let invalidTags = this.tags.filter(
-        item => this.validateTag(item) === false);
+      let invalidIDs = this.shareIDs.filter(
+        item => this.validateShareID(item) === false);
 
-      if (invalidTags.length) {
-        let msg = invalidTags.join(", ");
+      if (invalidIDs.length) {
+        let msg = invalidIDs.join(", ");
 
-        if (invalidTags.length > 1) {
+        if (invalidIDs.length > 1) {
           msg += this.$t("message.share.invalid_share_ids");
         } else {
           msg += this.$t("message.share.invalid_share_id");
@@ -392,19 +355,19 @@ export default {
         return false;
       }
       try {
-        await this.$store.state.client.shareNewAccess(
-          this.$store.state.active.id,
+        await this.$store.sharingClient.shareNewAccess(
+          this.$store.active.id,
           bucket,
-          this.tags,
+          this.shareIDs,
           rights,
-          await getSharedContainerAddress(this.$route.params.project),
+          this.s3endpoint,
         );
-        await this.$store.state.client.shareNewAccess(
-          this.$store.state.active.id,
+        await this.$store.sharingClient.shareNewAccess(
+          this.$store.active.id,
           `${this.bucketName}_segments`,
-          this.tags,
+          this.shareIDs,
           rights,
-          await getSharedContainerAddress(this.$route.params.project),
+          this.s3endpoint,
         );
       }
       catch(error) {
@@ -426,35 +389,29 @@ export default {
         }
       }
 
-      // Add read rights after the share entry to make the db entry empty
-      if (this.view) {
-        rights.push("r");
-      }
-
-      await addAccessControlMeta(
-        this.$route.params.project,
+      await addAccessControlBucketPolicy(
         bucket,
         rights,
-        this.tags,
+        this.shareIDs,
       );
-
-      await addAccessControlMeta(
-        this.$route.params.project,
-        `${this.bucketName}_segments`,
-        rights,
-        this.tags,
-      );
+      try {
+        await addAccessControlBucketPolicy(
+          `${bucket}_segments`,
+          rights,
+          this.shareIDs,
+        );
+      } catch {}
 
       // signal to update sharing containers in container table
-      this.$store.commit("setSharingUpdated", true);
+      this.$store.setSharingUpdated(true);
       return true;
     },
     toggleShareGuide: function () {
       this.openShareGuide = !this.openShareGuide;
     },
     toggleShareModal: function () {
-      this.$store.commit("toggleShareModal", false);
-      this.$store.commit("setBucketName", "");
+      this.$store.toggleShareModal(false);
+      this.$store.setBucketName("");
       this.sharedAccessRight = null;
       this.openShareGuide = false;
       this.tags = [];
@@ -464,8 +421,6 @@ export default {
       document.querySelector("#shareModal-toasts").removeToast("error-noid");
       document.querySelector("#shareModal-toasts")
         .removeToast("error-duplicate");
-
-      moveFocusOutOfModal(this.prevActiveEl);
     },
     closeSharedNotificationWithTimeout() {
       document.getElementById("share-card-modal-content").scrollTo(0, 0);
@@ -480,14 +435,41 @@ export default {
       this.isPermissionRemoved = false;
       this.isPermissionUpdated = false;
     },
-    getSharedDetails: function () {
-      this.$store.state.client.getShareDetails(
-        this.$route.params.project,
-        this.bucketName,
-      ).then((ret) => {
-        this.sharedDetails = ret;
-        this.tags = [];
-      });
+    getSharedDetails: async function () {
+      let shares = [];
+      try {
+        const ret = await this.$store.sharingClient.getShareDetails(
+          this.$route.params.project,
+          this.bucketName,
+        );
+        // A failed or non-JSON response must not hide the shares table
+        // silently — only accept a proper array
+        shares = Array.isArray(ret) ? ret : [];
+      } catch (e) {
+        console.error(
+          `Could not fetch existing shares for ${this.bucketName}:`, e);
+        return;
+      }
+      this.tags = [];
+      // Get an array of share receivers and corresponding project names
+      const shareIDs = shares.map((share) => share.sharedTo);
+      if (shareIDs.length) {
+        try {
+          const projectInfo =
+            await this.$store.sharingClient.projectBatchCheckIDs(shareIDs);
+          // Add project name to shared details
+          this.sharedDetails = shares.map((share) => {
+            const project = projectInfo?.find(
+              (prj) => prj.id === share.sharedTo);
+            return { ...share, sharedToName: project?.name || null };
+          });
+        } catch {
+          // Names are cosmetic — show the shares even if the lookup fails
+          this.sharedDetails = shares;
+        }
+      } else {
+        this.sharedDetails = shares;
+      }
     },
     updateSharedBucket: function () {
       this.closeSharedNotification();
@@ -504,13 +486,31 @@ export default {
       this.isPermissionRemoved = true;
       this.closeSharedNotificationWithTimeout();
     },
-    addingTag: function (e, onBlur) {
-      this.tags = addNewTag(e, this.tags, onBlur);
+    addTag: function (event, onBlur) {
+      if (taginputConfirmKeys.includes(event.key) || onBlur) {
+        event.preventDefault();
+        const newID = event.target.value.trim();
+        event.target.value = "";
+        if (newID !== "" && !this.shareIDs.includes(newID)) {
+          this.tags.push({ shareID: newID, projectName: "" });
+          if (this.validateShareID(newID)) {
+            this.getProjectName(newID);
+          }
+        }
+      }
     },
-    deletingTag: function (e, tag) {
-      this.tags = deleteTag(e, tag, this.tags);
+    deleteTag: function (event, tag) {
+      event.preventDefault();
+      this.tags = this.tags.filter(el => el.shareID !== tag.shareID);
     },
-    validateTag: function (tag) {
+    getProjectName: async function (shareID) {
+      const project = await this.$store.sharingClient.projectCheckIDs(shareID);
+      if (project?.name) {
+        const index = this.tags.findIndex(item => item.shareID === shareID);
+        if (index > -1) this.tags[index].projectName = project.name;
+      }
+    },
+    validateShareID: function (tag) {
       //tag should be 32 alphanumeric chars
       //and not own project
       return tag.length === 32 &&
@@ -518,84 +518,10 @@ export default {
         tag.match(/^[a-z0-9]+$/) != null;
     },
     handleKeyDown: function (e) {
-      const eTarget = e.target;
-      const shadowDomTarget = eTarget.shadowRoot?.activeElement;
-
-      const first = document.getElementById("close-share-modal-btn");
-
-      // last element is different between with or without shared list
-      let last = null;
-
-      // The real DOM's active element is nested under shadowDOM
-      // and cannot be accessed if using event target alone
-      let shadowRootActiveEl = null;
-
-      // If there is no shared projects, there is no data table,
-      // the last element is Share button
-      if (this.sharedDetails.length === 0) {
-        last = document.getElementById("share-btn");
+      if (e.key === "Escape") {
+        this.toggleShareModal();
       } else {
-        /*
-          If there is shared list table, the last element in the modal
-          would be inside c-pagination and
-          it is the last arrow icon used to move to Next page
-        */
-
-        if (eTarget.tagName.toLowerCase() === "c-data-table") {
-          const pagination = eTarget.shadowRoot.querySelector("c-pagination");
-          //  Assign the "last" element when the focus is on pagination
-          if (e.composedPath().includes(pagination)) {
-            last = pagination.shadowRoot?.querySelectorAll("li")[2];
-            shadowRootActiveEl = shadowDomTarget?.shadowRoot?.activeElement;
-          }
-        }
-      }
-
-      if (e.key === "Tab" && !e.shiftKey) {
-        // Check if "Tab" is on Share button or the last data-table's arrow
-        if (eTarget === last ||
-          (last && shadowRootActiveEl === last?.firstChild)) {
-          first.tabIndex="0";
-          first.focus();
-        }
-        /*
-          If the focus is on the whole data-table, there is no
-          specific active shadowDOM element. Therefore, we could remove
-          the focus class on table when doing "Tab".
-        */
-        else if (eTarget.tagName.toLowerCase() === "c-data-table" &&
-          shadowDomTarget === null) {
-          if (eTarget.classList.contains("button-focus")) {
-            removeFocusClass(eTarget);
-          }
-        }
-      } else if (e.key === "Tab" && e.shiftKey) {
-        if (eTarget === first) {
-          e.preventDefault();
-          /*
-            When shiftTab is on "first" element, originally the focus
-            should move to the previous "last" element -
-            which is table's arrow icon for Next page.
-            But it is difficult to get that el when the focus is not
-            on the table, we focus on the whole table itself instead.
-          */
-          if (this.sharedDetails.length > 0) {
-            last = document.getElementById("shared-projects-table");
-          }
-          last.tabIndex = "0";
-          last.focus();
-          if (last === document.activeElement) {
-            addFocusClass(last);
-          }
-        }
-        // Remove focus class if either the "last" el is
-        // Share button or the whole data-table
-        else if (eTarget === last ||
-          (eTarget.tagName.toLowerCase() === "c-data-table" &&
-            shadowDomTarget === null)
-        ) {
-          removeFocusClass(last ? last : eTarget);
-        }
+        captureKeyboardNavInsideModal(e, this.$refs.shareContainer);
       }
     },
   },
@@ -603,34 +529,6 @@ export default {
 </script>
 
 <style scoped>
-
-.share-card {
-  padding: 2rem;
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  max-height: 65vh;
-}
-
-@media screen and (max-width: 767px), (max-height: 580px) {
-  .share-card {
-    top: -5rem;
-  }
-}
-
-@media screen and (max-height: 580px) and (max-width: 767px),
-(max-width: 525px) {
-  .share-card {
-    top: -9rem;
-  }
-}
-
-@media screen and (max-height: 580px) and (max-width: 525px) {
-  .share-card {
-    top: -13rem;
-  }
-}
 
 #share-select {
   width: 100%;
@@ -641,7 +539,7 @@ export default {
   z-index: 2;
 }
 
-c-container {
+div.container {
   width: 100%;
 }
 
@@ -660,7 +558,7 @@ c-card-actions > h2 {
 .toggle-instructions {
   justify-content: flex-end;
   align-items: center;
-  color: var(--csc-primary);
+  color: var(--c-primary-600);
 }
 
 .guide-content {
@@ -683,6 +581,7 @@ c-select {
 }
 
 c-link {
+  --c-link-hover: none;
   min-width: 60px;
 }
 
@@ -690,10 +589,14 @@ c-link > span {
   font-size: 0.875rem;
 }
 
-c-flex, .shared-notification {
+div.flex, .shared-notification {
   display: flex;
   flex-direction: row;
   justify-content: space-between;
+}
+
+div.flex {
+  flex-direction: row-reverse;
 }
 
 c-alert[type="success"] {

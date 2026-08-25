@@ -8,16 +8,22 @@
       :key="tag"
       active
     >
-      <span>{{ tag }}</span>
-      <c-icon
-        tabindex="0"
-        :path="mdiClose"
+      <span v-if="typeof tag === 'string'">{{ tag }}</span>
+      <div v-else>
+        <span v-if="tag?.projectName">{{ tag.projectName }}&nbsp;-&nbsp;</span>
+        <span>{{ tag.shareID }}</span>
+      </div>
+      <c-icon-button
         :alt="$t('label.delete_tag')"
-        color="white"
-        size="16"
+        size="x-small"
         @click="$emit('deleteTag', $event, tag)"
         @keyup.enter="$emit('deleteTag', $event, tag)"
-      />
+      >
+        <c-icon
+          :path="mdiClose"
+          size="16"
+        />
+      </c-icon-button>
     </c-tag>
     <input
       type="text"
@@ -71,7 +77,7 @@ export default {
 }
 
 .tags-list:focus-within {
-  border: 2px solid var(--csc-primary);
+  border: 2px solid var(--c-primary-600);
 }
 
 .tags-list input {
@@ -79,6 +85,10 @@ export default {
   border: none;
   outline: none;
   flex: 1;
+}
+
+input[type="text"] {
+  font-size: 1rem;
 }
 
 span {
