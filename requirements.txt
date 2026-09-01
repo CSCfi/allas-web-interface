@@ -11,5 +11,5 @@ ldap3==2.9.1
 oidcrp==2.1.4
 python-swiftclient==4.7.0
 uvloop==0.21.0
-msgpack==1.1.0
+msgpack==1.2.2
 statsd==3.3.0
