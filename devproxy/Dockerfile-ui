@@ -13,6 +13,7 @@ RUN cd /tmpsrc && pip install --break-system-packages . && pip install --break-s
 RUN apt-get -y update && apt-get -y upgrade && apt-get -y install curl ca-certificates bash
 
 RUN curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
+
 RUN bash -l -c "nvm install 22 && npm install --global corepack@latest && corepack enable npm && corepack prepare pnpm@9 --activate"
 
 COPY --from=emscripten/emsdk /emsdk /emsdk
@@ -22,4 +23,4 @@ ENV PATH="/emsdk:/emsdk/upstream/emscripten:${PATH}"
 VOLUME [ "/src" ]
 WORKDIR /src
 
-CMD [ "bash", "-l", "-c", "honcho start" ]
+CMD [ "bash", "-lc", "source /root/.nvm/nvm.sh && nvm use 22 && cd /src/swift_browser_ui_frontend && pnpm install --frozen-lockfile && cd /src && honcho start" ]

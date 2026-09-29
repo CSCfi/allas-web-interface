@@ -123,6 +123,7 @@ services:
       - dev-dns
     volumes:
       - .:/src
+      - /src/swift_browser_ui_frontend/node_modules
     env_file:
       - .env
     ports:

@@ -15,23 +15,22 @@ dev-all:
 	make dev-ca
 	make volumes
 	docker compose -f docker-compose-dev.yml build
-	CURRENT_UID=$(id -u):$(id -g) docker compose -f docker-compose-dev.yml up
+	CURRENT_UID=$$(id -u):$$(id -g) docker compose -f docker-compose-dev.yml up
 
 dev-up:
 	make ceph-up
 	make volumes
-	CURRENT_UID=$(id -u):$(id -g) docker compose -f docker-compose-dev.yml up
+	CURRENT_UID=$$(id -u):$$(id -g) docker compose -f docker-compose-dev.yml up
 
 dev-docker-all:
 	@echo Checking dependencies
 	make refresh-submodules
 	make check-deps
-	make frontend-install
 	@echo Building the docker-only development environment
 	make dev-ca
 	make volumes
 	docker compose -f docker-compose-dev.yml build
-	CURRENT_UID=$(id -u):$(id -g) docker compose -f docker-compose-dev.yml up
+	CURRENT_UID=$$(id -u):$$(id -g) docker compose -f docker-compose-dev.yml up
 
 dev-down:
 	docker compose -f docker-compose-dev.yml down
@@ -63,7 +62,7 @@ dev-docker-build:
 
 dev-docker-up:
 	make volumes
-	CURRENT_UID=$(id -u):$(id -g) docker compose -f docker-compose-dev.yml up
+	CURRENT_UID=$$(id -u):$$(id -g) docker compose -f docker-compose-dev.yml up
 
 dev-docker-down:
 	docker compose -f docker-compose-dev.yml down
@@ -95,7 +94,8 @@ test-data:
 volumes:
 	# Create volume folder and fix permissions
 	-mkdir -p .docker-volumes
-	sudo chown -R $(USER):$(USER) .docker-volumes
+	# sudo chown -R $(USER):$(USER) .docker-volumes
+	sudo chown -R $$(id -u):$$(id -g) .docker-volumes
 	mkdir -p .docker-volumes/test-data
 	# Create volume mounts for firefox
 	mkdir -p .docker-volumes/config-ff
