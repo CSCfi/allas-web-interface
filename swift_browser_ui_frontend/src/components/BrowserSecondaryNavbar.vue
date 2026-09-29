@@ -38,10 +38,7 @@
           @click="copyProjectId"
           @keyup.enter="copyProjectId"
         >
-          <i
-            slot="icon"
-            class="mdi mdi-content-copy"
-          />
+          <c-icon :path="mdiContentCopy" />
           {{ $t("message.share.share_id_copy") }}
         </c-button>
         <div
@@ -73,24 +70,28 @@
       </div>
       <c-toasts
         id="copy-toasts"
-        vertical="center"
+        vertical="top"
         data-testid="copy-toasts"
       />
       <c-toasts
-        id="decryption-toasts"
-        vertical="center"
-        data-testid="decryption-toasts"
+        id="download-error-toasts"
+        vertical="top"
+        data-testid="download-error-toasts"
       />
       <c-spacer />
       <div class="nav-item">
         <c-button
-          :disabled="isUploading || !canUpload || projectSuspended"
+          :disabled="isUploading || !canUpload || workersInitializing || projectSuspended"
           data-testid="upload-file"
-          @click="toggleUploadModal(false)"
-          @keyup.enter="toggleUploadModal(true)"
+          @click="toggleUploadModal"
+          @keyup.enter="toggleUploadModal"
         >
           <c-icon :path="mdiTrayArrowUp" />
-          {{ $t("message.uploadSecondaryNav") }}
+          {{
+            workersInitializing
+              ? $t("message.uploadDisabledSecondaryNav")
+              : $t("message.uploadSecondaryNav")
+          }}
         </c-button>
       </div>
     </div>
@@ -98,12 +99,10 @@
 </template>
 
 <script>
+import { addErrorToastOnMain } from "@/common/globalFunctions";
+import { getAccessDetails } from "@/common/share";
 import {
-  addErrorToastOnMain,
-  getAccessDetails,
-} from "@/common/globalFunctions";
-import { setPrevActiveElement } from "@/common/keyboardNavigation";
-import {
+  mdiContentCopy,
   mdiInformationOutline,
   mdiTrayArrowUp,
 } from "@mdi/js";
@@ -113,6 +112,7 @@ export default {
   props: ["multipleProjects", "projects"],
   data: function () {
     return {
+      mdiContentCopy,
       mdiInformationOutline,
       mdiTrayArrowUp,
       copy: false,
@@ -121,19 +121,19 @@ export default {
   },
   computed: {
     active() {
-      const activeObject = this.$store.state.active;
+      const activeObject = this.$store.active;
       return { ...activeObject, value: activeObject.id };
     },
     routeToParams() {
-      return this.$store.state.routeTo.params;
+      return this.$store.routeTo.params;
     },
     uname() {
-      return this.$store.state.uname;
+      return this.$store.uname;
     },
     // C-select component handles options by name and value props
     // Append value-prop to projects
     mappedProjects() {
-      return this.projects.map(project => ({
+      return this.projects.map((project) => ({
         ...project,
         name: this.getProjectStr(project),
         value: project.id,
@@ -148,10 +148,10 @@ export default {
       return width + "px";
     },
     isUploading() {
-      return this.$store.state.isUploading;
+      return this.$store.isUploading;
     },
     projectSuspended() {
-      return this.$store.state.projectSuspended;
+      return this.$store.projectSuspended;
     },
     owner() {
       return this.$route.params.owner;
@@ -159,38 +159,34 @@ export default {
     container() {
       return this.$route.params.container;
     },
-    client() {
-      return this.$store.state.client;
+    sharingClient() {
+      return this.$store.sharingClient;
     },
     downloadAbortReason() {
-      return this.$store.state.downloadAbortReason;
+      return this.$store.downloadAbortReason;
     },
     downloadCount() {
-      return this.$store.state.downloadCount;
+      return this.$store.downloadCount;
+    },
+    workersInitializing() {
+      return this.$store.workersInitializing;
     },
   },
   watch: {
     container() {
       this.checkIfCanReadWrite();
     },
-    client() {
+    sharingClient() {
       this.checkIfCanReadWrite();
     },
     downloadAbortReason() {
       if (this.downloadAbortReason) {
         addErrorToastOnMain(this.$t(`message.download.${this.downloadAbortReason}`));
-        this.$store.commit("setDownloadAbortReason", undefined);
+        this.$store.setDownloadAbortReason(undefined);
       }
     },
   },
   methods: {
-    getProjectStr: function (project) {
-      return project?.name
-        ? project?.title
-          ? project.name + " " + project.title
-          : project.name
-        : "";
-    },
     changeActive(event) {
       const itemId = event.target.value;
       const navigationParams = {
@@ -207,22 +203,14 @@ export default {
         }
         else {
           //ask user confirmation to interrupt upload / download
-          this.$store.commit("setRouteTo", navigationParams);
-          this.$store.commit("toggleConfirmRouteModal", true);
+          this.$store.setRouteTo(navigationParams);
+          this.$store.toggleConfirmRouteModal(true);
         }
       }
     },
-    toggleUploadModal: function (keypress) {
-      this.$store.commit("setFilesAdded", true);
-      this.$store.commit("toggleUploadModal", true);
-      if (keypress) setPrevActiveElement();
-      if (!this.container) {
-        setTimeout(() => {
-          const uploadBucketInput = document
-            .querySelector("#upload-bucket-input input");
-          uploadBucketInput.focus();
-        }, 300);
-      }
+    toggleUploadModal: function () {
+      this.$store.setFilesAdded(true);
+      this.$store.toggleUploadModal(true);
     },
     checkIfCanReadWrite: async function () {
       //disable upload if user doesn't have rw perms
@@ -264,6 +252,13 @@ export default {
           );
         });
       }
+    },
+    getProjectStr: function (project) {
+      return project?.name
+        ? project?.title
+          ? project.name + " " + project.title
+          : project.name
+        : "";
     },
   },
 };
@@ -310,7 +305,7 @@ c-toasts {
 
 .tooltip c-icon {
   margin-left: 0.5rem;
-  color: var(--csc-primary);
+  color: var(--c-primary-600);
 }
 
 .tooltip-content {
@@ -318,7 +313,7 @@ c-toasts {
   text-align: left;
   width: 20rem;
   background-color: white;
-  border: 1px solid var(--csc-primary);
+  border: 1px solid var(--c-primary-600);
   border-radius: 0.375rem;
   padding: 1rem;
   font-size: 14px;
@@ -344,7 +339,7 @@ c-toasts {
   width: 0;
   height: 0;
   border: 0.7rem solid transparent;
-  border-bottom-color: var(--csc-primary);
+  border-bottom-color: var(--c-primary-600);
 }
 .tooltip-content::after {
   content: " ";

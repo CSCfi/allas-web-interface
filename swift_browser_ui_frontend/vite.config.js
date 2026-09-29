@@ -176,6 +176,7 @@ export default defineConfig(({ command, mode }) => {
     },
     server: {
       host: "0.0.0.0",
+      allowedHosts: true,
       port: process.env.FRONTEND_PORT || "8081",
       https,
       strictPort: true,
@@ -186,6 +187,9 @@ export default defineConfig(({ command, mode }) => {
       alias: {
         "@": root,
       },
+    },
+    define: {
+      "global": {},
     },
   };
 });

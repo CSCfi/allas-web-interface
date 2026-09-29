@@ -86,7 +86,7 @@ describe("Browse containers and test operations", function () {
     const tags = ["tag_1", "tag_2"];
 
     //create a new bucket
-    cy.addbucket(bucketName);
+    cy.addBucket(bucketName);
     cy.wait(3000);
 
     //check that modal closed, bucket name exists
@@ -169,7 +169,7 @@ describe("Browse containers and test operations", function () {
     cy.wait(3000);
 
     //go to bucket, check that file exists
-    cy.searchbucket(bucketName);
+    cy.searchBucket(bucketName);
     cy.get("[data-testid='search-result']")
       .contains(bucketName)
       .click();

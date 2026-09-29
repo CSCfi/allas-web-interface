@@ -12,7 +12,15 @@ async def handle_discover(_: Union[aiohttp.web.Request, None]) -> aiohttp.web.Re
     return aiohttp.web.json_response(
         {
             "sharing_endpoint": setd["sharing_endpoint"],
-            "request_endpoint": setd["request_endpoint"],
-            "upload_endpoint": setd["upload_external_endpoint"],
+        }
+    )
+
+
+async def handle_s3_discover(_: Union[aiohttp.web.Request, None]) -> aiohttp.web.Response:
+    """Handle requests for S3 API configuration."""
+    # For now not returning region, as it shouldn't be a requirement for our needs
+    return aiohttp.web.json_response(
+        {
+            "s3api_endpoint": setd["s3api_endpoint"],
         }
     )

@@ -1,3 +1,4 @@
+<!--NOT up-to-date: search not in use-->
 <template>
   <div
     class="search"
@@ -15,10 +16,7 @@
       @changeQuery="onQueryChange"
       @changeValue="goToResult"
     >
-      <i
-        slot="pre"
-        class="mdi mdi-magnify"
-      />
+      <c-icon :path="mdiMagnify" />
       <div
         v-for="(item, index) in searchResults"
         :key="index"
@@ -47,8 +45,9 @@
 </template>
 
 <script>
-import { tokenize } from "@/common/conv";
-import { getDB } from "@/common/db";
+import { mdiMagnify } from "@mdi/js";
+import { tokenize } from "@/common/globalFunctions";
+import { getDB } from "@/common/idb";
 import escapeRegExp from "lodash/escapeRegExp";
 import SearchResultItem from "@/components/SearchResultItem.vue";
 import debounce from "lodash/debounce";
@@ -61,6 +60,7 @@ export default {
   props: ["containers"],
   data: function () {
     return {
+      mdiMagnify,
       searchArray: [],
       searchResults: [],
       searchElements: [],
@@ -71,7 +71,7 @@ export default {
   },
   computed: {
     active() {
-      return this.$store.state.active;
+      return this.$store.active;
     },
   },
   created: function () {
@@ -163,7 +163,7 @@ export default {
 
       //get IDs of containers whose objects should be included in results
       const containerIDs = conts.map(({ id }) => id);
-
+      // Objects no longer in IDB
       const objects = await getDB().objects
         .filter(obj => obj.tokens?.find(t => t.match(re))
           || obj.tags?.find(t => t.match(re)))
@@ -173,7 +173,7 @@ export default {
         .toArray();
 
       let folders = [];
-
+      // Objects no longer in IDB
       const objForCount = await getDB().objects
         .filter(obj => containerIDs.includes(obj.containerID))
         .limit(1000)
@@ -186,7 +186,7 @@ export default {
             && folder.container === obj.container);
           if (index < 0) {
             let count = 0;
-            //add its folders content
+            //add its folders' content
             const size = objForCount.reduce((result, o) => {
               if (o.name.startsWith(name) && o.container === obj.container) {
                 count++;

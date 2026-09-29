@@ -1,10 +1,6 @@
 // API fetch functions.
 
-import {
-  getHumanReadableSize,
-  makeGetObjectsMetaURL,
-  DEV,
-} from "@/common/conv";
+import { DEV } from "@/common/globalFunctions";
 
 // A suspended/closed project makes storage-backed calls return 401 even
 // though the login session is still valid. The handler lets the app flag
@@ -110,581 +106,186 @@ export async function getProjects() {
   return await ret.json();
 }
 
-export async function getContainers(
+export async function copyBucket(
   project,
-  marker,
-  signal,
-) {
-  // List buckets for a given project.
-  let getBucketsUrl = new URL(
-    "/api/" + encodeURI(project), document.location.origin,
-  );
-  if (marker) {
-    getBucketsUrl.searchParams.append("marker", marker);
-  }
-  let ret = await GET(getBucketsUrl, signal);
-  if (ret.status == 200 && !signal?.aborted) {
-    projectSuspendedHandler?.(false);
-    return await ret.json();
-  }
-  return [];
-}
-
-export async function getContainerMeta(
-  project,
-  container,
-  signal,
-  owner = "",
-) {
-  // Get metadata for a given bucket, owned by a given project.
-  let url = new URL(
-    "/api/meta/".concat(
-      encodeURI(project), "/",
-      encodeURI(container)),
-    document.location.origin,
-  );
-  if (owner !== "") {
-    url.searchParams.append("owner", owner);
-  }
-
-  let ret = await GET(url, signal);
-  if (signal?.aborted || ret.status !== 200) {
-    return ["", {}];
-  }
-  return await ret.json();
-}
-
-export async function updateContainerMeta(
-  project,
-  container,
-  metadata,
-) {
-  // Update bucket metadata.
-  let url = new URL(
-    "/api/".concat(encodeURI(project), "/", encodeURI(container)),
-    document.location.origin,
-  );
-  let ret = await POST(url, JSON.stringify(metadata));
-  return ret;
-}
-
-export async function getObjects(
-  project,
-  container,
-  marker = "",
-  signal,
-  shared = false,
-  owner = "",
-) {
-  // Fetch object listing for a container.
-  let objUrl = new URL(
-    "/api/".concat(
-      encodeURI(project), "/",
-      encodeURI(container),
-    ),
-    document.location.origin,
-  );
-  if (marker) {
-    objUrl.searchParams.append("marker", marker);
-  }
-  if (shared && (owner != "")) {
-    objUrl.searchParams.append("owner", owner);
-  }
-  let objects = await GET(objUrl, signal);
-
-  if (objects?.status == 200 && !signal?.aborted) {
-    objects = await objects.json();
-    for (let i = 0; i < objects.length; i++) {
-      objects[i].bytes = Number(objects[i].bytes || 0);
-
-      if (shared) {
-        objects[i].url = "/download/".concat(
-          encodeURI(project), "/", encodeURI(container), "/", encodeURI(objects[i].name),
-        );
-      } else {
-        objects[i].url = "/api/".concat(
-          encodeURI(project), "/", encodeURI(container), "/", encodeURI(objects[i].name),
-        );
-      }
-    }
-    return objects;
-  } else {
-    return [];
-  }
-}
-
-export async function getObjectsMeta (
-  project,
-  container,
-  objects,
-  url,
-  signal,
-  owner = "",
-){
-  // Batch get metadata for a list of objects
-  if (url === undefined) {
-    url = makeGetObjectsMetaURL(project, container, objects);
-  }
-
-  if (owner !== "") {
-    url.searchParams.append("owner", owner);
-  }
-
-  let ret = await GET(url, signal);
-  if (signal?.aborted) {
-    return [];
-  }
-  return ret.json();
-}
-
-export async function updateObjectMeta (
-  project,
-  container,
-  objectMeta,
-) {
-  // Update metadata for object.
-  let url = new URL(
-    "/api/".concat(
-      encodeURI(project), "/",
-      encodeURI(container),
-    ),
-    document.location.origin,
-  );
-  url.searchParams.append("objects", "true");
-  let ret = await POST(url, JSON.stringify([objectMeta]));
-  return ret;
-}
-
-export async function getProjectMeta(project) {
-  // Fetch project metadata for the specified project
-  let metaURL = new URL(
-    "/api/meta/".concat(encodeURI(project)), document.location.origin,
-  );
-  let ret = GET(metaURL).then(function (resp) { return resp.json(); })
-    .then(function (json_ret) {
-      let newRet = json_ret;
-      newRet["Size"] = getHumanReadableSize(newRet["Bytes"]);
-      if (newRet["Bytes"] > 10995116277760) {
-        newRet["ProjectSize"] = newRet["Size"];
-      } else {
-        newRet["ProjectSize"] = "10TiB";
-      }
-      // we check if it is greather than 0.4Mib if not we display with 10
-      // decimal points
-      if (newRet["Bytes"] > 900000) {
-        newRet["Billed"] = parseFloat(newRet["Bytes"] / 10995116277760)
-          .toPrecision(4);
-      } else {
-        newRet["Billed"] = parseFloat(newRet["Bytes"] / 10995116277760)
-          .toFixed(10);
-      }
-      return newRet;
-    });
-  return ret;
-}
-
-export async function getAccessControlMeta(project) {
-  // Fetch the ACL metadata for all project containers.
-  let metaURL = new URL(
-    "/api/".concat(encodeURI(project), "/acl"), document.location.origin,
-  );
-  let ret = await GET(metaURL);
-  return await ret.json();
-}
-
-export async function removeAccessControlMeta(
-  project,
-  container,
-  receiver = undefined,
-) {
-  // Remove access control metadata from the specified container
-  let url = "/api/access/".concat(
-    encodeURI(project), "/",
-    encodeURI(container),
-  );
-  if (receiver) {
-    url = url.concat("/", encodeURI(receiver));
-  }
-  let aclURL = new URL(url, document.location.origin);
-  await DELETE(aclURL);
-}
-
-export async function modifyAccessControlMeta(
-  project,
-  container,
-  receivers,
-  rights,
-) {
-  // Modify access control metadata from the specified container
-  let url = "/api/access/".concat(
-    encodeURI(project), "/",
-    encodeURI(container),
-  );
-  const projects_csv = receivers.toString();
-  const aclURL = new URL(url, document.location.origin);
-  aclURL.searchParams.append("rights", rights);
-  aclURL.searchParams.append("projects", projects_csv);
-
-  await PUT(aclURL);
-}
-
-export async function addAccessControlMeta(
-  project,
-  container,
-  rights,
-  receivers,
-) {
-  // Add access control metadata to a container for the specified projects
-  let aclURL = new URL(
-    "/api/access/".concat(
-      encodeURI(project), "/",
-      encodeURI(container),
-    ),
-    document.location.origin,
-  );
-  let projects_csv = receivers.toString();
-  let rights_str = rights.toString().replace(",", "");
-  aclURL.searchParams.append("projects", projects_csv);
-  aclURL.searchParams.append("rights", rights_str);
-
-  await POST(aclURL);
-}
-
-export async function getSharedContainerAddress(project) {
-  // Get the project specific address for container sharing
-  let addrURL = new URL(
-    "/api/".concat(
-      encodeURI(project), "/address",
-    ),
-    document.location.origin,
-  );
-
-  let ret = await GET(addrURL);
-  return ret.json();
-}
-
-export async function swiftCreateContainer(project, container, tags = []) {
-  const url = new URL(`/api/${encodeURI(project)}/${encodeURI(container)}`, document.location.origin);
-
-  const classifyAndThrow = async (ret) => {
-    let text = "";
-    try { text = await ret.text(); } catch (_) {}
-    const msg = (text || "").toLowerCase();
-
-    const err = new Error(text || `Container creation failed (${ret.status})`);
-    err.status = ret.status;
-
-    if (ret.status === 409 || msg.includes("already in use") || msg.includes("conflict") || msg.includes("409")) {
-      err.code = "NAME_IN_USE";
-    } else if (ret.status === 400 && msg.includes("invalid")) {
-      err.code = "INVALID_NAME";
-    } else {
-      err.code = "CREATE_FAILED";
-    }
-
-    throw err;
-  };
-
-  // try to create with tags first
-  let ret = await PUT(url, JSON.stringify({ tags }));
-  if ([200, 201, 202, 204].includes(ret.status)) return;
-
-  // invalid name or already in use
-  {
-    let peek = "";
-    try { peek = await ret.clone().text(); } catch (_) {}
-    const msg = peek.toLowerCase();
-
-    if (ret.status === 409 || msg.includes("already in use") || msg.includes("conflict") || msg.includes("409")) {
-      const err = new Error(peek || "Container name already in use");
-      err.status = ret.status;
-      err.code = "NAME_IN_USE";
-      throw err;
-    }
-    if (ret.status === 400 && msg.includes("invalid")) {
-      const err = new Error(peek || "Invalid container name");
-      err.status = ret.status;
-      err.code = "INVALID_NAME";
-      throw err;
-    }
-  }
-
-  // retry without tags
-  const retry = ret.status === 415 || ret.status === 405 || ret.status === 400;
-  if (retry) {
-    ret = await PUT(url);
-    if ([200, 201, 202, 204].includes(ret.status)) return;
-    return classifyAndThrow(ret);
-  }
-
-  return classifyAndThrow(ret);
-}
-
-
-
-export async function swiftDeleteContainer(
-  project,
-  container,
-) {
-  // Delete a container.
-  let fetchURL = new URL("/api/".concat(
-    encodeURI(project), "/",
-    encodeURI(container),
-  ), document.location.origin);
-
-  let ret = await DELETE(fetchURL);
-  if (ret.status != 204) {
-    throw new Error("Container deletion not successful.");
-  }
-}
-
-export async function swiftDeleteObjects(
-  project,
-  container,
-  objects,
-) {
-  let fetchURL = new URL("/api/".concat(
-    encodeURI(project), "/",
-    encodeURI(container),
-  ), document.location.origin);
-  fetchURL.searchParams.append("objects", true);
-
-  let ret = await DELETE(
-    fetchURL, JSON.stringify(objects),
-  );
-
-  if (ret.status != 200) {
-    throw new Error("Object / objects deletion not successful.");
-  }
-}
-
-export async function swiftCopyContainer(
-  project,
-  container,
+  bucket,
   source_project,
-  source_container,
-  project_name = "",
-  source_project_name = "",
+  source_bucket,
+  project_name,
+  source_project_name,
 ) {
-  // Replicate the container from a specified source to the location
+  // Replicate the bucket from a specified source to the location
   let fetchURL = new URL("/replicate/".concat(
     encodeURI(project), "/",
-    encodeURI(container),
+    encodeURI(bucket),
   ), document.location.origin);
 
+  fetchURL.searchParams.append("from_bucket", source_bucket);
   fetchURL.searchParams.append("from_project", source_project);
-  fetchURL.searchParams.append("from_container", source_container);
-
-  if (project_name !== "") {
+  if (project_name) {
     fetchURL.searchParams.append("project_name", project_name);
   }
-  if (source_project_name !== "") {
+  if (source_project_name) {
     fetchURL.searchParams.append("from_project_name", source_project_name);
   }
 
   let ret = await POST(fetchURL);
 
   if (ret.status != 202) {
-    throw new Error("Container replication not successful.");
+    throw new Error("Bucket replication not successful.");
   }
 
-  return await ret.json();
-}
-
-export async function getCopyStatus(jobId, projectId) {
-  const url = new URL(`/replicate/status/${encodeURI(jobId)}`, document.location.origin);
-  url.searchParams.append("project", projectId);
-  const ret = await GET(url);
-  if (ret.status !== 200) throw new Error("Status fetch failed");
-  return ret.json();
-}
-
-export async function cancelCopy(jobId, projectId) {
-  const url = new URL(`/replicate/cancel/${encodeURI(jobId)}`, document.location.origin);
-  url.searchParams.append("project", projectId);
-  const ret = await POST(url);
-  if (ret.status !== 200) throw new Error("Cancel failed");
-  return ret.json();
+  return ret;
 }
 
 
-export async function createExtToken(
+// Proxy ListBuckets command through the backend
+export async function awsListBuckets(
   project,
-  id,
+  continuation_token = undefined,
+  max_buckets = undefined,
 ) {
-  // Tell backend to create a new project scoped API token
-  let fetchURL = new URL("/token/".concat(
-    encodeURI(project), "/",
-    encodeURI(id),
-  ), document.location.origin);
+  let fetchURL = new URL(`/api/s3/${encodeURI(project)}`, document.location.origin);
 
-  let ret = await GET(fetchURL);
-
-  if (ret.status != 201) {
-    throw new Error("Token creation failed");
+  if (continuation_token !== undefined) {
+    fetchURL.searchParams.append("continuation_token", continuation_token);
+  }
+  if (max_buckets !== undefined && max_buckets > 0) {
+    fetchURL.searchParams.append("max_buckets", max_buckets);
   }
 
-  return ret.json();
+  let resp = await GET(fetchURL);
+  if (resp.status === 401) {
+    // Suspended/closed project — the global 401 handler has already
+    // flagged the state; end the listing gracefully.
+    return { Buckets: [] };
+  }
+  if (resp.status != 200) {
+    throw new Error("Failed to retrieve the bucket page.");
+  }
+  projectSuspendedHandler?.(false);
+
+  let ret = await resp.json();
+  for (const bucket of ret.Buckets) {
+    bucket.CreationDate = new Date(bucket.CreationDate);
+  }
+
+  if (DEV) console.log(ret);
+
+  return ret;
 }
 
-export async function listTokens(project) {
-  // Get all tokens created for the project by id
+// Proxy CreateBucket command through the backend
+export async function awsCreateBucket(
+  project,
+  bucket,
+) {
+  let fetchURL = new URL(`/api/s3/${encodeURI(project)}/${encodeURI(bucket)}`, document.location.origin);
+  let resp = await PUT(fetchURL);
+
+  return resp;
+}
+
+// Update all bucket cors
+export async function awsBulkAddBucketCors(
+  project,
+) {
+  let fetchURL = new URL(`/api/s3/${encodeURI(project)}/cors`, document.location.origin);
+  let resp = await POST(fetchURL);
+
+  if (resp.status != 204) {
+    throw new Error("Failed to fix the bucket cors in all buckets.");
+  }
+}
+
+// Update CORS for a list of buckets
+export async function awsBulkAddBucketListCors(
+  project,
+  buckets,
+) {
+  let fetchURL = new URL(`/api/s3/${encodeURI(project)}/cors`, document.location.origin);
+  fetchURL.searchParams.append("buckets", buckets.join(";"));
+
+  let resp = await POST(fetchURL);
+
+  if (resp.status != 204) {
+    throw new Error("Failed to fix the bucket cors in the listed buckets.");
+  }
+}
+
+// Update single bucket cors
+export async function awsAddBucketCors(
+  project,
+  bucket,
+) {
+  let fetchURL = new URL(`/api/s3/${encodeURI(project)}/${bucket}/cors`, document.location.origin);
+  let resp = await POST(fetchURL);
+
+  if (resp.status != 204) {
+    throw new Error("Failed to fix the bucket cors.");
+  }
+}
+
+// TODO(swift-deprecation): remove swiftGetBucketPublic and
+// swiftSetBucketPublic together with their backend routes; they only
+// exist to sync the public toggle with the Swift UI
+//
+// Get the public read status of a bucket (Swift container read ACL)
+// and its public web address
+export async function swiftGetBucketPublic(project, bucket) {
   let fetchURL = new URL(
-    "/token/".concat(encodeURI(project)), document.location.origin,
+    `/api/${encodeURI(project)}/${encodeURIComponent(bucket)}/public`,
+    document.location.origin,
   );
+  let resp = await GET(fetchURL);
 
-  let ret = await GET(fetchURL);
-
-  if (ret.status != 200) {
-    throw new Error("Token listing fetch failed");
+  if (resp.status != 200) {
+    throw new Error("Failed to get the bucket public status.");
   }
 
-  return ret.json();
+  return await resp.json();
 }
 
-export async function removeToken(
-  project,
-  id,
-) {
-  // Tell backend to delete API tokens matching the ID
-  let fetchURL = new URL("/token/".concat(
-    encodeURI(project), "/",
-    encodeURI(id),
-  ), document.location.origin);
-
-  let ret = await DELETE(fetchURL);
-
-  if (ret.status != 204) {
-    throw new Error("Token deletion failed");
-  }
-}
-
-export async function getUploadEndpoint(
-  project,
-  owner,
-  container,
-) {
-  // Fetch upload endpoint, session and signature information
-  let fetchURL = new URL("/upload/".concat(
-    encodeURI(owner),
-    "/",
-    encodeURI(container),
-  ),
-  document.location.origin,
-  );
-  fetchURL.searchParams.append("project", project);
-  let ret = await GET(fetchURL);
-
-  if (ret.status != 200) {
-    throw new Error("Failed to get upload session information.");
-  }
-
-  return ret.json();
-}
-
-export async function killUploadEndpoint(
-  project,
-  owner,
-) {
+// Enable or disable public read access on a bucket via the backend,
+// which edits the Swift container read ACL (kept in sync with the
+// Swift UI)
+export async function swiftSetBucketPublic(project, bucket, enabled) {
   let fetchURL = new URL(
-    `/upload/${encodeURI(owner)}`,
+    `/api/${encodeURI(project)}/${encodeURIComponent(bucket)}/public`,
     document.location.origin,
   );
-  fetchURL.searchParams.append("project", project);
-  let ret = await DELETE(fetchURL);
+  fetchURL.searchParams.append("enabled", enabled ? "true" : "false");
 
-  if (ret.status != 204) {
-    throw new Error("Failed to kill upload session.");
+  let resp = await PUT(fetchURL);
+
+  if (resp.status != 204) {
+    throw new Error("Failed to update the bucket public status.");
   }
 }
 
-export async function getUploadSocket(
+export function getPreviewUrl(project, bucket, objectName) {
+  // Session-authenticated backend proxy: the URL only works for
+  // logged-in members of the project, it is not a shareable link
+  return new URL(
+    `/preview/${encodeURIComponent(project)}`
+    + `/${encodeURIComponent(bucket)}`
+    + `/${encodeURIComponent(objectName)}`,
+    document.location.origin,
+  ).toString();
+}
+
+// Check if bucket with given name exists. Proxied via the backend because
+// a browser-side HeadBucket fails at the CORS preflight stage for buckets
+// that have no CORS configuration yet.
+export async function checkBucketExists(
   project,
-  owner,
+  bucket,
 ) {
-  let fetchURL = new URL(
-    "/enupload/".concat(encodeURI(owner)),
-    document.location.origin,
-  );
-
-  fetchURL.searchParams.append("project", project);
-  let ret = await GET(fetchURL);
-
-  if (ret.status != 200) {
-    throw new Error("Failed to get upload socket information.");
-  }
-
-  return ret.json();
-}
-
-
-// Create an empty “folder” marker (zero-byte object ending with “/”).
-export async function swiftCreateEmptyObject(project, container, objectPath, owner) {
-  const name = objectPath.endsWith("/") ? objectPath : `${objectPath}/`;
-
-  const objectUrl = new URL(
-    `/api/${encodeURIComponent(project)}/${encodeURIComponent(container)}/${encodeURIComponent(name)}`,
-    document.location.origin,
-  );
-
-  // If owner is specified, add it as a query parameter (for shared containers)
-  if (owner) objectUrl.searchParams.append("owner", owner);
-
-  const ret = await PUT(objectUrl, new Blob([]));
-
-  if ([200, 201, 202, 204, 409].includes(ret.status)) return;
-
-  // Friendly errors
-  if (ret.status === 401) throw new Error("Session expired. Please sign in again.");
-  if (ret.status === 403) throw new Error("You don’t have permission to create objects here.");
-  if (ret.status === 404) throw new Error("Container not found.");
-  if (ret.status === 405) throw new Error("Object PUT not enabled in this UI (405).");
-  if (ret.status === 413) throw new Error("Payload too large.");
-  if (ret.status === 429) throw new Error("Rate limited — please retry.");
-  if (ret.status >= 500) throw new Error("Storage backend error.");
-  throw new Error(`Object creation failed (${ret.status}).`);
-}
-
-export function getPreviewUrl(project, container, objectName, owner = "") {
-  const url = new URL(
-    `/preview/${encodeURIComponent(project)}/${encodeURIComponent(container)}/${encodeURIComponent(objectName)}`,
-    document.location.origin,
-  );
-  if (owner) url.searchParams.append("owner", owner);
-  return url.toString();
-}
-
-export async function getPublicBaseAddress(project, signal) {
-  const url = new URL(
-    `/api/public/${encodeURI(project)}/address`,
-    document.location.origin,
-  );
-  const ret = await GET(url, signal);
-  if (ret.status !== 200) throw new Error("Failed to fetch public base address");
-  return ret.json();
-}
-
-export async function setContainerPublic(project, container, enabled, signal) {
-  const url = new URL(
-    `/api/public/${encodeURIComponent(project)}/${encodeURIComponent(container)}`,
-    document.location.origin,
-  );
-  url.searchParams.set("enabled", enabled ? "true" : "false");
-
-  const ret = await PUT(url, undefined);
-  if (ret.status !== 204) {
-    const msg = await ret.text().catch(() => "");
-    throw new Error(msg || `Failed to update public access (${ret.status})`);
-  }
-  return true;
-}
-
-export async function listPublicContainers(project, signal) {
-  const url = new URL(
-    `/api/public/${encodeURI(project)}`,
-    document.location.origin,
-  );
-  const ret = await GET(url, signal);
-  if (ret.status !== 200) throw new Error("Failed to list public containers");
-  return ret.json();
+  let fetchURL = new URL(`/api/s3/${encodeURI(project)}/${encodeURI(bucket)}`, document.location.origin);
+  let resp = await fetch(fetchURL, {
+    method: "HEAD",
+    credentials: "same-origin",
+  });
+  if (resp.status === 404) return false;
+  if (resp.status === 200 || resp.status === 403) return true;
 }

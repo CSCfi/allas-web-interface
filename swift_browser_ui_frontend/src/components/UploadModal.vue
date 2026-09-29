@@ -1,13 +1,15 @@
+
 <template>
   <c-card
     ref="uploadContainer"
-    class="upload-card"
+    class="modal-card"
     data-testid="upload-modal"
     @keydown="handleKeyDown"
   >
     <div
       id="upload-modal-content"
       class="modal-content-wrapper"
+      tabindex="-1"
     >
       <c-toasts
         id="uploadModal-toasts"
@@ -15,19 +17,19 @@
         vertical="bottom"
         absolute
       />
-      <h2 class="title is-4">
-        {{ $t("message.encrypt.uploadFiles") }}
-      </h2>
-      <c-card-content>
-        <div
-          v-if="!currentBucket"
-          id="upload-to-root"
-        >
+      <c-card-content class="modal-card-content">
+        <h2 class="title is-4">
+          {{ $t("message.uploadDialog.uploadFiles") }}
+        </h2>
+        <div v-if="!currentBucket" class="content-div">
           <h3 class="title is-6">
-            1. {{ $t("message.encrypt.upload_step1") }}
+            1. {{ $t("message.uploadDialog.uploadStep1.title") }}
           </h3>
-          <p class="info-text is-size-6">
-            {{ $t("message.container_ops.norename") }}
+          <p>
+            {{ $t('message.uploadDialog.uploadStep1.createAtRoot') }}
+          </p>
+          <p>
+            {{ $t('message.uploadDialog.uploadStep1.nonModifiable') }}
           </p>
           <c-text-field
             id="upload-bucket-input"
@@ -36,18 +38,21 @@
             data-testid="upload-bucket-input"
             :label="$t('message.container_ops.bucketName')"
             aria-required="true"
+            hide-details
             required
-            :valid="errorMsg.length === 0"
-            :validation="errorMsg"
-            @changeValue="interacted = true"
+            trim-whitespace
+            @changeValue="checkBucketName"
+          />
+          <BucketNameValidation
+            :result="validationResult"
           />
           <h3 class="title is-6">
-            2. {{ $t("message.encrypt.upload_step2") }}
+            2. {{ $t("message.uploadDialog.uploadStep2") }}
           </h3>
         </div>
         <div v-else>
           <p>
-            <b>{{ $t("message.encrypt.uploadDestination") }}</b>
+            <b>{{ $t("message.uploadDialog.uploadDestination") }}</b>
             {{ currentBucket }}
           </p>
         </div>
@@ -65,7 +70,7 @@
             @cancel="buttonAddingFiles=false"
           >
             <span>
-              {{ $t("message.encrypt.dropMsg") }}
+              {{ $t("message.uploadDialog.dropMsg") }}
             </span>
           </CUploadButton>
         </div>
@@ -83,10 +88,7 @@
                 size="small"
                 @click="error.show = false"
               >
-                <i
-                  slot="icon"
-                  class="mdi mdi-close"
-                />
+                <c-icon :path="mdiClose" />
                 {{ $t("message.close") }}
               </c-button>
             </div>
@@ -101,7 +103,7 @@
           >
             {{ $t("message.objects.file") }}
             <b>
-              {{ existingFiles[0].relativePath || existingFiles[0].name }}
+              {{ existingFiles[0].name }}
             </b>
             {{ $t("message.objects.overwriteConfirm") }}
           </span>
@@ -137,17 +139,19 @@
           class="files-table"
           :data.prop="paginatedDropFiles"
           :headers.prop="fileHeaders"
-          :no-data-text="$t('message.encrypt.empty')"
+          :no-data-text="$t('message.uploadDialog.empty')"
           :pagination.prop="filesPagination"
           :sort-by="sortBy"
           :sort-direction="sortDirection"
           external-data
-          @click="checkPage($event)"
+          @click="checkPage($event,false)"
           @sort="onSort"
           @paginate="getDropTablePage"
         />
-        <p class="info-text is-6 share-note">
-          {{ $t("message.encrypt.uploadedFiles") }}
+        <p
+          class="info-text is-6"
+        >
+          {{ $t("message.uploadDialog.uploadedFiles") }}
           <b>{{ active.name }}</b>{{ !owner ? "." : " (" }}
           <c-link
             :href="projectInfoLink"
@@ -155,23 +159,11 @@
             target="_blank"
           >
             {{ $t("message.container_ops.viewProjectMembers") }}
-            <i class="mdi mdi-open-in-new" />
+            <c-icon :path="mdiOpenInNew" />
           </c-link>
           {{ !owner ? "" :
-            ") " + $t("message.encrypt.uploadedToShared") }}
+            ") " + $t("message.uploadDialog.uploadedToShared") }}
         </p>
-        <p class="unencrypted-note is-size-7" role="note">
-          {{ $t('message.encrypt.unencryptedNotice') }}
-          <c-link
-            href="https://sd-connect.csc.fi"
-            underline
-            target="_blank"
-          >
-            SD-Connect
-            <i class="mdi mdi-open-in-new" />
-          </c-link>
-        </p>
-        <c-accordion id="accordion" />
       </c-card-content>
     </div>
     <c-card-actions justify="space-between">
@@ -181,7 +173,7 @@
         @click="cancelUpload"
         @keyup.enter="cancelUpload"
       >
-        {{ $t("message.encrypt.cancel") }}
+        {{ $t("message.uploadDialog.cancel") }}
       </c-button>
       <c-button
         data-testid="start-upload"
@@ -190,65 +182,70 @@
         @click="onUploadClick"
         @keyup.enter="onUploadClick"
       >
-        {{ $t("message.encrypt.normup") }}
+        {{ $t("message.uploadDialog.normup") }}
       </c-button>
     </c-card-actions>
   </c-card>
 </template>
 
 <script>
-import {
-  getHumanReadableSize,
-  truncate,
-  sortItems,
-} from "@/common/conv";
-import { getDB } from "@/common/db";
+import { getDB } from "@/common/idb";
 
 import {
+  DEV,
   getProjectNumber,
   validateBucketName,
-  checkIfItemIsLastOnPage,
   addErrorToastOnMain,
 } from "@/common/globalFunctions";
 import {
-  getFocusableElements,
-  moveFocusOutOfModal,
-  keyboardNavigationInsideModal,
-} from "@/common/keyboardNavigation";
+  checkIfItemIsLastOnPage,
+  getHumanReadableSize,
+  sortItems,
+  truncate,
+} from "@/common/tableFunctions";
+import { captureKeyboardNavInsideModal } from "@/common/keyboardNavigation";
 import CUploadButton from "@/components/CUploadButton.vue";
-import { swiftDeleteObjects, getObjects, swiftCreateContainer, swiftCreateEmptyObject } from "@/common/api";
+import BucketNameValidation from "./BucketNameValidation.vue";
+import {
+  awsListObjects,
+  awsPutObject,
+  checkBucketAccessible,
+} from "@/common/s3commands";
+import { awsAddBucketCors, awsCreateBucket } from "@/common/api";
 
-import { debounce } from "lodash";
-import { mdiDelete } from "@mdi/js";
+import { debounce, delay } from "lodash";
+import { mdiDelete, mdiClose, mdiOpenInNew } from "@mdi/js";
 
 export default {
   name: "UploadModal",
   components: {
     CUploadButton,
+    BucketNameValidation,
   },
   filters: {
     truncate,
   },
   data() {
     return {
+      mdiClose,
+      mdiOpenInNew,
       inputBucket: "",
       CUploadButton,
       projectInfoLink: "",
       addingFiles: false,
       buttonAddingFiles: false,
-      interacted: false,
-      errorMsg: "",
+      validationResult: {},
       toastMsg : "",
       containers: [],
       objects: [],
       existingFiles: [],
       filesToOverwrite: [],
-      emptyFolders: [],
       dropFileErrors: [
         {id: "duplicate", show: false},
         {id: "sizeZero", show: false},
       ],
       paginatedDropFiles: [],
+      emptyFolders: [],
       sortBy: "name",
       sortDirection: "asc",
       filesPagination: {
@@ -260,11 +257,8 @@ export default {
     };
   },
   computed: {
-    res() {
-      return this.$store.state.resumableClient;
-    },
     active() {
-      return this.$store.state.active;
+      return this.$store.active;
     },
     locale() {
       return this.$i18n.locale;
@@ -273,40 +267,40 @@ export default {
       return this.$route.params.container;
     },
     modalVisible() {
-      return this.$store.state.openUploadModal;
+      return this.$store.openUploadModal;
     },
     owner() {
       return this.$route.params.owner;
     },
-    socket() {
-      return this.$store.state.socket;
+    s3socket() {
+      return this.$store.s3upload;
     },
     abortReason() {
-      return this.$store.state.uploadAbortReason;
+      return this.$store.uploadAbortReason;
     },
     fileHeaders() {
       return [
         {
           key: "name",
-          value: this.$t("message.encrypt.table.name"),
+          value: this.$t("message.uploadDialog.table.name"),
           width: "30%",
           sortable: this.dropFiles.length > 1,
         },
         {
           key: "type",
-          value: this.$t("message.encrypt.table.type"),
+          value: this.$t("message.uploadDialog.table.type"),
           width: "15%",
           sortable: this.dropFiles.length > 1,
         },
         {
           key: "size",
-          value: this.$t("message.encrypt.table.size"),
+          value: this.$t("message.uploadDialog.table.size"),
           width: "10%",
           sortable: this.dropFiles.length > 1,
         },
         {
           key: "relativePath",
-          value: this.$t("message.encrypt.table.path"),
+          value: this.$t("message.uploadDialog.table.path"),
           width: "30%",
           sortable: this.dropFiles.length > 1,
         },
@@ -318,16 +312,17 @@ export default {
       ];
     },
     dropFiles() {
-      return this.$store.state.dropFiles;
+      return this.$store.dropFiles;
     },
     files: {
       get() {
-        return this.$store.state.dropFiles.message;
+        return this.$store.dropFiles.message;
       },
       set(value) {
         const files = Array.from(value);
         files.forEach(file => {
           if (this.addFiles) {
+            file.relativePath = file.name;
             this.appendDropFiles(file);
           }
         });
@@ -335,14 +330,11 @@ export default {
       },
     },
     addFiles() {
-      return this.$store.state.addUploadFiles;
-    },
-    prevActiveEl() {
-      return this.$store.state.prevActiveEl;
+      return this.$store.addUploadFiles;
     },
     existingFileNames() {
       return this.existingFiles.reduce((array, item) => {
-        array.push(item.relativePath || item.name);
+        array.push(item.name);
         return array;
       }, []).join(", ");
     },
@@ -356,17 +348,12 @@ export default {
         this.clearExistingFiles();
         this.objects = [];
         this.filesToOverwrite = [];
-        this.emptyFolders = [];
         this.inputBucket = "";
         this.containers = await getDB().containers
           .where({ projectID: this.active.id })
           .toArray();
         if (this.currentBucket) {
-          const cont = this.containers.find(c =>
-            c.name === this.currentBucket);
-          this.objects = await getDB().objects
-            .where({containerID: cont.id})
-            .toArray();
+          this.objects = await awsListObjects(this.currentBucket);
         }
       }
     },
@@ -375,14 +362,6 @@ export default {
       handler() {
         if (this.modalVisible) this.getDropTablePage();
       },
-    },
-    emptyFolders() {
-      if (this.modalVisible) this.getDropTablePage();
-    },
-    inputBucket: function() {
-      if (this.inputBucket && this.interacted) {
-        this.checkBucketName();
-      }
     },
     active: function () {
       this.projectInfoLink = this.$t("message.supportMenu.projectInfoBaseLink")
@@ -405,29 +384,19 @@ export default {
       }
     },
     abortReason() {
-      if (!this.abortReason) return;
-
-        // Only set uploadError once
-        if (this.uploadError) {
-          this.$store.commit("setUploadAbortReason", undefined);
-          return;
+      if (this.abortReason !== undefined) {
+        if (this.abortReason
+          ?.match("Could not create or access the container.")) {
+          this.uploadError = this.currentBucket ?
+            this.$t("message.upload.accessFail")
+            : this.$t("message.error.createFail")
+              .concat(" ", this.$t("message.error.inUseOtherPrj"));
         }
-        const r = (this.abortReason || "").toLowerCase();
-
-        if (r.includes("could not create or access the container")) {
-          // Container creation/access error
-          if (r.includes("already in use") || r.includes("conflict") || r.includes("409")) {
-            this.uploadError = this.$t("message.error.inUseOtherPrj");
-          } else {
-            this.uploadError = this.currentBucket
-              ? this.$t("message.upload.accessFail")
-              : this.$t("message.error.createFail");
-          }
-        } else if (r.includes("cancel")) {
+        else if (this.abortReason?.match("cancel")) {
           this.uploadError = this.$t("message.upload.cancelled");
         }
-
-        this.$store.commit("setUploadAbortReason", undefined);
+        this.$store.setUploadAbortReason(undefined);
+      }
     },
     uploadError() {
       if (this.uploadError) addErrorToastOnMain(this.uploadError);
@@ -443,42 +412,6 @@ export default {
     }
   },
   methods: {
-    // Get the current prefix from the route query
-    getCurrentPrefix() {
-      const raw = (this.$route.query.prefix || "").replace(/^\/+/, "");
-      return raw && !raw.endsWith("/") ? `${raw}/` : raw;
-    },
-    // Create any empty folders that were added
-    async createEmptyFolders() {
-      if (this.emptyFolders.length === 0) return;
-
-      const projectID = this.owner || this.active.id;
-      const container = this.currentBucket || (this.inputBucket || "").trim();
-      if (!container) return;
-
-      // Ensure the container exists (if uploading to root)
-      if (!this.currentBucket) {
-        try {
-          await swiftCreateContainer(projectID, container, []);
-        } catch (_) {}
-      }
-
-      // Get the prefix from the route
-      const rawPrefix = (this.$route.query.prefix || "").replace(/^\/+/, "");
-      const prefix    = rawPrefix && !rawPrefix.endsWith("/") ? `${rawPrefix}/` : rawPrefix;
-
-      // Create each empty folder (as an empty object with a trailing slash)
-      const folders = Array.from(new Set(this.emptyFolders)).sort();
-
-      for (const p of folders) {
-        const path = `${prefix}${p.endsWith("/") ? p : p + "/"}`;
-        try {
-          await swiftCreateEmptyObject(projectID, container, path, this.owner);
-        } catch (e) {
-          this.uploadError = this.$t("message.container_ops.createFail") || "Failed to create folder.";
-        }
-      }
-    },
     getHumanReadableSize,
     checkPage(event) {
       const page = checkIfItemIsLastOnPage(
@@ -496,11 +429,13 @@ export default {
         return;
       }
 
-      // Determine effective path with prefix
-      const prefix = this.getCurrentPrefix();
+      // Destination key is the current folder prefix + relative path.
+      // prefixApplied guards against prepending twice when a file
+      // re-enters via the overwrite confirmation.
       const rp = file.relativePath || file.name;
-      const effectivePath = `${prefix}${rp}`;
-
+      const effectivePath = file.prefixApplied
+        ? rp
+        : `${this.getCurrentPrefix()}${rp}`;
 
       //Check if file path already exists in dropFiles
       if (
@@ -513,104 +448,175 @@ export default {
           const existingFile = this.objects.find(obj => obj.name === effectivePath);
           if (existingFile) {
             file.relativePath = effectivePath;
+            file.prefixApplied = true;
             this.existingFiles.push(file);
             return;
           }
         }
         file.relativePath = effectivePath;
-        this.$store.commit("appendDropFiles", file);
+        file.prefixApplied = true;
+        this.$store.appendDropFiles(file);
       } else {
         this.dropFileErrors[0].show = true;
         setTimeout(() => this.dropFileErrors[0].show = false, 6000);
       }
     },
-    deleteEmptyFolder(path) {
-      const i = this.emptyFolders.indexOf(path);
-      if (i > -1) this.emptyFolders.splice(i, 1);
+    // Get the current folder prefix from the route query
+    getCurrentPrefix() {
+      const raw = (this.$route.query.prefix || "").replace(/^\/+/, "");
+      return raw && !raw.endsWith("/") ? `${raw}/` : raw;
+    },
+    // Create marker objects for any empty folders that were dropped
+    async createEmptyFolders() {
+      if (this.emptyFolders.length === 0) return;
+
+      const container = this.currentBucket || (this.inputBucket || "").trim();
+      if (!container) return;
+
+      // Ensure the bucket exists and has CORS when uploading to a new one
+      if (!this.currentBucket) {
+        const accessible = await checkBucketAccessible(container);
+        if (!accessible) {
+          try {
+            await awsCreateBucket(this.active.id, container);
+            await awsAddBucketCors(this.active.id, container);
+          } catch (e) {
+            if (DEV) console.log("Couldn't create bucket", container, e);
+            this.uploadError = this.$t("message.container_ops.folderCreateFail");
+            return;
+          }
+        }
+      }
+
+      const prefix = this.getCurrentPrefix();
+      const folders = Array.from(new Set(this.emptyFolders)).sort();
+
+      for (const p of folders) {
+        const path = `${prefix}${p.endsWith("/") ? p : p + "/"}`;
+        try {
+          await awsPutObject(container, path);
+        } catch {
+          this.uploadError = this.$t("message.container_ops.folderCreateFail");
+        }
+      }
+      this.emptyFolders = [];
     },
     getDropTablePage() {
-      const offset = this.filesPagination.currentPage * this.filesPagination.itemsPerPage
+      const offset =
+        this.filesPagination.currentPage
+        * this.filesPagination.itemsPerPage
         - this.filesPagination.itemsPerPage;
+
       const limit = this.filesPagination.itemsPerPage;
-
-      // Normal files (from store)
       const fileRows = this.dropFiles
-        .sort((a, b) => sortItems(a, b, this.sortBy, this.sortDirection))
-        .map(file => ({
-          kind: "file",
-          key: `f:${file.relativePath}`,
-          name: { value: file.name || truncate(100) },
-          type: { value: file.type },
-          size: { value: getHumanReadableSize(file.size, this.locale) },
-          relativePath: { value: file.relativePath || truncate(100) },
-          delete: {
-            children: [{
-              value: this.$t("message.delete"),
-              component: {
-                tag: "c-button",
-                params: {
-                  text: true,
-                  size: "small",
-                  title: this.$t("message.delete"),
-                  path: mdiDelete,
-                  onClick: () => this.deleteDropFile(file),
-                  onKeyUp: (e) => { if (e.keyCode === 13) this.deleteDropFile(file); },
+        .sort((a, b) => sortItems(
+          a, b, this.sortBy, this.sortDirection))
+        .map(file => {
+          return {
+            name: { value: file.name || truncate(100) },
+            type: { value: file.type },
+            size: { value: getHumanReadableSize(file.size, this.locale) },
+            relativePath: {
+              value: file.relativePath || truncate(100),
+            },
+            delete: {
+              children: [
+                {
+                  value: "",
+                  component: {
+                    tag: "c-button",
+                    params: {
+                      text: true,
+                      size: "small",
+                      onClick: () => {
+                        this.deleteDropFile(file);
+                      },
+                      onKeyUp: (e) => {
+                        if(e.keyCode === 13) {
+                          this.deleteDropFile(file);
+                        }
+                      },
+                    },
+                  },
+                  children: [
+                    {
+                      value: "",
+                      component: {
+                        tag: "c-icon",
+                        params: {
+                          path: mdiDelete,
+                          size: "18",
+                        },
+                      },
+                    },
+                    {
+                      value: this.$t("message.upload.remove"),
+                      component: {
+                        tag: "span",
+                      },
+                    },
+                  ],
                 },
-              },
-            }],
-          },
-        }));
+              ],
+            },
+          };
+        });
 
-      // Empty folders (from local state)
+      // Empty folders dropped for creation as marker objects
       const folderRows = Array.from(new Set(this.emptyFolders))
         .sort()
         .map(p => ({
-          kind: "folder",
-          key: `d:${p}`,
           name: { value: p.replace(/\/$/, "") },
           type: { value: this.$t("message.objects.folder") },
           size: { value: "-" },
-          relativePath: { value: p },
+          relativePath: { value: `${this.getCurrentPrefix()}${p}` },
           delete: {
-            children: [{
-              value: this.$t("message.delete"),
-              component: {
-                tag: "c-button",
-                params: {
-                  text: true,
-                  size: "small",
-                  title: this.$t("message.delete"),
-                  path: mdiDelete,
-                  onClick: () => {
-                    this.emptyFolders = this.emptyFolders.filter(x => x !== p);
+            children: [
+              {
+                value: "",
+                component: {
+                  tag: "c-button",
+                  params: {
+                    text: true,
+                    size: "small",
+                    onClick: () => {
+                      this.emptyFolders =
+                        this.emptyFolders.filter(x => x !== p);
+                      this.getDropTablePage();
+                    },
                   },
                 },
+                children: [
+                  {
+                    value: "",
+                    component: {
+                      tag: "c-icon",
+                      params: {
+                        path: mdiDelete,
+                        size: "18",
+                      },
+                    },
+                  },
+                  {
+                    value: this.$t("message.upload.remove"),
+                    component: {
+                      tag: "span",
+                    },
+                  },
+                ],
               },
-            }],
+            ],
           },
         }));
 
-      const unified = [...fileRows, ...folderRows];
+      this.paginatedDropFiles = [...fileRows, ...folderRows]
+        .slice(offset, offset + limit);
 
-      // Sorting
-      const keyForSort = (row) => {
-        if (this.sortBy === "size") return row.kind === "folder" ? -1 : undefined;
-        if (this.sortBy === "name") return row.name.value.toLowerCase();
-        if (this.sortBy === "relativePath") return row.relativePath.value.toLowerCase();
-        return row.name.value.toLowerCase();
+      this.filesPagination = {
+        ...this.filesPagination,
+        itemCount: this.dropFiles.length
+          + new Set(this.emptyFolders).size,
       };
-
-      unified.sort((a, b) => {
-        const A = keyForSort(a);
-        const B = keyForSort(b);
-        if (A === B) return 0;
-        if (this.sortDirection === "asc") return A < B ? -1 : 1;
-        return A > B ? -1 : 1;
-      });
-
-      // Pagination
-      this.paginatedDropFiles = unified.slice(offset, offset + limit);
-      this.filesPagination = { ...this.filesPagination, itemCount: unified.length };
     },
     onSort(event) {
       this.sortBy = event.detail.sortBy;
@@ -618,7 +624,7 @@ export default {
       this.getDropTablePage();
     },
     deleteDropFile(file) {
-      this.$store.commit("eraseDropFile", file);
+      this.$store.eraseDropFile(file);
       const i = this.filesToOverwrite.findIndex(
         (f) => f.relativePath === file.relativePath);
       if (i > -1) {
@@ -634,51 +640,12 @@ export default {
       }
       this.clearExistingFiles();
     },
-    async deleteSegments() {
-      //old file segments need to be deleted because
-      //they are not overwritten
-      if (!this.filesToOverwrite.length) return;
-
-      let oldSegments = [];
-      const segmentCont = await getDB().containers.get({
-        projectID: this.active.id,
-        name: `${this.currentBucket}_segments`,
-      });
-
-      // If no segments bucket yet, nothing to delete. Avoid 404 spam.
-      if (segmentCont) {
-        let segmentObjs = [];
-        try {
-          segmentObjs = await getObjects(
-            this.owner || this.active.id,
-            segmentCont.name,
-          );
-        } catch (_) {
-          segmentObjs = [];
-        }
-
-        for (const f of this.filesToOverwrite) {
-          const path = f.relativePath || f.name;
-          const seg = segmentObjs.find(obj => obj.name.startsWith(`${path}/`));
-          if (seg) oldSegments.push(seg.name);
-        }
-
-      }
-
-      if (oldSegments.length) {
-        await swiftDeleteObjects(
-          this.owner || this.active.id,
-          segmentCont.name,
-          oldSegments,
-        );
-      }
-    },
     clearExistingFiles() {
       this.existingFiles = [];
     },
-    checkBucketName: debounce(function () {
-      this.errorMsg = validateBucketName(
-        this.inputBucket, this.$t, this.containers);
+    checkBucketName: debounce(async function () {
+      this.validationResult = await validateBucketName(
+        this.active.id, this.inputBucket);
     }, 300),
     setFile: function (item, path) {
       let entry = undefined;
@@ -699,29 +666,28 @@ export default {
       }
       // Recursively process items inside a directory
       if (entry && entry.isDirectory) {
-        const newPath = path + entry.name + "/";
-        const dirReader = entry.createReader();
+        let newPath = path + entry.name + "/";
+        let dirReader = entry.createReader();
         let allEntries = [];
 
-        const readEntries = () => {
-          dirReader.readEntries((entries) => {
-            if (!this.addFiles) return; // modal was closed
-
-            if (entries.length) {
-              allEntries = allEntries.concat(entries);
-              return readEntries();
-            }
-
-            // If no entries, it's an empty folder
-            if (allEntries.length === 0) {
-              this.emptyFolders.push(newPath);
-              this.getDropTablePage();
-            }
-
-            // Recurse into children (if any)
-            for (const child of allEntries) {
-              if (this.addFiles) this.setFile(child, newPath);
-            }
+        let readEntries = () => {
+          dirReader.readEntries(entries => {
+            if (this.addFiles) {
+              if (entries.length) {
+                allEntries = allEntries.concat(entries);
+                return readEntries();
+              }
+              // No entries at all — an empty folder was dropped
+              if (allEntries.length === 0) {
+                this.emptyFolders.push(newPath);
+                this.getDropTablePage();
+              }
+              for (let item of allEntries) {
+                if (this.addFiles) {
+                  this.setFile(item, newPath);
+                }
+              }
+            } else return; //modal was closed
           });
         };
         readEntries();
@@ -772,56 +738,43 @@ export default {
       el.classList.remove("over-dropArea");
     },
     cancelUpload() {
-      this.$store.commit("setFilesAdded", false);
-      this.$store.commit("eraseDropFiles");
+      this.$store.setFilesAdded(false);
+      this.$store.eraseDropFiles();
       this.toggleUploadModal();
     },
-    resetAccordionVal() {
-      let accordion = document.getElementById("accordion");
-      accordion.value = "advancedOptions";
-    },
     toggleUploadModal() {
-      this.resetAccordionVal();
       document.querySelector("#uploadModal-toasts").removeToast("upload-toast");
       for (let i = 0; i < this.dropFileErrors.length; i++) {
         this.dropFileErrors[i].show = false;
       }
-      this.$store.commit("toggleUploadModal", false);
+      this.$store.toggleUploadModal(false);
       this.addingFiles = false;
+      this.tags = [];
       this.files = [];
-      this.interacted = false;
-      this.errorMsg = "";
+      this.emptyFolders = [];
+      this.validationResult = {};
       this.toastMsg = "";
       this.sortBy = "name";
       this.sortDirection = "asc";
       this.filesPagination.currentPage = 1;
       this.uploadError = "";
-      this.emptyFolders = [];
-
-      moveFocusOutOfModal(this.prevActiveEl);
     },
     checkIfCanUpload() {
-      // Check if there are files or empty folders to upload
-      const hasFiles = this.dropFiles.length > 0;
-      const hasEmptyFolders = this.emptyFolders.length > 0;
-
-      if (!hasFiles && !hasEmptyFolders) {
+      if (this.dropFiles.length === 0 && this.emptyFolders.length === 0) {
         return this.$t("message.upload.addFiles");
       }
-
       return "";
     },
     async onUploadClick() {
-      this.toastMsg = this.checkIfCanUpload();
-
       if (!this.currentBucket) {
-        this.inputBucket = this.inputBucket.trim();
-        this.errorMsg = validateBucketName(this.inputBucket, this.$t, this.containers);
+        this.validationResult =
+          await validateBucketName(this.active.id, this.inputBucket);
+        const validationError =
+          Object.values(this.validationResult).some(val => !val);
+        if (validationError) return;
       }
-      if (this.errorMsg) {
-        return;
-      }
-      else if (this.toastMsg) {
+      this.toastMsg = this.checkIfCanUpload();
+      if (this.toastMsg) {
         document.querySelector("#uploadModal-toasts").addToast(
           {
             id: "upload-toast",
@@ -833,149 +786,57 @@ export default {
         );
         return;
       }
-      else {
-        const hasFiles = this.dropFiles.length > 0;
-        const hasEmptyFolders = this.emptyFolders.length > 0;
-
-        // If uploading to root, create the container first
-        const creatingNewBucket = !this.currentBucket;
-        const projectID = this.owner || this.active.id;
-        const container = this.currentBucket || this.inputBucket.trim();
-
-        // Create the container (if needed)
-        try {
-          if (creatingNewBucket) {
-            await swiftCreateContainer(projectID, container, []);
-          }
-        } catch (e) {
-          if (e?.code === "NAME_IN_USE") {
-            this.uploadError = this.$t("message.error.inUseOtherPrj");
-          } else if (e?.code === "INVALID_NAME") {
-            this.uploadError = this.$t("message.container_ops.invalidName") || this.$t("message.error.createFail");
-          } else {
-            this.uploadError = this.$t("message.error.createFail") || "Bucket creation failed.";
-          }
-          return;
-        }
-
-        // If only empty folders, create them and exit
-        if (!hasFiles && hasEmptyFolders) {
-          await this.createEmptyFolders();
-          try {
-            const projectID = this.owner || this.active.id;
-            const container = this.currentBucket || this.inputBucket.trim();
-
-            // Refresh containers list
-            await this.$store.dispatch("updateContainers", { projectID });
-
-            const db = getDB();
-            const cont = await db.containers.get({ projectID, name: container });
-            if (cont) {
-              await this.$store.dispatch("updateObjects", {
-                projectID,
-                container: cont,
-                ...(this.owner ? { owner: this.owner } : {}),
-              });
-              // Update container object count and last_modified
-              const objs  = await db.objects.where({ containerID: cont.id }).toArray();
-              const bytes = objs.reduce((sum, o) => sum + (o?.bytes || 0), 0);
-
-              await db.containers.update(cont.id, {
-                count: objs.length,
-                bytes,
-                last_modified: new Date().toISOString(),
-              });
-
-            }
-            this.$store.commit("setNewBucket", container);
-          } catch (e) {}
-          this.toggleUploadModal();
-          return;
-        }
-
-        // Delete segments for files to be overwritten
-        this.deleteSegments();
-        if (hasEmptyFolders) await this.createEmptyFolders();
-        this.beginUpload();
+      // Only empty folders, no files: create the markers and close
+      if (this.dropFiles.length === 0) {
+        await this.createEmptyFolders();
+        this.toggleUploadModal();
+        return;
       }
-
+      if (this.emptyFolders.length > 0) {
+        await this.createEmptyFolders();
+      }
+      this.beginUpload();
     },
-    async beginUpload() {
-      const bucketName = this.currentBucket
-        ? this.currentBucket
-        : this.inputBucket;
+    async startUpload() {
+      const bucketName = this.currentBucket ?
+        this.currentBucket :
+        this.inputBucket;
 
-      const filesForUpload = this.$store.state.dropFiles.map(file => {
-        file.relativePath = file.relativePath || file.name;
-        return file;
-      });
-
-      const owner = this.$route.params.owner || "";
-      const ownerName = "";
-
-      this.$store.commit(
-        "setUploadBucket",
+      this.$store.setUploadBucket(
         { name: bucketName, owner: this.$route.params.owner },
       );
-      this.$store.commit("setNewBucket", bucketName);
+      this.$store.setNewBucket(bucketName);
 
-      // Adjust this to your websocket client signature.
-      // If it used to be addUpload(folder, files, keys, owner, ownerName),
-      // just pass [] for keys now.
-      this.socket.addUpload(
+      this.s3socket.addUploads(
         bucketName,
-        filesForUpload,
-        owner,
-        ownerName,
+        this.$store.dropFiles.map(item => item),
       );
-
-      this.toggleUploadModal();
+    },
+    beginUpload() {
+      this.startUpload().then(() => {
+        delay(() => {
+          if (this.$store.uploadProgress === undefined && this.dropFiles.length) {
+            //upload didn't start
+            this.uploadError = this.$t("message.upload.error");
+            this.$store.stopUploading(true);
+            this.$store.toggleUploadNotification(false);
+          }
+        }, 3000);
+        this.toggleUploadModal();
+      });
     },
     handleKeyDown: function (e) {
-      const focusableList = this.$refs.uploadContainer.querySelectorAll(
-        "c-link, c-button, textarea, c-text-field, c-data-table",
-      );
-      const { first, last } = getFocusableElements(focusableList);
-      keyboardNavigationInsideModal(e, first, last, true);
+      if (e.key === "Escape") {
+        this.toggleUploadModal();
+      } else {
+        captureKeyboardNavInsideModal(e, this.$refs.uploadContainer);
+      }
     },
   },
 };
 </script>
 
 <style scoped>
-
-.upload-card {
-  padding: 3rem;
-  position: absolute;
-  top: -1rem;
-  left: 0;
-  right: 0;
-  max-height: 75vh;
-}
-
-@media screen and (max-width: 767px), (max-height: 580px) {
-   .upload-card {
-    top: -5rem;
-  }
-}
-
-@media screen and (max-height: 580px) and (max-width: 767px),
-(max-width: 525px) {
-  .upload-card {
-    top: -9rem;
-  }
-}
-
-@media screen and (max-height: 580px) and (max-width: 525px) {
-  .upload-card {
-    top: -13rem;
-  }
-}
-
-c-card-content {
-  padding: 1rem 0 0 0;
-  color: var(--csc-dark);
-}
 
 c-card-actions {
   padding: 0;
@@ -997,15 +858,11 @@ c-card-actions {
 }
 
 .over-dropArea {
-  border: 2px dashed var(--csc-primary);
+  border: 2px dashed var(--c-primary-600);
 }
 
 c-data-table.files-table {
   margin-top: -24px;
-}
-
-#upload-to-root p {
-  padding: 1rem 0 1rem 0;
 }
 
 c-data-table.publickey-table {
@@ -1021,21 +878,15 @@ c-data-table.publickey-table {
 c-accordion c-button {
   margin-top: 0.5rem;
 }
+
 c-accordion h3 {
   padding: 1rem 0;
 }
 
-.unencrypted-note {
-  display: inline-flex;
-  align-items: center;
-  gap: .4rem;
-}
-.share-note {
-  margin-bottom: 0 !important;
-}
-
-.share-note + .unencrypted-note {
-  margin-top: 0 !important;
+.content-div {
+  & > * {
+    margin: 1rem 0;
+  }
 }
 
 </style>

@@ -1,0 +1,29 @@
+/* Allas brand override for csc-ui v3.
+ *
+ * Sets the csc-ui primary color to Allas navy (#002f5f), reproducing the only
+ * customization the old `allas-ui` fork made — but at runtime via CSS custom
+ * properties, so no forked component library is needed.
+ *
+ * Usage (once the frontend is migrated to @cscfi/csc-ui@3):
+ *   In src/assets/main.css, AFTER the csc-ui theme so this wins the cascade:
+ *     @import url('@cscfi/csc-ui/css/theme.css');
+ *     @import url('@/assets/allas-theme.css');
+ *
+ * The scale mirrors csc-ui v3's own tint/shade ramp applied to #002f5f
+ * (100-500 = base mixed with white; 600 = base; 700-900 = base darkened).
+ *
+ * NOTE: inert until @cscfi/csc-ui@3 is installed and imported — these vars
+ * have no effect against the current allas-ui fork.
+ */
+:root {
+  --c-primary-100: #e6eaef;
+  --c-primary-200: #ccd5df;
+  --c-primary-300: #99acbf;
+  --c-primary-400: #66829f;
+  --c-primary-500: #33597f;
+  --c-primary-600: #002f5f; /* Allas navy — base primary */
+  --c-primary-700: #00264c;
+  --c-primary-800: #001c39;
+  --c-primary-900: #001326;
+  --c-primary-rgb: 0, 47, 95; /* focus rings / ghost rgba() */
+}

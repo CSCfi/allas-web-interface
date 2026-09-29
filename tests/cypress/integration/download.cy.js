@@ -2,7 +2,7 @@
 
 import SparkMD5 from "../../../swift_browser_ui_frontend/node_modules/spark-md5";
 
-describe("Downloads file/container, verifies content and checksum", function () {
+describe("Downloads file/bucket, verifies content and checksum", function () {
   const useServiceWorker =
     "serviceWorker" in navigator && window.showSaveFilePicker === undefined;
   const fileName = Math.random().toString(36).substring(2, 7);
@@ -19,11 +19,11 @@ describe("Downloads file/container, verifies content and checksum", function () 
   it("should download a file", () => {
     //create a bucket
     const bucketName = Math.random().toString(36).substring(2, 7);
-    cy.addbucket(bucketName);
+    cy.addBucket(bucketName);
     cy.wait(3000);
 
     //access bucket
-    cy.searchbucket(bucketName);
+    cy.searchBucket(bucketName);
     cy.get("[data-testid='search-result']")
       .contains(bucketName)
       .click({ force: true });
@@ -31,12 +31,12 @@ describe("Downloads file/container, verifies content and checksum", function () 
 
     cy.fixture("text-files/" + fileName + ".txt", "utf-8").then(
       ($contentOnUpload) => {
-        //check file hash before upload (encryption)
+        //check file hash before upload
         const hexHashUpload = SparkMD5.hash($contentOnUpload);
         cy.log("Upload hash", hexHashUpload);
 
         //upload the fixture file
-        cy.uploadFileFrombucket(fileName);
+        cy.uploadFileFromBucket(fileName);
 
         //close toast
         cy.get('[data-testid="close-upload-toast"]').should("exist").click();
@@ -67,7 +67,7 @@ describe("Downloads file/container, verifies content and checksum", function () 
             ($contentOnDownload) => {
               //create a fixture file from file content in OPFS
               cy.writeFile(
-                Cypress.config("downloadsbucket") + "/" + fileName + ".txt",
+                Cypress.config("downloadsFolder") + "/" + fileName + ".txt",
                 $contentOnDownload
               );
             }
@@ -76,7 +76,7 @@ describe("Downloads file/container, verifies content and checksum", function () 
 
         //read fails if file doesn't exist
         cy.readFile(
-          Cypress.config("downloadsbucket") + "/" + fileName + ".txt"
+          Cypress.config("downloadsFolder") + "/" + fileName + ".txt"
         );
 
         // Check file hash after download
@@ -103,7 +103,7 @@ describe("Downloads file/container, verifies content and checksum", function () 
 
     cy.fixture("text-files/" + fileName + ".txt", "utf-8").then(
       ($contentOnUpload) => {
-        //check file hash before upload (encryption)
+        //check file hash before upload
         hexHashUpload = SparkMD5.hash($contentOnUpload);
 
         //open upload modal
@@ -158,7 +158,7 @@ describe("Downloads file/container, verifies content and checksum", function () 
             ($contentOnDownload) => {
               //need to create a fixture file from file content in OPFS
               cy.writeFile(
-                Cypress.config("downloadsbucket") +
+                Cypress.config("downloadsFolder") +
                   "/" +
                   bucketName +
                   "_download.tar",
@@ -171,18 +171,18 @@ describe("Downloads file/container, verifies content and checksum", function () 
         const downloadName =
           bucketName + (useServiceWorker ? ".tar" : "_download.tar");
         //check that archive exists
-        cy.readFile(Cypress.config("downloadsbucket") + "/" + downloadName);
+        cy.readFile(Cypress.config("downloadsFolder") + "/" + downloadName);
 
         //extract file
         cy.task("extractArchive", {
-          directory: Cypress.config("downloadsbucket"),
+          directory: Cypress.config("downloadsFolder"),
           archive: downloadName,
         });
         cy.wait(3000);
 
         //check if extraction successful
         cy.readFile(
-          Cypress.config("downloadsbucket") + "/" + fileName + ".txt"
+          Cypress.config("downloadsFolder") + "/" + fileName + ".txt"
         );
 
         //compare checksums and content with upload file

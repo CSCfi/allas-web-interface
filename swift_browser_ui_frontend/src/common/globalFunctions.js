@@ -1,40 +1,11 @@
-import store from "@/common/store";
-import { taginputConfirmKeys } from "@/common/conv";
-import { getDB } from "@/common/db";
+// Miscellaneous global functions
 
-export function toggleCreateBucketModal() {
-  store.commit("toggleCreateBucketModal", true);
-}
+import useStore from "@/common/store";
+import { awsHeadObject } from "@/common/s3commands";
+import { checkCorsFlag, updateCorsFlag } from "./idbFunctions";
+import { awsAddBucketCors, checkBucketExists } from "./api";
 
-export function toggleEditTagsModal(objectName, containerName) {
-  if (objectName) {
-    store.commit("setObjectName", objectName);
-  }
-  if (containerName) {
-    store.commit("setBucketName", containerName);
-  }
-  store.commit("toggleEditTagsModal", true);
-}
-
-export function toggleCopyBucketModal(bucketName, sourceProjectId) {
-  if (bucketName) {
-    store.commit("setBucketName", bucketName);
-  }
-  if(sourceProjectId) {
-    store.commit("setSourceProjectId", sourceProjectId);
-  }
-  store.commit("toggleCopyBucketModal", true);
-}
-
-export function toggleDeleteModal(objects, containerName) {
-  if (objects) {
-    store.commit("setDeletableObjects", objects);
-  }
-  if (containerName) {
-    store.commit("setBucketName", containerName);
-  }
-  store.commit("toggleDeleteModal", true);
-}
+export const DEV = import.meta.env.MODE === "development";
 
 export function getProjectNumber(project) {
   if (project.name) {
@@ -45,36 +16,125 @@ export function getProjectNumber(project) {
   }
 }
 
-export async function getSharingContainers (projectId, signal) {
-  return store.state.client && projectId
-    ? await store.state.client.getShare(projectId, signal)
-    : [];
+export function getPrefix(route) {
+  // Get current pseudofolder prefix
+  if (route.query.prefix == undefined) {
+    return "";
+  }
+  return `${route.query.prefix}/`;
 }
 
-export async function getSharedContainers (projectId, signal) {
-  let ret = store.state.client
-    ? await store.state.client.getAccess(projectId, signal)
-    : [];
-
-  return ret.filter(accessEntry => {
-    return accessEntry.owner != projectId;
-  });
+export function getFolderName(folderName, route) {
+  // Get the name of the currently displayed pseudofolder
+  let endregex = new RegExp("/.*$");
+  return folderName.replace(getPrefix(route), "").replace(endregex, "");
 }
 
-export async function getAccessDetails (
-  projectId,
-  bucketName,
-  sourceProjectId,
-  signal)
-{
-  return store.state.client
-    ? await store.state.client.getAccessDetails(
-      projectId,
-      bucketName,
-      sourceProjectId,
-      signal)
-    : [];
+export function isFile(path, route) {
+  // Return true if path represents a file in the active prefix context
+  return path.replace(getPrefix(route), "").match("/") ? false : true;
 }
+
+export async function validateBucketName(project, input) {
+  let result = {
+    lowerCaseOrNum: undefined,
+    inputLength: undefined,
+    alphaNumHyphen: undefined,
+    ownable: undefined,
+  };
+  if (!input) return result;
+
+  function isLowerCaseOrNum(char) {
+    return /[\p{L}0-9]/u.test(char) && char === char.toLowerCase();
+  }
+
+  result.lowerCaseOrNum = isLowerCaseOrNum(input[0]) &&
+    isLowerCaseOrNum(input[input.length - 1]);
+  result.inputLength = input.length >= 3 && input.length <= 63;
+  result.alphaNumHyphen = !!input.match(/^[a-z0-9-]+$/g);
+
+  if (result.lowerCaseOrNum && result.inputLength && result.alphaNumHyphen) {
+    const bucketExists = await checkBucketExists(project, input);
+    // In undefined case allow user to attempt bucket creation
+    result.ownable = !bucketExists;
+  } else {
+    result.ownable = false;
+  }
+  return result;
+}
+
+export function timeout(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+export async function computeSHA256(keyContent) {
+  const msgUint8 = new TextEncoder().encode(keyContent);
+  const hashBuffer = await crypto.subtle.digest("SHA-256", msgUint8);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  const hashHex = hashArray
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+  return hashHex;
+}
+
+export const tokenizerRE = "[^\\p{L}\\d]";
+
+export function tokenize(text, ignoreSmallerThan = 2) {
+  // don't use whole path for objects
+  const shortName = text.split("/").slice(-2).join("/").toLowerCase();
+  // splits with non-word and non-digit chars
+  const re = new RegExp(tokenizerRE, "u");
+  const split = shortName.split(re);
+
+  // filters out small words and duplicates
+  const result = split.filter(
+    (item, index) =>
+      item.length >= ignoreSmallerThan && split.indexOf(item) === index,
+  );
+  //if split too small to use, add unsplit name
+  if (result.length === 0) result.push(shortName);
+  return result;
+}
+
+export function getCurrentISOtime(time) {
+  return time ? new Date(time).toISOString() : new Date().toISOString();
+}
+
+// Ensure that the objects that are marked as empty actually are
+// This is required for v2 object compatibility
+export async function ensureObjectSizes(
+  bucket,
+  objects,
+) {
+  return await Promise.all(objects.map(async(object) => {
+    // If the object size is 0, try correcting the object size by forcing
+    // content parsing in s3 storage
+    if (object.bytes == 0) {
+      const objectMetadata = await awsHeadObject(bucket, object.name);
+      object.bytes = objectMetadata.ContentLength;
+    }
+    // Otherwise just return the object as is
+    return object;
+  }));
+}
+
+export async function checkAndAddBucketCors(projectID, bucket) {
+  if (!projectID || !bucket) throw new Error("Missing projectID and/or bucket for CORS check");
+  const corsAdded = await checkCorsFlag(projectID, bucket);
+  if (corsAdded === false) {
+    if (DEV) console.log("Adding CORS for", bucket);
+    try {
+      await awsAddBucketCors(projectID, bucket);
+      await updateCorsFlag(projectID, [bucket], true);
+    } catch {
+      if (DEV) console.log(`Failed to add CORS to bucket ${bucket}`);
+    }
+  }
+}
+
+/** TAGS */
+
+export const taginputConfirmKeys = ["Enter", " ", ",", ";", ".", ":"];
 
 export function addNewTag (event, currentTags, onBlur) {
   if (taginputConfirmKeys.includes(event.key) || onBlur) {
@@ -93,161 +153,7 @@ export function deleteTag (event, tag, currentTags) {
   return currentTags.filter(el => el !== tag);
 }
 
-export function getPrefix(route) {
-  // Get current pseudofolder prefix
-  const p = route?.query?.prefix || "";
-  return p && !p.endsWith("/") ? `${p}/` : p;
-}
-
-export function getFolderName(folderName, route) {
-  // Get the name of the currently displayed pseudofolder
-  let endregex = new RegExp("/.*$");
-  return folderName.replace(getPrefix(route), "").replace(endregex, "");
-}
-
-export function isFile(path, route) {
-  // Return true if path represents a file in the active prefix context
-  return path.replace(getPrefix(route), "").match("/") ? false : true;
-}
-
-export function getPaginationOptions(t) {
-  const itemText = count => count === 1 ? t("message.table.item")
-    : t("message.table.items").toLowerCase();
-
-  const paginationOptions = {
-    itemCount: 0,
-    itemsPerPage: 10,
-    currentPage: 1,
-    startFrom: 0,
-    endTo: 9,
-    textOverrides: {
-      itemsPerPageText: t("message.table.itemsPerPage"),
-      nextPage: t("message.table.nextPage"),
-      prevPage: t("message.table.prevPage"),
-      pageText: ({ start, end, count }) =>
-        start + " - " + end + " / " + count + " " + itemText(count),
-      pageOfText: ({ pageNumber, count }) =>
-        t("message.table.page") + pageNumber + " / " + count + "",
-    },
-  };
-  return paginationOptions;
-}
-
-export function validateBucketName(str, t, containers) {
-  //minimum length 3 chars
-  let error = "";
-  //forbid !"#$%&'()*+,/:;<=>?@[\]^`{|}~  allow .-_
-  const re = new RegExp("[!-,/:-@\\[-\\^`\\{-~]");
-  if (str.length <= 2) {
-    error = t("message.error.tooShort");
-  }
-  else if (str.match(re)) {
-    error= t("message.error.forbiddenChars");
-  }
-  else if (str.endsWith("_segments")) {
-    error= t("message.error.segments");
-  }
-  else {
-    if (containers) {
-      const found = containers.find(cont => cont.name === str);
-      if (found) error = t("message.error.inUse");
-    }
-  }
-  return error;
-}
-
-export function getCurrentISOtime(time) {
-  return time ? new Date(time).toISOString() : new Date().toISOString();
-}
-
-export function getContainerLastmodified(containers, cont) {
-  // Get the current container and its last_modified from IDB
-  const idb_cont = containers.find(
-    el => el.name === cont.name && el.last_modified);
-  const idb_last_modified = idb_cont ? idb_cont.last_modified : null;
-
-  // Compare the last_modified from current container with
-  // IDB container, choose the latest one
-  if (idb_last_modified &&
-    (idb_last_modified > cont.last_modified) ||
-    (!cont.last_modified)
-  ) {
-    return idb_last_modified;
-  }
-  return cont.last_modified;
-}
-
-export async function updateContainerLastmodified(
-  projectID,
-  container,
-  objects,
-) {
-  // Declare the latest last_modified of container
-  let cont_last_modified = container.last_modified;
-
-  const last_modified_arr = objects.map(obj => obj.last_modified);
-
-  // Find the latest last_modified among all objects,
-  // compare it with the current last_modified of container,
-  // assign the latest last_modified for container
-  for (let i = 0; i < last_modified_arr.length; i++) {
-    if (last_modified_arr[i] > cont_last_modified) {
-      cont_last_modified = last_modified_arr[i];
-    }
-  }
-
-  // Assign the latest last_modified of objects to parent container
-  if (cont_last_modified) {
-    await getDB().containers
-      .where({ projectID: projectID, name: container.name})
-      .modify({ last_modified: cont_last_modified });
-  }
-}
-
-export function checkIfItemIsLastOnPage(paginationOptions){
-  //Checks if item is last on page and reverts to previous page
-  if(paginationOptions.currentPage - 1 === 0){
-    return 1;
-  }
-  if(paginationOptions.itemCount ===
-    (paginationOptions.currentPage - 1)
-    * paginationOptions.itemsPerPage){
-    return paginationOptions.currentPage-=1;
-  }
-  return paginationOptions.currentPage;
-}
-
-export async function updateObjectsAndObjectTags(
-  containers,
-  projectID,
-  signal,
-  updateTags = true, // Obj tags don't need to be updated when uploading objs
-) {
-  if (containers.length > 0) {
-    for (let i = 0; i < containers.length; i++) {
-      const currentContainer = containers[i];
-
-      await store.dispatch("updateObjects", {
-        projectID,
-        owner: currentContainer.container.owner,
-        container: {
-          id: currentContainer.key,
-          ...currentContainer.container,
-        },
-        signal,
-        updateTags,
-      });
-
-      if (i === containers.length - 1) {
-        store.commit("setLoaderVisible", false);
-      }
-    }
-  }
-}
-
-export function timeout(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
+/** TOASTS */
 
 export function addErrorToastOnMain(msg) {
   document.querySelector("#container-error-toasts")
@@ -271,8 +177,60 @@ export function moveToast(toastToMove, otherElement, restore) {
   }
 }
 
+/** MODALS */
+
+export function toggleCreateBucketModal() {
+  const store = useStore();
+  store.toggleCreateBucketModal(true);
+}
+
+export function toggleEditTagsModal(objectName, containerName) {
+  const store = useStore();
+  if (objectName) {
+    store.setObjectName(objectName);
+  }
+  if (containerName) {
+    store.setBucketName(containerName);
+  }
+  store.toggleEditTagsModal(true);
+}
+
+export function toggleCopyBucketModal(bucketName, sourceProjectId) {
+  const store = useStore();
+  if (bucketName) {
+    store.setBucketName(bucketName);
+  }
+  if (sourceProjectId) {
+    store.setSourceProjectId(sourceProjectId);
+  }
+  store.toggleCopyBucketModal(true);
+}
+
+export function toggleDeleteModal(objects, containerName) {
+  const store = useStore();
+  if (objects) {
+    store.setDeletableObjects(objects);
+  }
+  if (containerName) {
+    store.setBucketName(containerName);
+  }
+  store.toggleDeleteModal(true);
+}
+
 export function toggleObjectInfoModal(objectInfo, containerName) {
-  if (objectInfo) store.commit("setSelectedObjectInfo", objectInfo);
-  if (containerName) store.commit("setBucketName", containerName);
-  store.commit("toggleObjectInfoModal", true);
+  const store = useStore();
+  if (objectInfo) {
+    store.setSelectedObjectInfo(objectInfo);
+  }
+  if (containerName) {
+    store.setBucketName(containerName);
+  }
+  store.toggleObjectInfoModal(true);
+}
+
+export function isS3CompatibleBucketName(name) {
+  // S3 requires: 3-63 chars, lowercase letters/numbers/hyphens only,
+  // must start and end with a letter or number (no underscores, uppercase, etc.)
+  if (name.length < 3 || name.length > 63) return false;
+  return /^[a-z0-9][a-z0-9-]*[a-z0-9]$/.test(name);
 }

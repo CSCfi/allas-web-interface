@@ -1,14 +1,15 @@
+<!--NOT up-to-date: tags not in use-->
 <template>
   <c-card
     ref="editTagsContainer"
-    class="edit-tags"
+    class="modal-card"
     data-testid="edit-tags-modal"
     @keydown="handleKeyDown"
   >
-    <h2 class="title is-4 has-text-dark">
-      {{ $t('message.editTags') }}
-    </h2>
-    <c-card-content>
+    <c-card-content class="modal-card-content">
+      <h2 class="title is-4 has-text-dark">
+        {{ $t('message.editTags') }}
+      </h2>
       <TagInput
         id="edit-tags-input"
         data-testid="edit-tags-input"
@@ -21,17 +22,17 @@
       <c-button
         outlined
         size="large"
-        @click="toggleEditTagsModal(false)"
-        @keyup.enter="toggleEditTagsModal(true)"
+        @click="toggleEditTagsModal"
+        @keyup.enter="toggleEditTagsModal"
       >
         {{ $t("message.cancel") }}
       </c-button>
       <c-button
         data-testid="save-edit-tags"
         size="large"
-        @click="isObject ? saveObjectTags(false) : saveContainerTags(false)"
+        @click="isObject ? saveObjectTags() : saveContainerTags()"
         @keyup.enter="isObject ?
-          saveObjectTags(true) : saveContainerTags(true)"
+          saveObjectTags() : saveContainerTags()"
       >
         {{ $t("message.save") }}
       </c-button>
@@ -40,27 +41,14 @@
 </template>
 
 <script>
-import {
-  updateObjectMeta,
-  updateContainerMeta,
-} from "@/common/api";
-
-import {
-  getTagsForObjects,
-  getTagsForContainer,
-} from "@/common/conv";
-import { getDB } from "@/common/db";
+import { getDB } from "@/common/idb";
 
 import {
   addNewTag,
   deleteTag,
   getCurrentISOtime,
 } from "@/common/globalFunctions";
-import {
-  getFocusableElements,
-  moveFocusOutOfModal,
-  keyboardNavigationInsideModal,
-} from "@/common/keyboardNavigation";
+import { captureKeyboardNavInsideModal } from "@/common/keyboardNavigation";
 import TagInput from "@/components/TagInput.vue";
 import { mdiClose } from "@mdi/js";
 
@@ -80,16 +68,16 @@ export default {
   },
   computed: {
     visible() {
-      return this.$store.state.openEditTagsModal;
+      return this.$store.openEditTagsModal;
     },
     selectedObjectName() {
-      return this.$store.state.selectedObjectName.length > 0
-        ? this.$store.state.selectedObjectName
+      return this.$store.selectedObjectName.length > 0
+        ? this.$store.selectedObjectName
         : "";
     },
     selectedBucketName() {
-      return this.$store.state.selectedBucketName.length > 0
-        ? this.$store.state.selectedBucketName
+      return this.$store.selectedBucketName.length > 0
+        ? this.$store.selectedBucketName
         : "";
     },
     projectID() {
@@ -97,9 +85,6 @@ export default {
     },
     containerName() {
       return this.$route.params.container;
-    },
-    prevActiveEl() {
-      return this.$store.state.prevActiveEl;
     },
   },
   watch: {
@@ -122,7 +107,7 @@ export default {
         projectID: this.projectID,
         name: this.containerName,
       });
-
+      // Objects no longer in IDB
       this.object = await getDB().objects.get({
         containerID: this.container.id,
         name: this.selectedObjectName,
@@ -146,34 +131,21 @@ export default {
       });
 
       if (!this.container?.tags) {
-        this.tags = await getTagsForContainer(
-          this.projectID,
-          this.container?.name,
-        );
+        // this.tags = await getTagsForContainer(
+        //   this.projectID,
+        //   this.container?.name,
+        // );
       } else {
         this.tags = this.container.tags;
       }
     },
-    toggleEditTagsModal: function (keypress) {
-      this.$store.commit("toggleEditTagsModal", false);
-      this.$store.commit("setObjectName", "");
-      this.$store.commit("setBucketName", "");
+    toggleEditTagsModal: function () {
+      this.$store.toggleEditTagsModal(false);
+      this.$store.setObjectName("");
+      this.$store.setBucketName("");
       this.tags = [];
-
-      /*
-        Prev Active element is a popup menu and it is removed from DOM
-        when we click it to open Edit Tags Modal.
-        Therefore, we need to make its focusable parent
-        to be focused instead after we close the modal.
-      */
-      if (keypress) {
-        const prevActiveElParent = this.containerName ?
-          document.getElementById("obj-table") :
-          document.getElementById("container-table");
-        moveFocusOutOfModal(prevActiveElParent, true);
-      }
     },
-    saveObjectTags: function (keypress) {
+    saveObjectTags: function () {
       const tags = toRaw(this.tags);
       let objectMeta = [
         this.object.name,
@@ -188,11 +160,8 @@ export default {
         objectMeta,
       ).then(async () => {
         const currentTime = getCurrentISOtime();
-        await getDB().objects
-          .where(":id").equals(this.object.id)
-          .modify({ tags, last_modified: currentTime });
 
-        // Also update container's last_modified in IDB
+        // Update container's last_modified in IDB
         await getDB().containers
           .where({
             projectID: this.projectID,
@@ -200,25 +169,11 @@ export default {
           })
           .modify({ last_modified: currentTime });
 
-        this.toggleEditTagsModal(keypress);
+        this.toggleEditTagsModal();
       });
     },
-    saveContainerTags: function (keypress) {
-      const tags = toRaw(this.tags);
-      const containerName = this.container.name;
-      let meta = {
-        usertags: tags.join(";"),
-      };
-      updateContainerMeta(this.projectID, containerName, meta)
-        .then(async () => {
-          await getDB().containers
-            .where({
-              projectID: this.projectID,
-              name: containerName,
-            })
-            .modify({ tags, last_modified: getCurrentISOtime() });
-        });
-      this.toggleEditTagsModal(keypress);
+    saveContainerTags: function () {
+      this.toggleEditTagsModal();
     },
     addingTag: function (e, onBlur) {
       this.tags = addNewTag(e, this.tags, onBlur);
@@ -227,11 +182,11 @@ export default {
       this.tags = deleteTag(e, tag, this.tags);
     },
     handleKeyDown: function(e) {
-      const focusableList = this.$refs.editTagsContainer.querySelectorAll(
-        "input, c-icon, c-button",
-      );
-      const { first, last } = getFocusableElements(focusableList);
-      keyboardNavigationInsideModal(e, first, last);
+      if (e.key === "Escape") {
+        this.toggleEditTagsModal();
+      } else {
+        captureKeyboardNavInsideModal(e, this.$refs.editTagsContainer);
+      }
     },
   },
 };
@@ -239,21 +194,7 @@ export default {
 
 <style scoped>
 
-.edit-tags {
-  padding: 3rem;
-  position: absolute;
-  top: -1rem;
-  left: 0;
-  right: 0;
-  max-height: 75vh;
-}
-
 h2 { margin: 0 !important; }
-
-c-card-content {
-  color: var(--csc-dark);
-  padding: 0;
-}
 
 c-card-actions {
   padding: 0;

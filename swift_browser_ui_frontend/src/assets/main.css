@@ -1,19 +1,29 @@
 @charset "utf-8";
-@import "allas-ui/dist/styles/variables.css";
+@import "@cscfi/csc-ui/css/theme.css";
+@import "./allas-theme.css";
 
 /* CSS file for integrating CSC brand colors */
 
 :root {
+  --csc-dark-blue: #002f5f;
   --csc-blue: #025b96;
   --csc-dark: #2E3438;
   --csc-grey: #595959;
-  --csc-info: #025b97;
-  --csc-dark-blue: #002f5f;
   --csc-primary-light: #c2dbdf;
   --csc-primary-lighter: #d8e8ea;
+  --csc-primary-lightest: #f2f7f8;
   --body-font-size: 16px;
   --csc-footer-grey: #dfe1e3;
   --csc-medium-grey: #757575;
+}
+
+html, body {
+  height: 100vh;
+}
+
+body {
+  /* Prevent open c-select from hiding overflow-y */
+  overflow-y: scroll !important;
 }
 
 html,
@@ -95,7 +105,7 @@ img {
 }
 
 * {
-  font-family: var(--csc-font-family);
+  font-family: var(--c-font-family);
 }
 
 .hl-1 {
@@ -105,13 +115,13 @@ img {
 }
 
 a {
-  color: var(--csc-link);
+  color: var(--c-info-700);
   cursor: pointer;
   text-decoration: none;
 }
 
 a:hover {
-  color: var(--csc-link);
+  color: var(--c-info-700);
 }
 
 .pr-3 {
@@ -152,4 +162,79 @@ footer {
 
 .content p {
   margin-bottom: 1em;
+}
+
+/* Replace deprecated csc-ui components with divs */
+
+div.main {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  justify-content: space-between;
+  background-color: #d8e8ea;
+}
+
+div.flex {
+  display: block;
+  flex: 1;
+}
+
+div.container {
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+  max-width: 1200px;
+}
+
+div.padding {
+  padding: 24px;
+}
+
+/* v3 c-login-card sizes to its content: when a page gives the host a fixed
+   height (index/OIDC login cards), the inner article and .c-login-card div
+   must fill it too, or the absolutely-positioned banner image stops at the
+   content edge and bare card background shows below. Light DOM, so this
+   global rule reaches the internals. No-op when the host height is auto. */
+c-login-card article,
+c-login-card article .c-login-card {
+  height: 100%;
+}
+
+c-menu {
+  --c-menu-text-color: var(--c-primary-600);
+}
+
+c-data-table {
+  --c-data-table-background-color-hover: var(--csc-primary-lightest);
+  --c-data-table-highlighted-column-background-color: var(--csc-primary-lightest);
+}
+
+.modal-content-wrapper {
+  overflow-y: scroll;
+  scrollbar-width: 0.5rem;
+  padding-right: 0.5rem;
+
+  &::-webkit-scrollbar {
+    width: 0.5rem;
+  }
+  &::-webkit-scrollbar-thumb {
+    background: var(--c-tertiary-500);
+    border-radius: 10px;
+    &:hover {
+      background: var(--c-tertiary-700);
+    }
+  }
+}
+
+.modal-card {
+  padding: 1.5rem;
+  max-height: 75vh;
+}
+
+.modal-card-content {
+  color: var(--csc-dark);
+}
+
+.no-padding-card {
+  --c-card-gap: 0;
 }

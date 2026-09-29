@@ -1,14 +1,11 @@
 """Module for handling queries for a valid Sharing/Request API signature."""
 
 import logging
-import secrets
 
 import aiohttp.web
 import aiohttp_session
 
 import swift_browser_ui.ui._convenience
-
-from .settings import setd
 
 LOGGER = logging.getLogger("signature")
 
@@ -54,104 +51,3 @@ async def handle_signature_request(
         raise aiohttp.web.HTTPForbidden(
             reason="Path contains a project not accessible in login scope."
         )
-
-
-async def handle_ext_token_create(request: aiohttp.web.Request) -> aiohttp.web.Response:
-    """Handle call for an API token create."""
-    session = await aiohttp_session.get_session(request)
-    project = request.match_info["project"]
-
-    if project not in session["projects"]:
-        raise aiohttp.web.HTTPForbidden(reason="No access to the project.")
-
-    LOGGER.debug(f"Creating a scoped API token for {project}")
-
-    ident = request.match_info["id"]
-    token = secrets.token_hex(64)
-
-    client: aiohttp.ClientSession = request.app["api_client"]
-
-    sharing_api_address = setd["sharing_internal_endpoint"]
-
-    if not sharing_api_address:
-        raise aiohttp.web.HTTPNotFound(reason="External APIs not configured on server")
-
-    path = f"/token/{project}/{ident}"
-    signature = await swift_browser_ui.ui._convenience.sign(3600, path)
-    signature["name"] = session["projects"][project]["name"]
-
-    async with client.post(
-        f"{sharing_api_address}{path}",
-        data={"token": token},
-        params=signature,
-    ) as id_resp:
-        if id_resp.status != 200:
-            raise aiohttp.web.HTTPInternalServerError(reason="Token creation failed")
-
-    resp = aiohttp.web.json_response(token, status=201)
-
-    return resp
-
-
-async def handle_ext_token_remove(request: aiohttp.web.Request) -> aiohttp.web.Response:
-    """Handle call for an API token delete."""
-    session = await aiohttp_session.get_session(request)
-
-    project = request.match_info["project"]
-    if project not in session["projects"]:
-        raise aiohttp.web.HTTPForbidden(reason="No access to the project.")
-
-    ident = request.match_info["id"]
-
-    client: aiohttp.ClientSession = request.app["api_client"]
-
-    sharing_api_address = setd["sharing_internal_endpoint"]
-
-    if not sharing_api_address:
-        raise aiohttp.web.HTTPNotFound(reason=("External APIs not configured on server"))
-
-    path = f"/token/{project}/{ident}"
-    signature = await swift_browser_ui.ui._convenience.sign(3600, path)
-
-    await client.delete(
-        f"{sharing_api_address}{path}",
-        params=signature,
-    )
-
-    resp = aiohttp.web.Response(status=204)
-
-    return resp
-
-
-async def handle_ext_token_list(request: aiohttp.web.Request) -> aiohttp.web.Response:
-    """Handle call for listing API tokens."""
-    session = await aiohttp_session.get_session(request)
-
-    project = request.match_info["project"]
-    if project not in session["projects"]:
-        raise aiohttp.web.HTTPForbidden(reason="No access to the project.")
-
-    client: aiohttp.ClientSession = request.app["api_client"]
-
-    sharing_api_address = setd["sharing_internal_endpoint"]
-
-    if not sharing_api_address:
-        raise aiohttp.web.HTTPNotFound(reason=("External APIs not configured on server"))
-
-    path = f"/token/{project}"
-    signature = await swift_browser_ui.ui._convenience.sign(3600, path)
-
-    async with client.get(
-        f"{sharing_api_address}{path}",
-        params={
-            "signature": signature["signature"],
-            "valid": signature["valid"],
-        },
-    ) as a_resp:
-        sharing_tokens_text = await a_resp.text()
-
-    LOGGER.debug(f"Sharing tokens: {sharing_tokens_text}")
-
-    resp = aiohttp.web.Response(text=sharing_tokens_text)
-
-    return resp

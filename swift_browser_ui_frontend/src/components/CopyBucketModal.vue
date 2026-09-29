@@ -1,7 +1,7 @@
 <template>
   <c-card
     ref="copyBucketContainer"
-    class="copy-bucket"
+    class="modal-card"
     @keydown="handleKeyDown"
   >
     <div class="modal-content-wrapper">
@@ -18,14 +18,16 @@
             v-csc-control
             :label="$t('message.replicate.name')"
             name="bucketname"
-            :valid="loadingBucketname || errorMsg.length === 0"
-            :validation="errorMsg"
             aria-required="true"
+            trim-whitespace
             required
+          />
+          <BucketNameValidation
+            :result="validationResult"
           />
           <c-loader v-show="loadingBucketname" />
         </div>
-        <label
+        <!--<label
           class="taginput-label"
           label-for="copy-bucket-taginput"
         >
@@ -36,7 +38,7 @@
           :tags="tags"
           @addTag="addingTag"
           @deleteTag="deletingTag"
-        />
+        />-->
       </c-card-content>
     </div>
     <c-card-actions justify="space-between">
@@ -61,51 +63,50 @@
 
 <script>
 import { debounce } from "lodash";
-import {
-  swiftCopyContainer,
-} from "@/common/api";
-import { getDB } from "@/common/db";
-
+import { copyBucket } from "@/common/api";
+import { getDB } from "@/common/idb";
+import { updateContainers, updateBucketStats } from "@/common/idbFunctions";
 import {
   addNewTag,
   deleteTag,
   validateBucketName,
 } from "@/common/globalFunctions";
-import {
-  getFocusableElements,
-  moveFocusOutOfModal,
-  keyboardNavigationInsideModal,
-} from "@/common/keyboardNavigation";
+import { captureKeyboardNavInsideModal } from "@/common/keyboardNavigation";
 import { useObservable } from "@vueuse/rxjs";
 import { liveQuery } from "dexie";
-import TagInput from "@/components/TagInput.vue";
+//import TagInput from "@/components/TagInput.vue";
+import BucketNameValidation from "./BucketNameValidation.vue";
+import { awsListObjects } from "@/common/s3commands";
 
 export default {
   name: "CopyBucketModal",
-  components: { TagInput },
+  components: {
+    //TagInput,
+    BucketNameValidation,
+  },
   data() {
     return {
       bucketName: "",
       loadingBucketname: true,
       tags: [],
       buckets: [],
-      errorMsg: "",
+      validationResult: {},
     };
   },
   computed: {
     active() {
-      return this.$store.state.active;
+      return this.$store.active;
     },
     selectedBucketName() {
-      return this.$store.state.selectedBucketName.length > 0
-        ? this.$store.state.selectedBucketName
+      return this.$store.selectedBucketName.length > 0
+        ? this.$store.selectedBucketName
         : "";
     },
     sourceProjectId() {
-      return this.$store.state.sourceProjectId;
+      return this.$store.sourceProjectId;
     },
     visible() {
-      return this.$store.state.openCopyBucketModal;
+      return this.$store.openCopyBucketModal;
     },
   },
   watch: {
@@ -142,87 +143,70 @@ export default {
         ),
       );
 
-      await this.$store.dispatch("updateContainers", {
-        projectID: this.$route.params.project,
-        signal: null,
-      });
+      await updateContainers(this.$route.params.project);
     },
     getCopyBucket: function (origBucketName) {
       if (this.buckets) {
         // Check if current bucket is a copy
-        const reg = new RegExp("\\b(copy)\\s(\\d+)\\b$", "i");
-        const isCopied = origBucketName.match(reg);
+        const copySuffix = new RegExp("-(copy)-(\\d+)$", "i");
+        const hasCopySuffix = origBucketName.match(copySuffix);
 
         // Use a var to keep the bucket as a copy name without copy version
-        let copiedBucket = "";
-        if (isCopied) {
-          copiedBucket = `${origBucketName.slice(0, isCopied["index"])}copy`;
-        } else {
-          copiedBucket = `${origBucketName} copy`;
-        }
+        let newBucketName = hasCopySuffix ?
+          `${origBucketName.slice(0, hasCopySuffix["index"])}-copy` : `${origBucketName}-copy`;
 
         const existingCopiedBuckets = [];
         for (let bucket of this.buckets) {
           // Check if bucket is one of the copy versions
           // which ends in the form 'copy + number'
-          const copiedReg = new RegExp(`\\b${copiedBucket}\\s(\\d+)\\b$`, "gi");
+          const copiedReg = new RegExp(`^${newBucketName}-(\\d+)$`, "i");
           bucket.name.match(copiedReg) ?
             existingCopiedBuckets.push(bucket.name) : null;
         }
 
+        let nextVersion = 1;
         if (existingCopiedBuckets.length > 0) {
           // Sort the array in asc, the last item is the latest copy
           // then extract the copy version from it
           existingCopiedBuckets.sort();
-          const latestVer= existingCopiedBuckets[
-            existingCopiedBuckets.length-1].match(reg);
-          this.bucketName = !isCopied ? `${copiedBucket} ${+latestVer[2] + 1}` : origBucketName.replace(/\d+$/, +latestVer[2]+1);
-        } else {
-          this.bucketName = `${copiedBucket} 1`;
+          const latestVer = existingCopiedBuckets[
+            existingCopiedBuckets.length-1].match(copySuffix);
+          nextVersion = +latestVer[2] + 1;
         }
+        this.bucketName = `${newBucketName}-${nextVersion}`;
         this.loadingBucketname = false;
       }
     },
-    cancelCopy: function (keypress) {
-      this.$store.commit("toggleCopyBucketModal", false);
-      this.$store.commit("setBucketName", "");
+    cancelCopy: function () {
+      this.$store.toggleCopyBucketModal(false);
+      this.$store.setBucketName("");
       this.bucketName = "";
       this.tags = [];
       this.loadingBucketname = true;
-      this.errorMsg = "";
-
-      /*
-        Prev Active element is a popup menu and it is removed from DOM
-        when we click it to open Copy Modal.
-        Therefore, we need to make its focusable parent
-        to be focused instead after we close the modal.
-      */
-      if (keypress) {
-        const prevActiveElParent = document.getElementById("container-table");
-        moveFocusOutOfModal(prevActiveElParent, true);
-      }
+      this.validationResult = {};
     },
-    replicateContainer: function (keypress) {
-      this.bucketName = this.bucketName.trim();
-      this.checkValidity();
-      this.a_replicate_container(keypress).then(() => {});
+    replicateContainer: async function () {
+      this.validationResult = await validateBucketName(
+        this.active.id, this.bucketName);
+      const validationError =
+        Object.values(this.validationResult).some(val => !val);
+      if (validationError) return;
+
+      await this.a_replicate_container();
     },
-    a_replicate_container: async function (keypress) {
-      if (this.errorMsg.length) return;
-      this.$store.commit("toggleCopyBucketModal", false);
-
-      // Fetch the source project id if it exists
-      let sourceProjectName = "";
-      if (this.sourceProjectId) {
-        let ids = await this.$store.state.client.projectCheckIDs(
-          this.sourceProjectId,
-        );
-        sourceProjectName = ids.name;
-      }
-
-      // Initiate the container replication operation
+    a_replicate_container: async function () {
+      this.$store.toggleCopyBucketModal(false);
       try {
-        const { job_id } = await swiftCopyContainer(
+        // Fetch the source project id if it exists
+        let sourceProjectName = "";
+        if (this.sourceProjectId) {
+          let ids = await this.$store.sharingClient.projectCheckIDs(
+            this.sourceProjectId,
+          );
+          sourceProjectName = ids?.name;
+        }
+
+        await copyBucket(
           this.active.id,
           this.bucketName,
           this.sourceProjectId ? this.sourceProjectId : this.active.id,
@@ -230,16 +214,71 @@ export default {
           this.active.name,
           sourceProjectName,
         );
+        await updateContainers(this.active.id);
+        // Pin the copy to the top of the bucket list, same as a bucket
+        // created via the create or upload modals
+        this.$store.setNewBucket(this.bucketName);
+        // CORS for new bucket is added on bucket creation
+        // Source bucket CORS checked on bucket copy click
+        // Proceed with object fetch
+        let objects = await awsListObjects(
+          this.selectedBucketName,
+        );
+        const sleep =
+          time => new Promise(resolve => setTimeout(resolve, time));
 
-        this.$store.dispatch("startCopyJob", {
-          jobId: job_id,
-          projectId: this.active.id,
+        this.$store.setCopyProgress({
           label: `${this.selectedBucketName} → ${this.bucketName}`,
+          done: 0,
+          total: objects.length,
+          state: "running",
         });
 
-        this.cancelCopy(keypress);
-      } catch (e) {
-        this.errorMsg = this.$t("message.copyfail");
+        let copiedObjects;
+        while (
+          copiedObjects === undefined
+          || copiedObjects.length < objects.length
+        ) {
+          copiedObjects = await awsListObjects(this.bucketName);
+          if (this.$store.copyProgress !== null) {
+            this.$store.setCopyProgress({
+              label: `${this.selectedBucketName} → ${this.bucketName}`,
+              done: copiedObjects.length,
+              total: objects.length,
+              state: "running",
+            });
+          }
+          await sleep(2000);
+        }
+        const bytes = copiedObjects.reduce((sum, obj) => sum + (obj.bytes || 0), 0);
+        await updateBucketStats(this.active.id, this.bucketName, copiedObjects.length, bytes);
+        if (this.$store.copyProgress !== null) {
+          this.$store.setCopyProgress({
+            label: `${this.selectedBucketName} → ${this.bucketName}`,
+            done: copiedObjects.length,
+            total: objects.length,
+            state: "finished",
+          });
+        }
+      } catch {
+        document.querySelector("#copyBucket-toasts").addToast(
+          {
+            id: "copy-error",
+            type: "error",
+            duration: 5000,
+            persistent: false,
+            progress: false,
+            message: this.$t("message.copyfail"),
+          },
+        );
+        this.$store.setCopyProgress({
+          label: `${this.selectedBucketName} → ${this.bucketName}`,
+          done: 0,
+          total: 0,
+          state: "failed",
+        });
+      } finally {
+        this.cancelCopy();
       }
     },
     addingTag: function (e, onBlur) {
@@ -248,50 +287,22 @@ export default {
     deletingTag: function (e, tag) {
       this.tags = deleteTag(e, tag, this.tags);
     },
-    checkValidity: debounce(function () {
-      this.errorMsg = validateBucketName(
-        this.bucketName, this.$t, this.buckets);
+    checkValidity: debounce(async function () {
+      this.validationResult = await validateBucketName(
+        this.active.id, this.bucketName);
     }, 300, { leading: true }),
     handleKeyDown: function (e) {
-      const focusableList = this.$refs.copyBucketContainer.querySelectorAll(
-        "input, c-icon, c-button",
-      );
-      const { first, last } = getFocusableElements(focusableList);
-      keyboardNavigationInsideModal(e, first, last);
+      if (e.key === "Escape") {
+        this.cancelCopy();
+      } else {
+        captureKeyboardNavInsideModal(e, this.$refs.copyBucketContainer);
+      }
     },
   },
 };
 </script>
 
 <style scoped>
-
-.copy-bucket {
-  padding: 3rem;
-  position: absolute;
-  top: -1rem;
-  left: 0;
-  right: 0;
-  max-height: 75vh;
-}
-
-@media screen and (max-width: 767px), (max-height: 580px) {
-   .copy-bucket {
-    top: -5rem;
-  }
-}
-
-@media screen and (max-height: 580px) and (max-width: 767px),
-(max-width: 525px) {
-  .copy-bucket {
-    top: -9rem;
-  }
-}
-
-@media screen and (max-height: 580px) and (max-width: 525px) {
-  .copy-bucket {
-    top: -13rem;
-  }
-}
 
 c-card-content {
   color: var(--csc-dark);

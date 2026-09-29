@@ -1,108 +1,123 @@
 <template>
   <c-card
     ref="infoContainer"
-    class="info-card"
+    class="modal-card"
     data-testid="object-info-modal"
     @keydown="handleKeyDown"
   >
-    <div id="object-info-modal-content" class="modal-content-wrapper">
-     <h2 class="title is-4 title-row" v-if="info">
-       <c-link
-         href="javascript:void(0)"
-         color="dark-grey"
-         :path="info.isFolder ? mdiFolder : mdiFileOutline"
-         icon-fill="primary"
-         class="title-icon-link"
-       />
-       {{ info.name }}
-     </h2>
+    <div
+      id="object-info-modal-content"
+      class="modal-content-wrapper"
+    >
+      <h2
+        v-if="info"
+        class="title is-4 title-row"
+      >
+        <c-icon
+          :path="info.isFolder ? mdiFolder : mdiFileOutline"
+          color="var(--c-primary-600)"
+          size="20"
+          class="title-icon-link"
+        />
+        {{ info.name }}
+      </h2>
 
       <c-card-content>
         <div v-if="info">
-          <p><b>{{ $t("message.table.name") || "Name" }}:</b> {{ info.name }}</p>
-          <p><b>{{ $t("message.table.size") || "Size" }}:</b> {{ info.sizeHuman || "-" }}</p>
-           <p v-if="info.isFolder">
-            <b>{{ $t("message.objects.items") || "Items" }}:</b> {{ info.itemCount }}
+          <p><b>{{ $t("message.table.name") }}:</b> {{ info.name }}</p>
+          <p><b>{{ $t("message.table.size") }}:</b> {{ info.sizeHuman || "-" }}</p>
+          <p v-if="info.isFolder">
+            <b>{{ $t("message.objects.items") }}:</b> {{ info.itemCount }}
           </p>
-          <p><b>{{ $t("message.objects.fullPath") || "Full path" }}:</b> {{ info.fullPath || "-" }}</p>
-          <p><b>{{ $t("message.objects.contentType") || "Content-Type" }}:</b> {{ info.contentType || "-" }}</p>
-          <p v-if="info.etag" class="inline-copy">
+          <p><b>{{ $t("message.objects.fullPath") }}:</b> {{ info.fullPath || "-" }}</p>
+          <p><b>{{ $t("message.objects.contentType") }}:</b> {{ info.contentType || "-" }}</p>
+          <p
+            v-if="info.etag"
+            class="inline-copy"
+          >
             <b>ETag:</b>
             <span class="inline-copy-value">{{ info.etag }}</span>
             <c-button
               ghost
               class="copy-icon-btn"
               title="Copy ETag"
-              :aria-label="'Copy ETag'"
+              aria-label="Copy ETag"
               @click="copyToClipboard(info.etag)"
               @keyup.enter="copyToClipboard(info.etag)"
             >
-              <c-icon slot="icon" :path="mdiContentCopy" />
+              <c-icon
+                :path="mdiContentCopy"
+              />
             </c-button>
           </p>
-          <p><b>{{ $t("message.table.modified") || "Last modified" }}:</b> {{ info.lastModified || "-" }}</p>
-          <p v-if="info && !info.isFolder">
-            <b>{{ $t("message.objects.created") || "Created" }}:</b> {{ info.created || "-" }}
+          <p><b>{{ $t("message.table.modified") }}:</b> {{ info.lastModified || "-" }}</p>
+          <p v-if="!info.isFolder">
+            <b>{{ $t("message.objects.created") }}:</b> {{ info.created || "-" }}
           </p>
-          <p v-if="!info.isFolder" class="inline-copy">
-            <b>{{ $t("message.objects.checksum") || "Checksum" }} (SHA-256):</b>
+          <p
+            v-if="!info.isFolder"
+            class="inline-copy"
+          >
+            <b>{{ $t("message.objects.checksum") }} (SHA-256):</b>
             <span class="inline-copy-value">{{ info.checksum || "-" }}</span>
-              <c-button
-                v-if="info.checksum && info.checksum !== '-'"
-                ghost
-                class="copy-icon-btn"
-                title="Copy checksum"
-                aria-label="Copy checksum"
-                @click="copyToClipboard(info.checksum)"
-                @keyup.enter="copyToClipboard(info.checksum)"
-              >
-                <c-icon slot="icon" :path="mdiContentCopy" />
-              </c-button>
+            <c-button
+              v-if="info.checksum && info.checksum !== '-'"
+              ghost
+              class="copy-icon-btn"
+              title="Copy checksum"
+              aria-label="Copy checksum"
+              @click="copyToClipboard(info.checksum)"
+              @keyup.enter="copyToClipboard(info.checksum)"
+            >
+              <c-icon
+                :path="mdiContentCopy"
+              />
+            </c-button>
           </p>
-          <p class="info-note" v-if="info && !info.isFolder">
+          <p
+            v-if="!info.isFolder"
+            class="info-note"
+          >
             {{ $t("message.objects.createdChecksumNote") }}
           </p>
         </div>
 
         <div v-else>
-          {{ $t("message.objects.noInfo") || "No info available." }}
+          {{ $t("message.objects.noInfo") }}
         </div>
       </c-card-content>
     </div>
 
     <c-card-actions justify="end">
-      <c-button outlined size="large" @click="close" @keyup.enter="close">
-        {{ $t("message.close") || "Close" }}
+      <c-button
+        outlined
+        size="large"
+        @click="close"
+        @keyup.enter="close"
+      >
+        {{ $t("message.close") }}
       </c-button>
     </c-card-actions>
   </c-card>
 </template>
 
 <script>
-import {
-  getFocusableElements,
-  keyboardNavigationInsideModal,
-  moveFocusOutOfModal,
-} from "@/common/keyboardNavigation";
+import { captureKeyboardNavInsideModal } from "@/common/keyboardNavigation";
 import { mdiFolder, mdiFileOutline, mdiContentCopy } from "@mdi/js";
-
 
 export default {
   name: "ObjectInfoModal",
-  computed: {
-    info() {
-      return this.$store.state.selectedObjectInfo;
-    },
-    prevActiveEl() {
-      return this.$store.state.prevActiveEl;
-    },
-  },
   data() {
     return {
       mdiFolder,
       mdiFileOutline,
       mdiContentCopy,
     };
+  },
+  computed: {
+    info() {
+      return this.$store.selectedObjectInfo;
+    },
   },
   methods: {
     async copyToClipboard(value) {
@@ -120,43 +135,24 @@ export default {
       }
     },
     close() {
-      this.$store.commit("toggleObjectInfoModal", false);
-      this.$store.commit("setSelectedObjectInfo", null);
-      moveFocusOutOfModal(this.prevActiveEl);
+      this.$store.toggleObjectInfoModal(false);
+      this.$store.setSelectedObjectInfo(null);
     },
     handleKeyDown(e) {
-      const focusableList = this.$refs.infoContainer.querySelectorAll(
-        "c-link, c-button, textarea, c-text-field, c-data-table",
-      );
-      const { first, last } = getFocusableElements(focusableList);
-      keyboardNavigationInsideModal(e, first, last, true);
+      if (e.key === "Escape") {
+        this.close();
+      } else {
+        captureKeyboardNavInsideModal(e, this.$refs.infoContainer);
+      }
     },
   },
 };
 </script>
 
 <style scoped>
-.info-card {
-  padding: 3rem;
-  position: absolute;
-  top: -1rem;
-  left: 0;
-  right: 0;
-  max-height: 75vh;
-}
 c-card-content {
   padding: 1rem 0 0 0;
   color: var(--csc-dark);
-}
-ul {
-  margin-top: .5rem;
-  padding-left: 1.2rem;
-}
-.info-note {
-  margin-top: 1.8rem;
-  font-size: 0.9rem;
-  font-style: italic;
-  opacity: 0.75;
 }
 .title-row {
   display: flex;
@@ -167,14 +163,18 @@ ul {
   pointer-events: none;
   display: inline-flex;
   margin-right: 0.25rem;
-}
-.title-icon-link {
   line-height: 1;
 }
 .inline-copy {
   display: flex;
   gap: 0.4rem;
   margin-bottom: -25px;
+}
+.info-note {
+  margin-top: 1.8rem;
+  font-size: 0.9rem;
+  font-style: italic;
+  opacity: 0.75;
 }
 .inline-copy-value {
   word-break: break-all;

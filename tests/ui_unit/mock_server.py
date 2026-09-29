@@ -18,7 +18,6 @@ import swift_browser_ui.ui.server
 
 import tests.common.mockups
 
-
 SESSION_MODE = bool(os.environ.get("TEST_SESSION_MODE", False))
 
 

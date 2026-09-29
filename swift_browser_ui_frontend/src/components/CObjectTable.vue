@@ -3,11 +3,12 @@
     <!-- Footer options needs to be in CamelCase,
     because csc-ui wont recognise it otherwise. -->
     <c-data-table
+      v-if="paginationReady"
+      :key="tableKey"
       id="obj-table"
       data-testid="object-table"
       :data.prop="objects"
-      :headers.prop="hideTags ?
-        headers.filter(header => header.key !== 'tags'): headers"
+      :headers.prop="headers"
       :pagination.prop="disablePagination ? null : paginationOptions"
       :hide-footer="disablePagination"
       :footerOptions.prop="footerOptions"
@@ -29,39 +30,35 @@
 
 <script>
 import {
+  checkIfItemIsLastOnPage,
+  getPaginationOptions,
   sortItems,
   parseDateTime,
   parseDateFromNow,
   getHumanReadableSize,
-  DEV,
-  makeGetObjectsMetaURL,
-} from "@/common/conv";
+} from "@/common/tableFunctions";
 
 import {
-  toggleEditTagsModal,
+  DEV,
+  // toggleEditTagsModal, (re-add when the edit-tags cell below is restored)
+  toggleObjectInfoModal,
   isFile,
   getFolderName,
   getPrefix,
-  getPaginationOptions,
-  checkIfItemIsLastOnPage,
   addErrorToastOnMain,
-  toggleObjectInfoModal,
 } from "@/common/globalFunctions";
-import {
-  setPrevActiveElement,
-  disableFocusOutsideModal,
-} from "@/common/keyboardNavigation";
+import { awsHeadObject } from "@/common/s3commands";
+import { getPreviewUrl } from "@/common/api";
+import { DateTime } from "luxon";
 import {
   mdiTrayArrowDown,
-  mdiPencilOutline,
+  //mdiPencilOutline,
   mdiDeleteOutline,
   mdiFolder,
   mdiFileOutline,
   mdiInformationOutline,
 } from "@mdi/js";
-
-import { getObjectsMeta, getPreviewUrl } from "@/common/api";
-import { DateTime } from "luxon";
+import { updatePaginationOptions } from "@/common/idbFunctions";
 
 export default {
   name: "CObjectTable",
@@ -71,10 +68,6 @@ export default {
       default: () => [],
     },
     disablePagination: {
-      type: Boolean,
-      default: false,
-    },
-    hideTags: {
       type: Boolean,
       default: false,
     },
@@ -103,6 +96,11 @@ export default {
     return {
       currentDownload: undefined,
       objects: [],
+      // Remounts the c-data-table when the visible rows' folder/file pattern
+      // changes: v3 renders cell-children (our name icon) with no vdom key, so
+      // c-icon elements get reused by position and keep a stale path across
+      // folder navigation/sort (files inheriting a folder icon).
+      tableKey: "",
       footerOptions: {
         itemsPerPageOptions: [5, 10, 25, 50, 100],
       },
@@ -122,41 +120,40 @@ export default {
       return this.$i18n.locale;
     },
     active () {
-      return this.$store.state.active;
+      return this.$store.active;
     },
     selectable () {
       return this.$route.name !== "SharedObjects"
         || this.accessRights.length === 2;
     },
     isLoaderVisible() {
-      return this.$store.state.isLoaderVisible
-        && this.$store.state.uploadBucket.name === this.container;
+      return this.$store.isLoaderVisible
+        && this.$store.uploadBucket.name === this.container;
     },
     owner() {
       return this.$route.params.owner;
     },
-    isSharedContainer() {
-      const container = this.$route.params.container;
-      if (this.$route.params.owner) return true; // browsing someone else’s bucket
-      const sharedToMe = (this.$store.state.sharedContainers || [])
-        .some(c => c.container === container); // check if container is in shared containers
-      const sharedOut = (this.$store.state.sharingContainers || [])
-        .includes(container); // check if container is being shared out
-      return sharedToMe || sharedOut;
+    paginationReady() {
+      return this.disablePagination || !!this.paginationOptions?.itemsPerPage;
     },
   },
   watch: {
     prefix() {
       this.getPage();
     },
-    locale() {
+    async locale() {
       this.setHeaders();
-      this.setPagination();
+      await this.setPagination();
+    },
+    "paginationOptions.itemsPerPage": async function (newVal, oldVal) {
+      if (oldVal && newVal) {
+        await updatePaginationOptions({ itemsPerPage: newVal });
+      }
     },
   },
-  created() {
+  async created() {
     this.setHeaders();
-    this.setPagination();
+    await this.setPagination();
   },
   beforeUpdate() {
     this.getPage();
@@ -177,74 +174,55 @@ export default {
       const isFolder = !!item?.folder;
 
       const base = {
-        name: this.renderFolders ? getFolderName(item.name, this.$route) : item.name,
+        name: this.renderFolders
+          ? getFolderName(item.name, this.$route)
+          : item.name,
         fullPath: `${this.container}/${item.name}`,
         sizeHuman: getHumanReadableSize(Number(item.bytes) || 0, this.locale),
-        itemCount: isFolder ? item.itemCount ?? "-" : undefined,
+        itemCount: isFolder
+          ? this.objs.filter(
+            obj => obj.name.startsWith(item.name) && obj.name !== item.name,
+          ).length
+          : undefined,
         lastModified: item.last_modified
           ? parseDateTime(this.locale, item.last_modified, this.$t, false)
           : "-",
-        contentType: item.content_type || item.type || (isFolder ? "application/x-directory" : "-"),
+        contentType: isFolder ? "application/x-directory" : "-",
+        etag: undefined,
         created: "-",
-        etag: isFolder ? undefined : (item.etag || "-"),
         checksum: "-",
         isFolder,
       };
 
       if (isFolder) return base;
 
-      const projectID = this.active?.id;
-      if (!projectID) throw new Error("No active project selected");
-      const owner = this.owner || "";
-      const container = this.container;
-      const objects = [item.name];
+      const head = await awsHeadObject(this.container, item.name);
+      const meta = head.Metadata || {};
 
-      const url = makeGetObjectsMetaURL(projectID, container, [...objects]);
-      if (owner) url.searchParams.append("owner", owner);
-
-      const meta = await getObjectsMeta(
-        projectID, container, objects, url, undefined, owner
-      );
-      const metaObj = meta?.[0]?.[1] || {};
-
-
+      // "created" and "sha256" are user metadata stamped by this UI's
+      // upload workers; objects uploaded elsewhere won't have them
       let created = "-";
-
-      const createdRaw = metaObj?.Created ?? metaObj?.created ?? "";
-      const createdSec = Number.parseInt(createdRaw, 10);
+      const createdSec = Number.parseInt(meta.created ?? "", 10);
       if (Number.isFinite(createdSec) && createdSec > 0) {
         const iso = DateTime.fromSeconds(createdSec).toUTC().toISO();
-        if (iso) {
-          created = parseDateTime(this.locale, iso, this.$t, false);
-        }
+        if (iso) created = parseDateTime(this.locale, iso, this.$t, false);
       }
-
-      const etag =
-        (metaObj.etag || "").toString().replaceAll("\"", "") || base.etag;
-
-      const checksum = (metaObj?.Sha256 ?? metaObj?.sha256 ?? base.checksum);
-
 
       return {
         ...base,
+        contentType: head.ContentType || "-",
+        etag: (head.ETag || "").replaceAll("\"", "") || "-",
         created,
-        etag,
-        checksum,
+        checksum: meta.sha256 || "-",
       };
     },
-    async onOpenInfoModal(item, keypress) {
+    async onOpenInfoModal(item) {
       try {
         const info = await this.buildInfoForItem(item);
         toggleObjectInfoModal(info, this.container);
-
-        if (keypress) {
-          setPrevActiveElement();
-          const modal = document.getElementById("object-info-modal");
-          disableFocusOutsideModal(modal);
-        }
       } catch (e) {
-        console.error("Info modal failed:", e);
-        addErrorToastOnMain("Failed to fetch object metadata.");
+        if (DEV) console.error("Info modal failed:", e);
+        addErrorToastOnMain(this.$t("message.objects.noInfo"));
       }
     },
     handlePopState(event) {
@@ -253,15 +231,21 @@ export default {
         this.paginationOptions.currentPage = 1;
       }
     },
-    changeFolder(folder) {
+    changeFolder: function (folder) {
       this.paginationOptions.currentPage = 1;
-      const base = getPrefix(this.$route) || "";
-      const next = `${base}${folder}`.replace(/\/?$/, "/");
-      this.$router.push({
-        name: this.$route.name,
-        params: this.$route.params,
-        query: { ...this.$route.query, page: 1, prefix: next },
-      });
+      this.$router.push(
+        `${window.location.pathname}?prefix=${getPrefix(this.$route)}${folder}`,
+      );
+    },
+    openPreview: function (item) {
+      const projectID = this.active?.id;
+      if (!projectID) {
+        addErrorToastOnMain("No active project selected.");
+        return;
+      }
+      const url = getPreviewUrl(projectID, this.container, item.name);
+      window.open(url, "_blank");
+      this.$store.togglePreviewOpenedToast(true);
     },
     formatItem: function (item) {
       const name = this.renderFolders ?
@@ -270,149 +254,136 @@ export default {
 
       return {
         name: {
+          // `value` must carry the real name: c-data-table's
+          // selection-property="name" reads row.name.value to identify
+          // selected rows (falls back to row index when empty, which
+          // breaks checkbox selection + bulk delete). The icon + clickable
+          // name are rendered via `children`; the raw value is wrapped in a
+          // display:none span so it isn't shown twice.
           value: name,
-          ...(item?.folder ? {
-            component: {
-              tag: "c-link",
-              params: {
-                href: "javascript:void(0)",
-                color: "dark-grey",
-                path: mdiFolder,
-                iconFill: "primary",
-                iconStyle: {
-                  marginRight: "1rem",
-                  flexShrink: "0",
-                },
-                onClick: () => this.changeFolder(name),
-              },
-            },
-          } : {
-            value: name,
-            component: {
-              tag: "c-link",
-              params: {
-                href: "javascript:void(0)",
-                color: "dark-grey",
-                path: mdiFileOutline,
-                iconFill: "primary",
-                iconStyle: {
-                  marginRight: "1rem",
-                  flexShrink: "0",
-                },
-                onClick: () => {
-                  const projectID = this.active?.id;
-                  const owner = this.owner || "";
-                  if (!projectID) {
-                    addErrorToastOnMain("No active project selected.");
-                    return;
-                  }
-
-                  // Determine if we need to use the proxy URL
-                  const isSharedRoute = !!this.$route.params.owner;
-                  const needsProxy = isSharedRoute || this.isSharedContainer;
-
-                  const url = needsProxy
-                    ? this.$store.state.socket.buildProxyUrl(this.container, item.name, owner)
-                    : getPreviewUrl(projectID, this.container, item.name, owner);
-
-                  window.open(url, "_blank");
-                  this.$store.commit("togglePreviewOpenedToast", true);
+          component: {
+            tag: "span",
+            params: { style: { display: "none" } },
+          },
+          children: [
+            {
+              value: "",
+              component: {
+                tag: "c-icon",
+                params: {
+                  // Empty folders exist as zero-byte "name/" placeholder
+                  // objects: in the flat file-path view they aren't reduced
+                  // into pseudo-folders (item.folder stays unset), but they
+                  // should still read as folders, not files.
+                  path: item?.folder || item.name.endsWith("/")
+                    ? mdiFolder : mdiFileOutline,
+                  color: "var(--c-primary-600)",
+                  size: "18",
                 },
               },
             },
-          }),
+            {
+              value: name,
+              component: {
+                tag: "c-link",
+                params: {
+                  href: "javascript:void(0)",
+                  style: {
+                    "--c-link-color": "var(--c-tertiary-700)",
+                    "--c-link-hover": "none",
+                    marginLeft: "1rem",
+                  },
+                  onClick: item?.folder
+                    ? () => this.changeFolder(name)
+                    : () => this.openPreview(item),
+                },
+              },
+            },
+          ],
         },
         size: {
-          value: getHumanReadableSize(Number(item.bytes) || 0, this.locale),
+          value: getHumanReadableSize(item.bytes, this.locale),
         },
         last_modified: {
           value: this.showTimestamp? parseDateTime(
             this.locale, item.last_modified, this.$t, false) :
             parseDateFromNow(this.locale, item.last_modified, this.$t),
         },
-        ...(this.hideTags ? {} : {
-          tags: {
-            value: null,
-            children: [
-              ...(item.tags?.length ?
-                item.tags.map((tag, index) => ({
-                  key: "tag_" + index + "",
-                  value: tag,
-                  component: {
-                    tag: "c-tag",
-                    params: {
-                      flat: true,
-                    },
-                  },
-                })) : [{ key: "no_tags", value: "-" }]),
-            ],
-          },
-        }),
         actions: {
           value: null,
           sortable: null,
           align: "end",
           children: [
             {
-              value: this.$t("message.download.download"),
+              value: "",
               component: {
                 tag: "c-button",
                 params: {
                   testid: "download-object",
                   text: true,
                   size: "small",
-                  title: "Download",
-                  path: mdiTrayArrowDown,
                   onClick: ({ event }) => {
-                    const isSharedRoute = !!this.$route.params.owner;
-                    const isFolder = !!item?.folder;
-                    const hasNonAscii = /[^\x20-\x7E]/.test(item.name);
-                    const hasSpaceOrTab = /[ \t]/.test(item.name);
-                    const hasNonAsciiBucket = /[^\x20-\x7E]/.test(this.container);
-                    const hasSpaceOrTabBucket = /[ \t]/.test(this.container);
-                    const hasUnsafeUrlChars = /[^A-Za-z0-9\-._~\/]/.test(item.name);
-
-
-                    const needsProxy =
-                      isSharedRoute ||
-                      this.isSharedContainer ||
-                      isFolder ||
-                      hasNonAscii ||
-                      hasSpaceOrTab ||
-                      hasNonAsciiBucket ||
-                      hasSpaceOrTabBucket ||
-                      hasUnsafeUrlChars;
-
-                    if (needsProxy) {
-                      this.beginDownload(item, event.isTrusted); // proxy path
-                    } else {
-                      this.navDownload(item.url); // TempURL path
-                    }
+                    this.beginDownload(item, event.isTrusted);
                   },
                   disabled: this.owner != undefined &&
                     this.accessRights.length === 0,
                 },
               },
+              children: [
+                {
+                  value: "",
+                  component: {
+                    tag: "c-icon",
+                    params: {
+                      path: mdiTrayArrowDown,
+                      size: "18",
+                    },
+                  },
+                },
+                {
+                  value: this.$t("message.download.download"),
+                  component: {
+                    tag: "span",
+                  },
+                },
+              ],
             },
             {
-              value: this.$t("message.objects.info") || "Info",
+              value: "",
               component: {
                 tag: "c-button",
                 params: {
                   testid: "object-info",
                   text: true,
                   size: "small",
-                  title: "Info",
-                  path: mdiInformationOutline,
                   onClick: () => this.onOpenInfoModal(item),
                   onKeyUp: (event) => {
-                    if (event.keyCode === 13) this.onOpenInfoModal(item, true);
+                    if (event.keyCode === 13) this.onOpenInfoModal(item);
                   },
-                  disabled: this.owner != undefined && this.accessRights.length === 0,
+                  disabled: this.owner != undefined &&
+                    this.accessRights.length === 0,
                 },
               },
+              children: [
+                {
+                  value: "",
+                  component: {
+                    tag: "c-icon",
+                    params: {
+                      path: mdiInformationOutline,
+                      size: "18",
+                    },
+                  },
+                },
+                {
+                  value: this.$t("message.objects.info"),
+                  component: {
+                    tag: "span",
+                  },
+                },
+              ],
             },
-            {
+            /*{
               value: this.$t("message.table.editTags"),
               component: {
                 tag: "c-button",
@@ -423,27 +394,25 @@ export default {
                   title: "Edit tags",
                   path: mdiPencilOutline,
                   onClick: () =>
-                    this.onOpenEditTagsModal(item.name),
+                    toggleEditTagsModal(item.name, null),
                   onKeyUp: (event) => {
                     if(event.keyCode === 13) {
-                      this.onOpenEditTagsModal(item.name, true);
+                      toggleEditTagsModal(item.name, null);
                     }
                   },
                   disabled: item?.folder ||
                     (this.owner != undefined && this.accessRights.length <= 1),
                 },
               },
-            },
+            },*/
             {
-              value: this.$t("message.delete"),
+              value: "",
               component: {
                 tag: "c-button",
                 params: {
                   testid: "delete-object",
                   text: true,
                   size: "small",
-                  title: "Delete object",
-                  path: mdiDeleteOutline,
                   onClick: () => {
                     this.$emit("delete-object", item);
                   },
@@ -456,6 +425,24 @@ export default {
                     this.owner != undefined && this.accessRights.length <= 1,
                 },
               },
+              children: [
+                {
+                  value: "",
+                  component: {
+                    tag: "c-icon",
+                    params: {
+                      path: mdiDeleteOutline,
+                      size: "18",
+                    },
+                  },
+                },
+                {
+                  value: this.$t("message.delete"),
+                  component: {
+                    tag: "span",
+                  },
+                },
+              ],
             },
           ],
         },
@@ -463,6 +450,9 @@ export default {
     },
 
     getPage: function () {
+      if (!this.paginationReady) {
+        return;
+      }
       let offset = 0;
       let limit = this.objs.length;
       if (!this.disablePagination || this.objs.length > 500) {
@@ -474,16 +464,20 @@ export default {
         limit = this.paginationOptions.itemsPerPage;
       }
 
-      // Filter objects by prefix
-      const prefix = getPrefix(this.$route);
-      const filteredObjs = this.objs
-        .filter(obj => obj.name.startsWith(prefix))
-        .filter(obj => obj.name !== prefix);
+      // Filtered objects based on prefix; the current folder's own
+      // marker object (zero-byte key equal to the prefix) is hidden
+      const filteredObjs = this
+        .objs
+        .filter((obj) => {
+          return obj.name.startsWith(getPrefix(this.$route));
+        })
+        .filter((obj) => obj.name !== getPrefix(this.$route));
 
-
+      // If the prefix no longer matches anything (e.g. the folder was
+      // deleted in another tab), navigate up one level instead of erroring
       const p = this.$route.query.prefix || "";
-      if (p && !this.$store.state.openDeleteModal &&
-        !this.objs.some(o => o.name === p || o.name.startsWith(p))) {
+      if (p && this.objs.length && !this.$store.openDeleteModal &&
+        !this.objs.some(o => o.name === p || o.name.startsWith(getPrefix(this.$route)))) {
         let up = p.replace(/[^/]+\/?$/, "");
         if (up && !up.endsWith("/")) up += "/";
         this.$router.replace({
@@ -491,10 +485,9 @@ export default {
         });
       }
 
-
       let pagedLength = 0;
 
-      this.objects = filteredObjs.reduce((items, item) => {
+      const rows = filteredObjs.reduce((items, item) => {
         if (isFile(item.name, this.$route) || !this.renderFolders) {
           items.push(item);
         } else {
@@ -526,17 +519,21 @@ export default {
               last_modified: folderObjs[0].last_modified,
               tags: [],
               folder: true,
-              itemCount: folderObjs.length,
             };
             items.push(folder);
           }
         }
         pagedLength = items.length;
         return items;
-      }, [])
+      }, []);
+
+      const pageRows = rows
         .sort((a, b) => sortItems(a, b, this.sortBy, this.sortDirection))
-        .slice(offset, offset + limit)
-        .map(item => this.formatItem(item));
+        .slice(offset, offset + limit);
+
+      this.tableKey = getPrefix(this.$route) + "|"
+        + pageRows.map(o => (o.folder ? "d" : "f")).join("");
+      this.objects = pageRows.map(item => this.formatItem(item));
 
       this.paginationOptions = {
         ...this.paginationOptions,
@@ -571,8 +568,8 @@ export default {
         this.$router.replace({"query": queryWithOutFile});
       }
     },
-    setPagination: function () {
-      const paginationOptions = getPaginationOptions(this.$t);
+    setPagination: async function () {
+      const paginationOptions = await getPaginationOptions(this.$t);
       this.paginationOptions = paginationOptions;
     },
     onSort(event) {
@@ -595,14 +592,7 @@ export default {
       //automated testing creates untrusted events
       const test = eventTrusted === undefined ? false: !eventTrusted;
 
-      const MAX_DOWNLOAD_SIZE = 5 * 1024 * 1024 * 1024; // 5GiB in bytes
-
       if (object?.folder) {
-        // Check if bucket/folder size exceeds the limit
-        if (object.bytes > MAX_DOWNLOAD_SIZE) {
-          addErrorToastOnMain(this.$t("message.download.errorSizeExceeded"));
-          return;
-        }
         const folderFiles = this
           .objs
           .filter((obj) => {
@@ -610,31 +600,34 @@ export default {
           })
           .map(item => item.name);
 
-        this.$store.state.socket.addDownload(
+        this.$store.s3download.addDownload(
           this.$route.params.container,
           folderFiles,
           this.$route.params.owner ? this.$route.params.owner : "",
           test,
         ).then(() => {
           if (DEV) console.log(`Started downloading folder ${object.name}`);
-        }).catch(() => {
+        }).catch((error) => {
+          if (DEV) {
+            console.log(error);
+          }
           addErrorToastOnMain(this.$t("message.download.error"));
         });
       } else {
-        this.$store.state.socket.addDownload(
+        this.$store.s3download.addDownload(
           this.$route.params.container,
           [object.name],
           this.$route.params.owner ? this.$route.params.owner : "",
           test,
         ).then(() => {
           if (DEV) console.log(`Started downloading object ${object.name}`);
-        }).catch(() => {
+        }).catch((error) => {
+          if (DEV) {
+            console.log(error);
+          }
           addErrorToastOnMain(this.$t("message.download.error"));
         });
       }
-    },
-    navDownload(url) {
-      window.open(url, "_blank");
     },
     setHeaders() {
       this.headers = [
@@ -649,11 +642,6 @@ export default {
           sortable: true,
         },
         {
-          key: "tags",
-          value: this.$t("message.table.tags"),
-          sortable: true,
-        },
-        {
           key: "last_modified",
           value: this.$t("message.table.modified"),
           sortable: true,
@@ -665,19 +653,6 @@ export default {
           sortable: false,
         },
       ];
-    },
-    onOpenEditTagsModal(itemName, keypress) {
-      toggleEditTagsModal(itemName, null);
-      if (keypress) {
-        setPrevActiveElement();
-        const editTagsModal = document.getElementById("edit-tags-modal");
-        disableFocusOutsideModal(editTagsModal);
-      }
-      setTimeout(() => {
-        const editTagsInput = document.getElementById("edit-tags-input")
-          ?.children[0];
-        editTagsInput.focus();
-      }, 300);
     },
   },
 };

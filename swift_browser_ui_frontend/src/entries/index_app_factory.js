@@ -2,34 +2,64 @@ import { createApp } from "vue";
 
 import { i18n } from "@/common/i18n";
 
-import checkIDB from "@/common/idb_support";
+import { checkIDB } from "@/common/idb";
 
-import { applyPolyfills, defineCustomElements } from "allas-ui/dist/loader";
-import { vControl } from "@/common/csc-ui-vue-directive";
+import { defineCustomElements } from "@cscfi/csc-ui/loader";
+import { vControl } from "@cscfi/csc-ui-vue";
 
 import CFooter from "@/components/CFooter.vue";
-import MainToolbar from "@/components/MainToolbar.vue";
 import CookieConsentModal from "@/components/CookieConsentModal.vue";
+import MainToolbar from "@/components/MainToolbar.vue";
 
 import "@/assets/main.css";
 
-applyPolyfills().then(() => {
-  defineCustomElements();
-});
+defineCustomElements();
 
 export function newApp(name, data, Component) {
   return createApp({
     name: name,
     components: {
       CFooter,
-      MainToolbar,
       CookieConsentModal,
+      MainToolbar,
     },
     data: data,
     created() {
       document.title = this.$t("message.program_name");
     },
     mounted: function() {
+      // Login card content doesn't fill the card due to an invisible svg
+      const targetNode = document.querySelector("form");
+      if (targetNode) {
+        const observer = new MutationObserver(() => {
+          // Remove the svg once it appears in DOM
+          const svg = targetNode.querySelector("c-login-card > article > svg");
+          if (svg) {
+            svg.remove();
+            observer.disconnect();
+          }
+        });
+        observer.observe(targetNode, { childList: true, subtree: true });
+      }
+
+      // Plausible analytics. The site is keyed by data-domain, so the
+      // same code serves every deployment: events are attributed to
+      // whichever site matching this hostname is registered in the
+      // Plausible admin (unregistered hostnames are simply dropped).
+      // Production uses the main Plausible instance, everything else
+      // reports to the dev instance.
+      const host = window.location.hostname;
+      if (host !== "localhost" && !host.startsWith("127.")) {
+        const plausibleHost = host === "allas.csc.fi"
+          ? "https://stats.rahtiapp.fi"
+          : "https://stats-dev.rahtiapp.fi";
+        const script = document.createElement("script");
+        script.setAttribute("defer", "");
+        script.setAttribute("data-domain", host);
+        script.setAttribute("src", `${plausibleHost}/js/script.outbound-links.js`);
+        document.head.appendChild(script);
+      }
+
       checkIDB().then(result => this.idb = result);
     },
     methods: {

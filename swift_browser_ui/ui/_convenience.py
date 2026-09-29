@@ -159,32 +159,6 @@ async def get_tempurl_key(request: aiohttp.web.Request) -> str:
     return str(temp_url_key)
 
 
-async def open_upload_runner_session(
-    request: aiohttp.web.Request,
-    project: str = "",
-) -> str:
-    """Open an upload session to the token."""
-    session = await aiohttp_session.get_session(request)
-    if not project:
-        project = request.match_info["project"]
-    try:
-        return str(session["projects"][project]["runner"])
-    except KeyError:
-        client = request.app["api_client"]
-        path = f"{setd['upload_internal_endpoint']}/{project}"
-        signature = await sign(3600, f"/{project}")
-        async with client.post(
-            path,
-            data={"token": session["token"]},
-            params=signature,
-            ssl=ssl_context,
-        ) as resp:
-            ret = str(resp.cookies["RUNNER_SESSION_ID"].value)
-            session["projects"][project]["runner"] = ret
-            session.changed()
-        return ret
-
-
 async def get_redis_client() -> redis.Redis:
     """Initialize and return a Python Redis client."""
     sentinel_url = str(os.environ.get("SWIFT_UI_REDIS_SENTINEL_HOST", ""))
@@ -226,12 +200,10 @@ async def get_redis_client() -> redis.Redis:
         redis_port = str(os.environ.get("SWIFT_UI_REDIS_PORT", ""))
         redis_host = str(os.environ.get("SWIFT_UI_REDIS_HOST", "localhost"))
 
-        redis_creds = ""
-        if redis_user and redis_password:
-            redis_creds = f"{redis_user}:{redis_password}@"
-
         redis_client = redis.from_url(
-            f"redis://{redis_creds}{redis_host}:{redis_port}",
+            f"redis://{redis_host}:{redis_port}",
+            username=redis_user if redis_user else None,
+            password=redis_password if redis_password else None,
             health_check_interval=5,
             retry=retry_conf,
             retry_on_error=retry_errors,
@@ -299,16 +271,22 @@ async def ldap_get_project_titles(projects: dict[str, dict]) -> dict[str, str]:
 
         found = {}
         with Connection(server=pool, user=bind, password=password) as conn:
+
             conn.search(
                 search_base=distinguished_name,
                 search_filter=filter.format(projects=project_numbers),
                 attributes=attributes,
             )
+
+            # Extract titles
             for entry in conn.entries:
                 found[str(entry["CSCPrjNum"])] = str(entry["CSCPrjTitle"])
 
         return found
 
+    # ldap3 does blocking socket I/O (TCP connect, TLS handshake, bind,
+    # search); run it in a worker thread so a slow LDAP server can't stall
+    # the event loop and every other in-flight request with it.
     titles.update(await asyncio.get_running_loop().run_in_executor(None, _search))
 
     return titles

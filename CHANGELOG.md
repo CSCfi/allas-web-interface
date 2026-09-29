@@ -7,6 +7,183 @@ and this project adheres to [Calendar Versioning](https://calver.org/).
 
 ## [Unreleased]
 
+## [2026.4.1] - 2026-04-08
+
+### Fixed
+
+- (users) broken advanced encryption options are no longer visible in the UI.
+
+## [2026.4.0] - 2026-04-07
+
+### Fixed
+
+- Fix duplicate share error and preserve correct rights during ACL sync (#1298)
+
+## [2026.3.1] - 2026-03-31
+
+### Fixed
+
+- (users) Fixed drag-and-drop folder upload (#1326)
+
+### Changed
+
+- prune newlines from vault exception reason fields to allow errors correctly bubble through
+
+## [2026.3.0] - 2026-03-04
+
+### Changed
+
+- (users) API tokens are now valid for a week instead of one day
+- API tokens are now valid for a week instead of one day
+- refactored oidcrp out in favor of idpy-oidc
+- Migrated from Vuex to Pinia state management store (#1294)
+- update dev vault from 1.19 to 1.21
+- Replaced singular object deletion with batch deletion
+- Moved bucket data fetching and enrichment to Containers component
+- pin `setuptools` version by default to prevent builds breaking.
+- readme to be up to date and compliant with the team readme standard
+- .env.test to be up to date
+- (users) Updated copy toast text
+- (admins) UI deployment now needs vault client credentials configured for copying headers
+- add a placeholder active file to store earlier in the upload preparation process
+- upload modal start check is delayed more
+- reduce header simultaneous request limit from 32 to 8
+- filter out the bucket policy statements in ACL sync that don't match `GrantSDConnectSharedAccessToProject`
+- Bucket table UI updated
+- Hide showTimestamp option from bucket view
+- Do not overwrite indexedDB container data on each container update
+- Bucket size, item count, last modified moved to object view to avoid fetching objects in container view
+- add `.docker-volumes` to `.dockerignore` to reduce image build context size if there's a lot of test data
+- Reorganize /common files for clarity
+- dev browser now opens directly into the UI address
+- Reorganized s3client initialization and wrapped frontend s3 commands (#1273)
+
+### Fixed
+
+- issue where makefile fails if .docker-volumes folder is owned by root
+- Fixed Delete modal allowing multiclicks
+- Fixed shared with view permission bucket appearing empty to receiver
+- Fix missing import
+- (users) upload should no longer be incorrectly flagged as failed due to a slow start
+- (users) Uploading too quickly after refresh or login on a slow connection should no longer be possible, as upload button is disabled until upload works
+- (users) bucket ownership retention share no longer shows up as a shared bucket
+- Copy progress stuck (#1300)
+- Fix bucket count not resetting to zero after object deletion
+- (admins) missing project id-name mapping prevented deletion from finishing, leading to the "delete access" confirmation to not close after deletion
+- (admins) incorrect referred ID leading to share deletion not working properly
+- (users) deleted shares no longer reappear after refresh
+- missing project id-name mapping prevented deletion from finishing, leading to the "delete access" confirmation to not close after deletion
+- incorrect referred ID leading to share deletion not working properly
+- (users) implicit project no longer causes share recipient created objects to be inaccessible to the bucket owner
+- (users) headers are uploaded using the correct owner when uploading to a shared bucket
+- implicit project no longer causes share recipient created objects to be inaccessible to the bucket owner
+- headers are uploaded using the correct owner when uploading to a shared bucket
+- Fix upload not starting after cancelled uploads (#1295)
+- (users) header upload should no longer crash when hundreds of files are uploaded
+- header upload no longer overflows the event loop due to too many headers
+- Fix s3 command error logging
+- Fixed stale share deletion after bucket deletion (#1291)
+- Fix Vite htmlPlugin returning undefined with Vite v7
+- Fix share modal loader being stuck on sharing fail (#1290)
+- Fix EC2 credential retrieval fail (#1280)
+- Fix HeadBucket commands failing
+- Fix hanging "gathering files" notification on Firefox on download abort
+- Fix persistent loader after project-level upload (#1288)
+- (users) smaller files are now correctly padded to fix incorrectly formatted tar archives
+- smaller files are now correctly padded to fix incorrectly formatted tar archives
+- (users) v2 buckets can now be downloaded if they contain objects, even if the size shows up as zero
+- (users) v2 object downloads now work in v3 UI unless bucket names break even lax s3 naming conventions (like contain spaces for example)
+- retrieve file sizes for old object downloads with `HeadObject` so the slicer uses correct length for retrieval
+- don't block downloads if file size is 0, instead allow based on object count
+
+### Removed
+
+- Removed irrelevant sphinx docs
+- Remove bulma remnants and sass dependency (#1292)
+- Purge SD Submit related code (#1275)
+
+### Added
+
+- Added basic bucket and object deletion error toasts (#1286)
+- make can now automatically pull fresh submodule branch versions
+- makefile dependency checks
+- Add header copy from previous implementation to bucket copy
+- interruptible keyword to pipeline jobs
+- (users) header addition and retrieval progress is now displayed when uploading or downloading
+- Vuex store now saves the progress of header operations
+- upload button is now blocked until the workers have finished loading
+- dev browser files are now persisted using docker volumes
+
+### Security
+
+- (admins) update docker base images to something currently supported
+- update docker base images to something currently supported
+
+## [2025.12.0] - 2025-12-18
+
+### Changed
+
+- (users) sharing now uses S3 bucket policies, which should improve shared bucket performance
+- (users) multithreaded uploads provide increased upload performance
+- sharing now uses s3 bucket policies instead of Swift ACLs
+- Uploads are now multithreaded and use S3 multipart uploads for larger files
+- (users) Implemented stricter bucket name validation criteria (#1263)
+- `/api/projects` returns additional field `title` for each project
+- (users) Replaced `folder` with `bucket`, `subfolder` with `folder`
+- (users) Updated API key modal text and changed to inline error validation (#1262)
+- (users) Changed the text of removal button in upload modal table (#1262)
+- outdated syntax in ceedling config
+- aiohttp to version 3.12.15
+
+### Removed
+
+- much of old swift related code from backend and frontend
+- (admins) deprecation warning -> `request` microservice will be removed before SD Connect v3 launch. This change will be reflected in the Helm charts in time.
+- Bucket creation no longer creates segments buckets as with S3 they're not required (segments buckets are still handled in deletion as they may exist for older buckets)
+- Backend API for proxying Allas Openstack Swift API
+- Old backend bucket replication runner
+- Swift API usage
+- stdout_pretty_tests_report in ceedling config
+
+### Added
+
+- frontend handlers for fetching upload and header worker scripts.
+- (admins) Configuration parameter for allowed CORS entry now exists
+- (users) CORS entries for SD Connect implicitly upon login
+- Configuration parameter for allowed CORS entry now exists
+- CORS entries for SD Connect implicitly upon login
+- s3 API as object storage source
+- ec2 credential access
+- (users) Show project title along with the number in the project selector (#1263)
+- (admins) LDAP connection need five new environment variables to expose project name functionality - found in `.github/config/.env.test`
+- (users) Added a placeholder footer link for cookie policy (#1262)
+
+### Fixed
+
+- catch exceptions on listing based bulk cors update requests, previously caused issues on fresh projects.
+- (users) qa downloads now work with Firefox as well
+- service worker path logic was missed in refactoring
+- header issues in nginx conf
+- (users) loading screen gets stuck when objects are refreshed after upload
+- (users) uploads not starting correctly from the bucket listing view
+- (users) downloads occasionally missing files due to an ongoing refresh
+- (users) uploaded objects not being immediately viewable
+- (users) downloads not starting with Firefox in SD Connect v3
+- loading screen gets stuck when objects are refreshed after upload
+- downloads missing files due to stale IndexedDB (by removing most of the IndexedDB)
+- objects being fetched using the old API calls
+- database refresh latency causing errating table rendering
+- firefox downloads not accessible due to trying to load ServiceWorker from incorrect URL
+- uploads started from bucket listing view now correctly check for access and create a new bucket with cors
+- bucket deletion incorrectly deleting buckets from DB, where they no longer exist
+- bucket creation modal doesn't implicitly add CORS info to fresh buckets
+- (users) Fixed sharing permissions not being visible without scrolling (#1255)
+- (users) Fixed attempting to delete subfolders only opening a confirmation modal (#1262)
+
+### Deprecated
+
+- Purge remaining reliance on IDB objects (#1271)
+
 ## [2025.6.0] - 2025-06-17
 
 ### Fixed
@@ -545,7 +722,12 @@ and this project adheres to [Calendar Versioning](https://calver.org/).
 - GH (GH #493) redesign upload UI
   - removed vue-material-design-icons
 
-[Unreleased]: https://gitlab.ci.csc.fi/sds-dev/sd-connect/swift-browser-ui/compare/2025.6.0...HEAD
+[Unreleased]: https://gitlab.ci.csc.fi/sds-dev/sd-connect/swift-browser-ui/compare/2026.4.1...HEAD
+[2026.4.1]: https://gitlab.ci.csc.fi/sds-dev/sd-connect/swift-browser-ui/compare/2026.4.0...2026.4.1
+[2026.4.0]: https://gitlab.ci.csc.fi/sds-dev/sd-connect/swift-browser-ui/compare/2026.3.1...2026.4.0
+[2026.3.1]: https://gitlab.ci.csc.fi/sds-dev/sd-connect/swift-browser-ui/compare/2026.3.0...2026.3.1
+[2026.3.0]: https://gitlab.ci.csc.fi/sds-dev/sd-connect/swift-browser-ui/compare/2025.12.0...2026.3.0
+[2025.12.0]: https://gitlab.ci.csc.fi/sds-dev/sd-connect/swift-browser-ui/compare/2025.6.0...2025.12.0
 [2025.6.0]: https://gitlab.ci.csc.fi/sds-dev/sd-connect/swift-browser-ui/compare/2025.4.1...2025.6.0
 [2025.4.1]: https://gitlab.ci.csc.fi/sds-dev/sd-connect/swift-browser-ui/compare/2025.4.0...2025.4.1
 [2025.4.0]: https://gitlab.ci.csc.fi/sds-dev/sd-connect/swift-browser-ui/compare/2025.2.0...2025.4.0

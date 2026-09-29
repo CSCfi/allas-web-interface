@@ -21,7 +21,7 @@ describe("User can share bucket from container table", function () {
       let i = 0;
       while (i < 12) {
         const bucketName = Math.random().toString(36).substring(2, 7);
-        cy.addbucket(bucketName);
+        cy.addBucket(bucketName);
         i++;
         cy.wait(1000);
       }
@@ -29,8 +29,8 @@ describe("User can share bucket from container table", function () {
       const randomName = Math.random().toString(36).substring(2, 7);
 
       const bucketName = `x${randomName}`;
-      cy.addbucket(bucketName);
-      findbucket(bucketName);
+      cy.addBucket(bucketName);
+      findBucket(bucketName);
 
       cy.contains(bucketName)
         .parent()
@@ -53,7 +53,7 @@ describe("User can share bucket from container table", function () {
       cy.wait(5000);
 
       //access bucket
-      findbucket(bucketName)
+      findBucket(bucketName)
       cy.contains(bucketName)
         .click({ force: true });
 
@@ -62,7 +62,7 @@ describe("User can share bucket from container table", function () {
       cy.generateFixture(file);
 
       //upload file from destination bucket
-      cy.uploadFileFrombucket(file);
+      cy.uploadFileFromBucket(file);
 
       //upload modal closes when upload starts successfully
       cy.get("[data-testid='upload-modal']")
@@ -74,7 +74,7 @@ describe("User can share bucket from container table", function () {
   });
 });
 
-const findbucket = (fname) => {
+const findBucket = (fname) => {
   const findInPage = (index) => {
     let found = false;
 

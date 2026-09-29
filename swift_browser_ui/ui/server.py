@@ -2,8 +2,8 @@
 
 # Generic imports
 import asyncio
-import base64
 import logging
+import mimetypes
 import secrets
 import ssl
 import sys
@@ -12,48 +12,31 @@ import typing
 import aiohttp.web
 import aiohttp_session
 import aiohttp_session.redis_storage
-import cryptography.fernet
 import uvloop
-from oidcrp.rp_handler import RPHandler
+from idpyoidc.client.rp_handler import RPHandler
 
 import swift_browser_ui.ui.middlewares
 from swift_browser_ui.ui._convenience import get_redis_client
 from swift_browser_ui.ui.api import (
-    add_project_container_acl,
-    close_upload_session,
-    get_access_control_metadata,
-    get_crypted_upload_session,
-    get_crypted_upload_socket_info,
+    aws_bulk_update_bucket_cors,
+    aws_create_bucket,
+    aws_head_bucket,
+    aws_list_buckets,
+    aws_preview_object,
+    aws_update_bucket_cors,
     get_os_user,
-    get_public_base_address,
-    get_shared_container_address,
-    get_upload_session,
-    list_public_containers,
-    modify_container_write_acl,
+    keystone_gen_ec2,
     os_list_projects,
-    remove_container_acl,
-    remove_project_container_acl,
-    set_container_public,
-    swift_create_container,
-    swift_delete_container,
-    swift_download_container,
-    swift_download_object,
-    swift_download_shared_object,
-    swift_get_metadata_container,
-    swift_get_project_metadata,
-    swift_list_containers,
-    swift_list_objects,
-    swift_preview_object,
-    swift_put_object,
-    swift_replicate_cancel,
-    swift_replicate_container,
-    swift_replicate_status,
-    swift_update_container_metadata,
+    replicate_bucket,
+    swift_get_container_public,
+    swift_set_container_public,
 )
-from swift_browser_ui.ui.discover import handle_discover
+from swift_browser_ui.ui.discover import (
+    handle_discover,
+    handle_s3_discover,
+)
 from swift_browser_ui.ui.front import (
     accessibility,
-    agg_swjs,
     badrequest,
     browse,
     down_swasm,
@@ -85,9 +68,6 @@ from swift_browser_ui.ui.login import (
 from swift_browser_ui.ui.misc_handlers import handle_bounce_direct_access_request
 from swift_browser_ui.ui.settings import setd
 from swift_browser_ui.ui.signature import (
-    handle_ext_token_create,
-    handle_ext_token_list,
-    handle_ext_token_remove,
     handle_signature_request,
 )
 
@@ -95,10 +75,20 @@ from swift_browser_ui.ui.signature import (
 # this issue is fixed https://github.com/MagicStack/uvloop/issues/575
 asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())  # type: ignore
 
+# Alpine Linux's mimetypes database omits common web types; needed for add_static route
+mimetypes.add_type("application/javascript", ".js")
+mimetypes.add_type("application/javascript", ".mjs")
+
 
 async def open_client_to_app(app: aiohttp.web.Application) -> None:
     """Open a client session for download proxies."""
-    app["api_client"] = aiohttp.ClientSession()
+    if not setd["check_certificate"]:
+        api_client = aiohttp.ClientSession(
+            connector=aiohttp.TCPConnector(verify_ssl=False)
+        )
+    else:
+        api_client = aiohttp.ClientSession()
+    app["api_client"] = api_client
 
 
 async def kill_dload_client(app: aiohttp.web.Application) -> None:
@@ -135,7 +125,6 @@ async def servinit(
         redis_client,
         cookie_name="SWIFT_UI_SESSION",
     )
-    app["seckey"] = base64.urlsafe_b64decode(cryptography.fernet.Fernet.generate_key())
     aiohttp_session.setup(
         app,
         storage,
@@ -144,9 +133,8 @@ async def servinit(
     # Add the rest of the middlewares
     [app.middlewares.append(i) for i in middlewares]  # type: ignore
 
-    # Create a signature salt to prevent editing the signature on the client
-    # side. Hash function doesn't need to be cryptographically secure, it's
-    # just a convenient way of getting ascii output from byte values.
+    # Create a signature salt to prevent editing the signature on the client side.
+    # This is not object encryption; it is only for protecting signed request data.
     app["Salt"] = secrets.token_hex(64)
     # Set application specific logging
     app["Log"] = logging.getLogger("swift-browser-ui")
@@ -154,19 +142,20 @@ async def servinit(
 
     if setd["oidc_enabled"]:
         oidc_url = "{}/.well-known/openid-configuration".format(setd["oidc_url"])
-        oidc_conf = {
-            "oidc": {
+        client_config = {
+            "default": {
                 "issuer": setd["oidc_url"],
                 "client_id": setd["oidc_client_id"],
                 "client_secret": setd["oidc_client_secret"],
+                "client_type": "oidc",
                 "redirect_uris": str(setd["oidc_redirect_uris"]).split(" "),
-                "behaviour": {
+                "preference": {
                     "response_types": ["code"],
                     "scope": ["openid", "profile", "email"],
                 },
             },
         }
-        app["oidc_client"] = RPHandler(oidc_url, client_configs=oidc_conf)
+        app["oidc_client"] = RPHandler(oidc_url, client_configs=client_config)
 
     # Setup static folder during development, if it has been specified
     if setd["static_directory"] is not None:
@@ -181,13 +170,12 @@ async def servinit(
         [
             aiohttp.web.get("/", index),
             # Worker routes
-            aiohttp.web.get("/upworker.js", up_swjs),
-            aiohttp.web.get("/upworker.wasm", up_swasm),
-            aiohttp.web.get("/downworker.js", down_swjs),
-            aiohttp.web.get("/downworker.wasm", down_swasm),
-            aiohttp.web.get("/upworker-post.js.map", map_up_swjs),
-            aiohttp.web.get("/downworker-post.js.map", map_down_swjs),
-            aiohttp.web.get("/aggregatorsw.js", agg_swjs),
+            aiohttp.web.get("/s3downworker.js", down_swjs),
+            aiohttp.web.get("/s3downworker.wasm", down_swasm),
+            aiohttp.web.get("/crypt-post-s3download.js.map", map_down_swjs),
+            aiohttp.web.get("/s3upworker.js", up_swjs),
+            aiohttp.web.get("/s3upworker.wasm", up_swasm),
+            aiohttp.web.get("/crypt-post-s3upload.js.map", map_up_swjs),
             aiohttp.web.get("/loginpassword", loginpassword),
             aiohttp.web.get("/browse", browse),
             # Route all URLs prefixed by /browse to the browser page, as this is
@@ -231,14 +219,23 @@ async def servinit(
         )
 
     # Add signature endpoint
-    app.add_routes([aiohttp.web.get("/sign/{valid}", handle_signature_request)])
-
-    # Add token functionality
     app.add_routes(
         [
-            aiohttp.web.get("/token/{project}/{id}", handle_ext_token_create),
-            aiohttp.web.delete("/token/{project}/{id}", handle_ext_token_remove),
-            aiohttp.web.get("/token/{project}", handle_ext_token_list),
+            aiohttp.web.get("/sign/{valid}", handle_signature_request),
+        ]
+    )
+
+    # Add S3 CORS compatibility routes
+    app.add_routes(
+        [
+            aiohttp.web.get("/api/s3/{project}", aws_list_buckets),
+            aiohttp.web.head("/api/s3/{project}/{bucket}", aws_head_bucket),
+            aiohttp.web.post("/api/s3/{project}/cors", aws_bulk_update_bucket_cors),
+            aiohttp.web.put("/api/s3/{project}/{bucket}", aws_create_bucket),
+            aiohttp.web.post("/api/s3/{project}/{bucket}/cors", aws_update_bucket_cors),
+            aiohttp.web.get(
+                "/preview/{project}/{bucket}/{object:.*}", aws_preview_object
+            ),
         ]
     )
 
@@ -247,66 +244,14 @@ async def servinit(
         [
             aiohttp.web.get("/api/username", get_os_user),
             aiohttp.web.get("/api/projects", os_list_projects),
-            aiohttp.web.post(
-                "/api/access/{project}/{container}", add_project_container_acl
-            ),
-            aiohttp.web.delete("/api/access/{project}/{container}", remove_container_acl),
-            aiohttp.web.delete(
-                "/api/access/{project}/{container}/{receiver}",
-                remove_project_container_acl,
+            aiohttp.web.get("/api/{project}/OS-EC2", keystone_gen_ec2),
+            # TODO(swift-deprecation): remove both /public routes
+            # together with their handlers in api.py
+            aiohttp.web.get(
+                "/api/{project}/{container}/public", swift_get_container_public
             ),
             aiohttp.web.put(
-                "/api/access/{project}/{container}", modify_container_write_acl
-            ),
-            aiohttp.web.get("/api/meta/{project}", swift_get_project_metadata),
-            aiohttp.web.get(
-                "/api/meta/{project}/{container}", swift_get_metadata_container
-            ),
-            aiohttp.web.get("/api/public/{project}", list_public_containers),
-            aiohttp.web.get("/api/public/{project}/address", get_public_base_address),
-            aiohttp.web.put("/api/public/{project}/{container}", set_container_public),
-            aiohttp.web.get("/api/{project}", swift_list_containers),
-            aiohttp.web.get("/api/{project}/acl", get_access_control_metadata),
-            aiohttp.web.get("/api/{project}/address", get_shared_container_address),
-            aiohttp.web.put("/api/{project}/{container}", swift_create_container),
-            aiohttp.web.delete("/api/{project}/{container}", swift_delete_container),
-            aiohttp.web.get("/api/{project}/{container}", swift_list_objects),
-            aiohttp.web.get(
-                "/api/{project}/{container}/{object:.*}", swift_download_object
-            ),
-            aiohttp.web.put("/api/{project}/{container}/{object:.*}", swift_put_object),
-            aiohttp.web.post(
-                "/api/{project}/{container}", swift_update_container_metadata
-            ),
-            aiohttp.web.get(
-                "/preview/{project}/{container}/{object:.*}", swift_preview_object
-            ),
-        ]
-    )
-
-    # Add download routes
-    app.add_routes(
-        [
-            aiohttp.web.get("/download/{project}/{container}", swift_download_container),
-            aiohttp.web.get(
-                "/download/{project}/{container}/{object:.*}",
-                swift_download_shared_object,
-            ),
-        ]
-    )
-
-    # Add upload routes
-    app.add_routes(
-        [
-            aiohttp.web.delete("/upload/{project}", close_upload_session),
-            aiohttp.web.get("/upload/{project}/{container}", get_upload_session),
-            aiohttp.web.get(
-                "/enupload/{project}/{container}/{object_name:.*}",
-                get_crypted_upload_session,
-            ),
-            aiohttp.web.get(
-                "/enupload/{project}",
-                get_crypted_upload_socket_info,
+                "/api/{project}/{container}/public", swift_set_container_public
             ),
         ]
     )
@@ -314,20 +259,23 @@ async def servinit(
     # Add replication routes
     app.add_routes(
         [
-            aiohttp.web.post(
-                "/replicate/{project}/{container}", swift_replicate_container
-            ),
-            aiohttp.web.get("/replicate/status/{job_id}", swift_replicate_status),
-            aiohttp.web.post("/replicate/cancel/{job_id}", swift_replicate_cancel),
+            aiohttp.web.post("/replicate/{project}/{bucket}", replicate_bucket),
         ]
     )
 
     # Add discovery routes
-    app.add_routes([aiohttp.web.get("/discover", handle_discover)])
+    app.add_routes(
+        [
+            aiohttp.web.get("/discover", handle_discover),
+            aiohttp.web.get("/discover/s3", handle_s3_discover),
+        ]
+    )
 
     # Add direct routes
     app.add_routes(
-        [aiohttp.web.get("/direct/request", handle_bounce_direct_access_request)]
+        [
+            aiohttp.web.get("/direct/request", handle_bounce_direct_access_request),
+        ]
     )
 
     # Add health check endpoint

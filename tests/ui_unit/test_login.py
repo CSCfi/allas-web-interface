@@ -301,6 +301,7 @@ class LoginTestClass(tests.common.mockups.APITestBase):
             "token": {
                 "user": {
                     "name": "test-user",
+                    "id": "test-user-id",
                 },
                 "roles": [
                     {

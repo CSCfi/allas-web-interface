@@ -1,0 +1,145 @@
+workflow:
+  auto_cancel:
+    on_new_commit: conservative
+
+stages:
+  - verify
+  - test
+  - release
+  - deploy
+
+variables:
+  BUILD_IMAGE: $ARTIFACTORY_SERVER/sds/sdd-common-ci
+
+include:
+  - project: 'sds-dev/releases'
+    ref: main
+    file: 'releases.yml'
+
+backend-lint:
+  stage: verify
+  tags:
+    - docker-exec
+  rules:
+    - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
+  interruptible: true
+  image: $BUILD_IMAGE
+  before_script:
+    - pip install pre-commit tox mypy .[dev]
+  script:
+    - SKIP=no-commit-to-branch pre-commit run --all-files -c .pre-commit-config.yaml --show-diff-on-failure --color never
+    - tox -e bandit
+
+spellcheck:
+  stage: verify
+  tags:
+    - docker-exec
+  rules:
+    - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
+  interruptible: true
+  image: $BUILD_IMAGE
+  before_script:
+    - pip install pyspelling
+  script:
+    - pyspelling
+
+frontend-lint:
+  stage: verify
+  tags:
+    - docker-exec
+  rules:
+    - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
+  interruptible: true
+  image: $BUILD_IMAGE
+  before_script:
+    - pnpm --prefix swift_browser_ui_frontend install
+  script:
+    - pnpm --prefix swift_browser_ui_frontend lint
+
+backend-test:
+  stage: test
+  tags:
+    - docker-exec
+  rules:
+    - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
+      allow_failure: true
+  interruptible: true
+  image: $BUILD_IMAGE
+  before_script:
+    - pnpm --prefix swift_browser_ui_frontend install --prod
+    - pip install .[test]
+  script:
+    - pnpm --prefix swift_browser_ui_frontend docker-build
+    - tox -e pytest
+    - coverage run -m pytest tests/
+    - coverage report --precision=1
+  coverage: '/TOTAL.*\s+(\d+\%)/'
+
+wasm-test:
+  stage: test
+  tags:
+    - docker-exec
+  rules:
+    - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
+      allow_failure: true
+  interruptible: true
+  image: $BUILD_IMAGE
+  before_script:
+    - ruby --version
+    - gem --version
+    - gem install ceedling
+  script:
+    - cd swift_browser_ui_frontend/wasm
+    - ceedling --verbosity debug
+
+# This job creates the automated releases
+release-job:
+  extends: .automated-release
+  interruptible: true
+  release:
+    description: $(cat release_changes.md)
+    assets:
+      links:
+        - name: ${ARTIFACTORY_SERVER}/sds/sd-connect:${RELEASE_VERSION}
+          url: https://${ARTIFACTORY_SERVER}/sds/sd-connect:${RELEASE_VERSION}
+          link_type: image
+        - name: ${ARTIFACTORY_SERVER}/sds/swift-x-account-sharing:${RELEASE_VERSION}
+          url: https://${ARTIFACTORY_SERVER}/sds/swift-x-account-sharing:${RELEASE_VERSION}
+          link_type: image
+
+# This is a manual dry-run for developers to run in the merge request
+update-versions-dryrun:
+  extends: .update-versions-dryrun
+  interruptible: true
+  variables:
+    UPDATE_VERSION_FILES_LIST: "openapi.yaml;swift_browser_ui/__init__.py;swift_browser_ui_frontend/package.json"
+
+# This job updates the versions
+update-versions:
+  extends: .update-versions
+  variables:
+    UPDATE_VERSION_FILES_LIST: "openapi.yaml;swift_browser_ui/__init__.py;swift_browser_ui_frontend/package.json"
+
+deploy:
+  rules:
+    # until this is https://gitlab.com/groups/gitlab-org/-/epics/4529 is merged
+    # ENVIRONMENT env var will not be sent downstream and it will default to devel branch
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      when: manual
+    - if: '$CI_COMMIT_TAG !~ "/^$/"'
+    - if: "$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH"
+  stage: deploy
+  tags:
+    - sds
+  variables:
+    GITLAB_PROJECT_ID: $GITLAB_SWIFT_BROWSER_CONFIG_BUILD
+    GITLAB_REF: main
+    BUILD_BRANCH: $CI_COMMIT_REF_NAME
+  script:
+    - >
+      curl --request POST
+      --form "token=$CI_JOB_TOKEN"
+      --form "ref=$GITLAB_REF"
+      --form "variables[ENVIRONMENT]=$BUILD_BRANCH"
+      "$GITLAB_CI_URL/api/v4/projects/$GITLAB_PROJECT_ID/trigger/pipeline"
+  allow_failure: true

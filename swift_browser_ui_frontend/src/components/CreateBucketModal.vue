@@ -1,7 +1,7 @@
 <template>
   <c-card
     ref="createBucketContainer"
-    class="add-bucket"
+    class="modal-card"
     data-testid="create-bucket-modal"
     @keydown="handleKeyDown"
   >
@@ -15,12 +15,12 @@
         vertical="bottom"
         absolute
       />
-      <h2 class="title is-4">
-        {{ $t("message.container_ops.addContainer") }}
-      </h2>
-      <c-card-content>
+      <c-card-content class="modal-card-content">
+        <h2 class="title is-4">
+          {{ $t("message.container_ops.addContainer") }}
+        </h2>
         <p class="info-text">
-          {{ $t("message.container_ops.norename") }}
+          {{ $t("message.uploadDialog.uploadStep1.nonModifiable") }}
         </p>
         <c-text-field
           id="newBucket-input"
@@ -30,13 +30,15 @@
           name="bucketname"
           aria-required="true"
           data-testid="bucket-name"
-          :valid="errorMsg.length === 0"
-          :validation="errorMsg"
+          hide-details
           required
-          validate-on-blur
-          @changeValue="interacted=true"
+          trim-whitespace
+          @changeValue="checkBucketName"
         />
-        <label
+        <BucketNameValidation
+          :result="validationResult"
+        />
+        <!--<label
           class="taginput-label"
           label-for="create-bucket-taginput"
         >
@@ -48,7 +50,7 @@
           data-testid="bucket-tag"
           @addTag="addingTag"
           @deleteTag="deletingTag"
-        />
+        />-->
         <p class="info-text is-6">
           {{ $t("message.container_ops.createdBucket") }}
           <b>{{ active.name }}</b>.
@@ -59,7 +61,7 @@
           target="_blank"
         >
           {{ $t("message.container_ops.viewProjectMembers") }}
-          <i class="mdi mdi-open-in-new" />
+          <c-icon :path="mdiOpenInNew" />
         </c-link>
       </c-card-content>
     </div>
@@ -68,16 +70,16 @@
         outlined
         size="large"
         data-testid="cancel-save-bucket"
-        @click="toggleCreateBucketModal(false)"
-        @keyup.enter="toggleCreateBucketModal(true)"
+        @click="toggleCreateBucketModal"
+        @keyup.enter="toggleCreateBucketModal"
       >
         {{ $t("message.cancel") }}
       </c-button>
       <c-button
         size="large"
         data-testid="save-bucket"
-        @click="createContainer(false)"
-        @keyup.enter="createContainer(true)"
+        @click="() => createContainer()"
+        @keyup.enter="() => createContainer()"
       >
         {{ $t("message.save") }}
       </c-button>
@@ -86,66 +88,60 @@
 </template>
 
 <script>
-import { swiftCreateContainer } from "@/common/api";
-import { tokenize, getTimestampForContainer } from "@/common/conv";
-import { getDB } from "@/common/db";
+import { mdiOpenInNew } from "@mdi/js";
+import { getDB } from "@/common/idb";
 
 import {
+  DEV,
   addNewTag,
   deleteTag,
   getProjectNumber,
   validateBucketName,
   getCurrentISOtime,
+  tokenize,
 } from "@/common/globalFunctions";
-import {
-  getFocusableElements,
-  moveFocusOutOfModal,
-  keyboardNavigationInsideModal,
-} from "@/common/keyboardNavigation";
-import TagInput from "@/components/TagInput.vue";
+import { captureKeyboardNavInsideModal } from "@/common/keyboardNavigation";
+// import TagInput from "@/components/TagInput.vue";
+import BucketNameValidation from "./BucketNameValidation.vue";
 
 import { toRaw } from "vue";
+import { debounce } from "lodash";
+import { awsAddBucketCors, awsCreateBucket } from "@/common/api";
 
 export default {
   name: "CreateBucketModal",
-  components: { TagInput },
+  components: {
+    //TagInput,
+    BucketNameValidation,
+  },
   data() {
     return {
+      mdiOpenInNew,
       bucketName: "",
       tags: [],
       projectInfoLink: "",
-      interacted: false, //don't show error when opening modal
-      errorMsg: "",
+      validationResult: {},
       containers: [],
     };
   },
   computed: {
     active() {
-      return this.$store.state.active;
+      return this.$store.active;
     },
     uname() {
-      return this.$store.state.uname;
+      return this.$store.uname;
     },
     controller() {
       return new AbortController();
     },
-    prevActiveEl() {
-      return this.$store.state.prevActiveEl;
-    },
     modalVisible() {
-      return this.$store.state.openCreateBucketModal;
+      return this.$store.openCreateBucketModal;
     },
   },
   watch: {
     active: function () {
       this.projectInfoLink = this.$t("message.supportMenu.projectInfoBaseLink")
         + getProjectNumber(this.active);
-    },
-    bucketName: function () {
-      this.interacted ?
-        this.errorMsg = validateBucketName(
-          this.bucketName, this.$t, this.containers) :
-        this.errorMsg = "";
     },
     modalVisible: async function() {
       if (this.modalVisible) {
@@ -156,79 +152,90 @@ export default {
     },
   },
   methods: {
-    createContainer: function (keypress) {
-      this.bucketName = this.bucketName.trim();
-      this.errorMsg = validateBucketName(
-        this.bucketName, this.$t, this.containers);
-      if (this.errorMsg.length) return;
+    checkBucketName: debounce(async function () {
+      this.validationResult = await validateBucketName(
+        this.active.id, this.bucketName);
+    }, 300),
+    createContainer: async function () {
+      this.validationResult = await validateBucketName(
+        this.active.id, this.bucketName);
+      const validationError =
+        Object.values(this.validationResult).some(val => !val);
+      if (validationError) return;
 
       let projectID = this.$route.params.project;
       const bucketName = toRaw(this.bucketName);
-      const tags = toRaw(this.tags);
-      swiftCreateContainer(projectID, bucketName, tags.join(";"))
-        .then(async () => {
-          const containerTimestamp = await getTimestampForContainer(
-            projectID, bucketName, this.controller.signal);
+      //const tags = toRaw(this.tags);
 
-          getDB().containers.add({
-            projectID: projectID,
-            name: bucketName,
-            tokens: tokenize(bucketName),
-            tags: tags,
-            count: 0,
-            bytes: 0,
-            last_modified: getCurrentISOtime(containerTimestamp*1000),
-          });
-        }).then(() => {
-          swiftCreateContainer(projectID, `${bucketName}_segments`, [])
-            .then(() => {
-              getDB().containers.add({
-                projectID: projectID,
-                name: `${bucketName}_segments`,
-                tokens: [],
-                tags: [],
-                count: 0,
-                bytes: 0,
-              });
-            });
-          this.toggleCreateBucketModal(keypress);
+      let resp = await awsCreateBucket(projectID, bucketName);
+      let errorMessage = this.$t("message.error.createFail");
+      switch (resp) {
+        case 409:
+          errorMessage = this.$t("message.error.inUseOtherPrj");
+          break;
+        case 400:
+          errorMessage = this.$t("message.error.invalidName");
+          break;
+      }
 
-          this.$router.push({
-            name: "AllBuckets",
-            params: {
-              project: this.active.id,
-              user: this.uname,
-            },
-          });
-          this.$store.commit("setNewBucket", bucketName);
-        })
-        .catch(err => {
-          let errorMessage = this.$t("message.error.createFail");
+      if (resp.status != 204) {
+        document.querySelector("#createModal-toasts").addToast(
+          {
+            id: "create-toast",
+            progress: false,
+            type: "error",
+            message: errorMessage,
+          },
+        );
+        return;
+      }
 
-          if (err?.code === "NAME_IN_USE") {
-            errorMessage = this.$t("message.error.inUseOtherPrj");
-          } else if (err?.code === "INVALID_NAME") {
-            errorMessage = this.$t("message.error.invalidName");
-          }
-          document.querySelector("#createModal-toasts").addToast(
-            {
-              id: "create-toast",
-              progress: false,
-              type: "error",
-              message: errorMessage },
+      // We won't get the timestamp immediately from the backend with S3
+      // Let's just assume current time :)
+      // Seen below as the bare getCurrentISOtime() call.
+
+      let newBucket = {
+        name: bucketName,
+        bytes: 0,
+        count: 0,
+        created: getCurrentISOtime(),
+        last_modified: getCurrentISOtime(),
+        projectID: projectID,
+      };
+
+      try {
+        await awsAddBucketCors(projectID, bucketName);
+        newBucket.cors_added = true;
+      } catch (e) {
+        if (DEV) {
+          console.error(
+            `Failed to update CORS for the new bucket ${bucketName}`,
           );
-        });
+        }
+        newBucket.cors_added = false;
+      } finally {
+        await getDB().containers.add(newBucket);
+      }
+
+      this.toggleCreateBucketModal();
+
+      this.$router.push({
+        name: "AllBuckets",
+        params: {
+          project: this.active.id,
+          user: this.uname,
+        },
+      });
+
+      this.$store.setNewBucket(bucketName);
     },
-    toggleCreateBucketModal: function (keypress) {
-      this.$store.commit("toggleCreateBucketModal", false);
+    toggleCreateBucketModal: function () {
+      this.$store.toggleCreateBucketModal(false);
       this.bucketName = "";
       this.tags = [];
       this.create = true;
-      this.interacted = false;
-      this.errorMsg = "";
+      this.validationResult = {};
       document.querySelector("#createModal-toasts").removeToast("create-toast");
-
-      if (keypress) moveFocusOutOfModal(this.prevActiveEl);
     },
     addingTag: function (e, onBlur) {
       this.tags = addNewTag(e, this.tags, onBlur);
@@ -237,50 +244,17 @@ export default {
       this.tags = deleteTag(e, tag, this.tags);
     },
     handleKeyDown: function (e) {
-      const focusableList = this.$refs.createBucketContainer.querySelectorAll(
-        "input, c-link, c-button",
-      );
-      const { first, last } = getFocusableElements(focusableList);
-      keyboardNavigationInsideModal(e, first, last);
+      if (e.key === "Escape") {
+        this.toggleCreateBucketModal();
+      } else {
+        captureKeyboardNavInsideModal(e, this.$refs.createBucketContainer);
+      }
     },
   },
 };
 </script>
 
 <style scoped>
-
-.add-bucket {
-  padding: 3rem;
-  position: absolute;
-  top: -1rem;
-  left: 0;
-  right: 0;
-  max-height: 75vh;
-}
-
-@media screen and (max-width: 767px), (max-height: 580px) {
-   .add-bucket {
-    top: -5rem;
-  }
-}
-
-@media screen and (max-height: 580px) and (max-width: 767px),
-(max-width: 525px) {
-  .add-bucket {
-    top: -9rem;
-  }
-}
-
-@media screen and (max-height: 580px) and (max-width: 525px) {
-  .add-bucket {
-    top: -13rem;
-  }
-}
-
-c-card-content {
-  color: var(--csc-dark);
-  padding: 1.5rem 0 0 0;
-}
 
 c-card-actions {
   padding: 0;

@@ -2,9 +2,10 @@ import { createRouter, createWebHistory } from "vue-router";
 import ContainersView from "@/components/Containers.vue";
 import ObjectsView from "@/views/Objects.vue";
 import SharedObjects from "@/views/SharedObjects.vue";
-import {getProjects, getContainers} from "@/common/api.js";
-import { getDB } from "@/common/db";
-import store from "@/common/store";
+import { getProjects } from "@/common/api.js";
+import { getDB } from "@/common/idb";
+import { updateContainers } from "./idbFunctions";
+import useStore from "@/common/store";
 
 async function checkProject (to, from, next){
 
@@ -26,20 +27,26 @@ async function checkProject (to, from, next){
   }
   next();
 }
-async function checkContainer (to, from, next){
 
-  if(to.params.container === store.state.uploadBucket.name) {
+async function checkContainer (to, from, next){
+  const store = useStore();
+
+  if(to.params.container === store.uploadBucket.name) {
     //When new bucket is created with upload but containers not updated yet
     next();
   }
   else {
-    let containers = await getDB()
+    let buckets = await getDB()
       .containers.where({projectID: to.params.project} )
       .toArray();
-    if(containers.length === 0){
-      containers = await getContainers();
+    if(buckets.length === 0) {
+      await updateContainers(to.params.project);
+      buckets = await getDB()
+        .containers.where({projectID: to.params.project} )
+        .toArray();
     }
-    const val = containers.find(item =>
+
+    const val = buckets.find(item =>
       item.name === to.params.container);
     if(val === undefined) {
       window.location.pathname = "/notfound";
@@ -68,6 +75,9 @@ export default createRouter({
       name: "AllBuckets",
       component: ContainersView,
     },
+    // The shared/to and shared/from paths are kept for old links and
+    // the table's empty-state texts; the merged view renders for all
+    // three routes and the filter drawer selects the content
     {
       path: "/browse/:user/:project/shared/to",
       name: "SharedTo",

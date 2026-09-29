@@ -1,11 +1,11 @@
 # Deployment of swift-broser-ui
 
-This repository consists of SD Connect main API components: `runner`, `sharing`, `request` as well as the `sd-connect-ui`.
+This repository consists of SD Connect main API components: `sharing`, `request` as well as the `sd-connect-ui`.
 
 
 ## Prerequisites
 
-[Hashicorp Vault](https://www.hashicorp.com/products/vault), [Redis](https://redis.io/) and [PostgreSQL DB](https://www.postgresql.org/) need to be setup. Their setup is documented as part of the installation.
+[Redis](https://redis.io/) and [PostgreSQL DB](https://www.postgresql.org/) need to be setup. Their setup is documented as part of the installation.
 
 
 ## Installation

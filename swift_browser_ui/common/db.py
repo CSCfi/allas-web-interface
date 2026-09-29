@@ -74,39 +74,13 @@ class BaseDBConn:
                 FROM Tokens
                 WHERE token_owner = $1
                 OR token_owner_name = $1
-                AND created > NOW() - INTERVAL '1 day'
+                AND created > NOW() - INTERVAL '7 days'
                 ;
                 """,
                 token_owner,
             )
             return list(query)
         return []
-
-
-class UploadDBConn(BaseDBConn):
-    """Class for the upload token database."""
-
-    def __init__(self) -> None:
-        """Initialize connection variable."""
-        super().__init__()
-
-    async def open(self) -> None:
-        """Initialize the database connection."""
-        await super()._open(
-            password=os.environ.get("UPLOAD_DB_PASSWORD", None),
-            user=os.environ.get("UPLOAD_DB_USER", "sharing"),
-            host=os.environ.get("UPLOAD_DB_HOST", "localhost"),
-            port=int(os.environ.get("UPLOAD_DB_PORT", 5432)),
-            ssl=os.environ.get("UPLOAD_DB_SSL", "prefer"),
-            database=os.environ.get("UPLOAD_DB_NAME", "swiftbrowserdb"),
-            min_size=int(os.environ.get("UPLOAD_DB_MIN_CONNECTIONS", 1)),
-            max_size=int(os.environ.get("UPLOAD_DB_MAX_CONNECTIONS", 10)),
-            timeout=int(os.environ.get("UPLOAD_DB_TIMEOUT", 120)),
-            command_timeout=int(os.environ.get("UPLOAD_DB_COMMAND_TIMEOUT", 9)),
-            max_inactive_connection_lifetime=int(
-                os.environ.get("UPLOAD_DB_MAX_INACTIVE_CONN_LIFETIME", 300)
-            ),
-        )
 
 
 class SharingDBConn(BaseDBConn):
@@ -124,7 +98,7 @@ class SharingDBConn(BaseDBConn):
             host=os.environ.get("SHARING_DB_HOST", "localhost"),
             port=int(os.environ.get("SHARING_DB_PORT", 5432)),
             ssl=os.environ.get("SHARING_DB_SSL", "prefer"),
-            database=os.environ.get("SHARING_DB_NAME", "swiftbrowserdb"),
+            database=os.environ.get("SHARING_DB_NAME", "s3browserdb"),
             min_size=int(os.environ.get("SHARING_DB_MIN_CONNECTIONS", 1)),
             max_size=int(os.environ.get("SHARING_DB_MAX_CONNECTIONS", 10)),
             timeout=int(os.environ.get("SHARING_DB_TIMEOUT", 120)),
@@ -389,7 +363,7 @@ class SharingDBConn(BaseDBConn):
                         DELETE FROM Tokens
                         WHERE
                             token_owner = $1 AND
-                            created < NOW() - INTERVAL '1 day'
+                            created < NOW() - INTERVAL '7 days'
                         ;
                         """,
                         token_owner,
@@ -457,170 +431,48 @@ class SharingDBConn(BaseDBConn):
                         id,
                     )
 
-    async def match_id_name(self, id: str) -> list:
-        """Match an id to the correct name."""
+    async def match_ids_names(self, ids: str | list) -> list:
+        """Match id(s) to the correct name(s)."""
         if self.pool is not None:
-            query = await self.pool.fetch(
-                """
+            if isinstance(ids, str):
+                query = """
                 SELECT *
                 FROM ProjectIDs
                 WHERE id = $1
                 ;
-                """,
-                id,
-            )
-            return list(query)
+                """
+            else:
+                query = """
+                SELECT *
+                FROM ProjectIDs
+                WHERE id = ANY($1)
+                ;
+                """
+            rows = await self.pool.fetch(query, ids)
+
+            return list(rows)
 
         return []
 
-    async def match_name_id(self, name: str) -> list:
-        """Match a name to the correct id."""
+    async def match_names_ids(self, names: str | list) -> list:
+        """Match name(s) to the correct id(s)."""
         if self.pool is not None:
-            query = await self.pool.fetch(
-                """
+            if isinstance(names, str):
+                query = """
                 SELECT *
                 FROM ProjectIDs
                 WHERE name = $1
                 ;
-                """,
-                name,
-            )
-            return list(query)
-
-        return []
-
-
-class RequestDBConn(BaseDBConn):
-    """Class for handling sharing request database connection."""
-
-    def __init__(self) -> None:
-        """."""
-        super().__init__()
-
-    async def open(self) -> None:
-        """Gracefully open the database."""
-        await super()._open(
-            password=os.environ.get("REQUEST_DB_PASSWORD", None),
-            user=os.environ.get("REQUEST_DB_USER", "request"),
-            host=os.environ.get("REQUEST_DB_HOST", "localhost"),
-            port=int(os.environ.get("REQUEST_DB_PORT", 5432)),
-            ssl=os.environ.get("REQUEST_DB_SSL", "prefer"),
-            database=os.environ.get("REQUEST_DB_NAME", "swiftbrowserdb"),
-            min_size=int(os.environ.get("REQUEST_DB_MIN_CONNECTIONS", 0)),
-            max_size=int(os.environ.get("REQUEST_DB_MAX_CONNECTIONS", 49)),
-            timeout=int(os.environ.get("REQUEST_DB_TIMEOUT", 120)),
-            command_timeout=int(os.environ.get("REQUEST_DB_COMMAND_TIMEOUT", 180)),
-            max_inactive_connection_lifetime=int(
-                os.environ.get("REQUEST_DB_MAX_INACTIVE_CONN_LIFETIME", 0)
-            ),
-        )
-
-    @staticmethod
-    async def parse_query(
-        query: typing.List[asyncpg.Record],
-    ) -> typing.List[typing.Dict[str, typing.Any]]:
-        """Parse a database query list to JSON serializable form."""
-        return [
-            {
-                "container": rec["container"],
-                "user": rec["recipient"],
-                "owner": rec["container_owner"],
-                "date": rec["created"].isoformat(),
-            }
-            for rec in query
-        ]
-
-    async def add_request(self, user: str, container: str, owner: str) -> bool:
-        """Add an access request to the database."""
-        if self.pool is not None:
-            async with self.pool.acquire() as conn:
-                async with conn.transaction():
-                    await conn.execute(
-                        """
-                        INSERT INTO Requests(
-                            container,
-                            container_owner,
-                            recipient,
-                            created
-                        ) VALUES (
-                            $1, $2, $3, NOW()
-                        );
-                        """,
-                        container,
-                        owner,
-                        user,
-                    )
-                    return True
-        return False
-
-    async def get_request_owned(
-        self, user: str
-    ) -> typing.List[typing.Dict[str, typing.Any]]:
-        """Get the requests owned by the getter."""
-        if self.pool is not None:
-            query = await self.pool.fetch(
                 """
+            else:
+                query = """
                 SELECT *
-                FROM Requests
-                WHERE container_owner = $1
+                FROM ProjectIDs
+                WHERE name = ANY($1)
                 ;
-                """,
-                user,
-            )
-            return await self.parse_query(query)
-        return []
-
-    async def get_request_made(
-        self, user: str
-    ) -> typing.List[typing.Dict[str, typing.Any]]:
-        """Get the requests made by the getter."""
-        if self.pool is not None:
-            query = await self.pool.fetch(
                 """
-                SELECT *
-                FROM Requests
-                WHERE recipient = $1
-                ;
-                """,
-                user,
-            )
-            return await self.parse_query(query)
-        return []
+            rows = await self.pool.fetch(query, names)
 
-    async def get_request_container(
-        self, container: str
-    ) -> typing.List[typing.Dict[str, typing.Any]]:
-        """Get the requests made for a container."""
-        if self.pool is not None:
-            query = await self.pool.fetch(
-                """
-                SELECT *
-                FROM Requests
-                WHERE container = $1
-                ;
-                """,
-                container,
-            )
-            return await self.parse_query(query)
-        return []
+            return list(rows)
 
-    async def delete_request(self, container: str, owner: str, recipient: str) -> bool:
-        """Delete an access request from the database."""
-        if self.pool is not None:
-            async with self.pool.acquire() as conn:
-                async with conn.transaction():
-                    await conn.execute(
-                        """
-                        DELETE FROM Requests
-                        WHERE
-                            container = $1 AND
-                            container_owner = $2 AND
-                            recipient = $3
-                        ;
-                        """,
-                        container,
-                        owner,
-                        recipient,
-                    )
-                return True
-        return False
+        return []

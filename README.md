@@ -1,133 +1,80 @@
-## allas-web-interface
+## swift-browser-ui
 
-### Notice:
-> **⚠️ Notice:** This repository is using a modified version that omits the Encryption & Decryption. The original can be found [in this repo](https://github.com/CSCfi/swift-browser-ui).
+![Python Unit Tests](https://github.com/CSCfi/swift-browser-ui/workflows/Python%20Unit%20Tests/badge.svg)
+![Javascript ESLint check](https://github.com/CSCfi/swift-browser-ui/workflows/Javascript%20ESLint%20check/badge.svg)
+![Python style check](https://github.com/CSCfi/swift-browser-ui/workflows/Python%20style%20check/badge.svg)
 
+A web frontend for browsing and managing objects saved using S3 compatible object storage.
+Currently developed and tested using Openstack identity API and Ceph object storage.
 
+Project documentation is hosted as a part of the source code.
 
+* [Bucket sharing](README-sharing.md)
 
-### Description
+### 💻 Development
+<details open><summary>Click to expand</summary>
 
-A web frontend for browsing and downloading objects saved in [SWIFT](https://docs.openstack.org/swift/latest/)
-compliant object storage, supporting SSO with SAML2 federated authentication.
+#### Prerequisites
 
-### Requirements
+Bare minimum
 
-Python 3.12+ required.
+* Python 3.12+ required (pyenv recommended for installation)
+* Node version 22+ required, 24 recommended (nvm recommended for installation)
+* pnpm 9+ (`npm install -g pnpm@9`)
+* working docker
+* sudo (due to docker access rights we haven't bothered to fix)
+* git
+* ssh (client)
+* dev python dependencies (`pip install .[dev]`)
 
-- The dependencies mentioned in `requirements.txt`.
-- A suitable storage backend supporting usage via OpenStack Object Storage API. (e.g. Ceph RGW, OpenStack Swift)
-- PostgreSQL
-- Redis
+Testing
+* test python dependencies (`pip install .[test]`)
+* ui testing python dependencies (`pip install . .[ui_test]`)
 
-### Development
-To start all required services, you can use the `docker-compose` files from https://github.com/CSCfi/swift-ui-deployment,
-or the provided `Procfile`, as shown bellow.
+Local ceph
 
-Please, read and adhere to the [CONTRIBUTING guidelines](CONTRIBUTING.md) for submitting changes.
+* libvirt, virsh + compatible hardware virtualization backend (e.g. kvm or hvf)
+* 60 GiB available disk space
+* 8 GiB RAM to spare (32 GiB on the laptop)
 
-#### Getting started:
+Default installation (with local Ceph):
+
 ```bash
-git clone -b devel git@github.com:CSCfi/swift-browser-ui.git
+git clone --recurse-submodules ssh://git@gitlab.ci.csc.fi:10022/sds-dev/sd-connect/swift-browser-ui.git
+# OR from the public repo
+git clone --recurse-submodules https://github.com/cscfi/swift-browser-ui
+
 cd swift-browser-ui
-```
-Install frontend dependencies, and build (without encryption or OIDC enabled).
 
-```bash
-pnpm --prefix swift_browser_ui_frontend install
-pnpm --prefix swift_browser_ui_frontend run build
-```
+# Environment checks, not needed after it's been run once
+pyenv install 3.12 \
+	&& pyenv virtualenv 3.12 sd-connect-dev \
 
-Install python dependencies, optionally in a virtual environment.
-
-```bash
-python3 -m venv venv --prompt swiftui  # Optional step, creates python virtual environment
-source venv/bin/activate  # activates virtual environment
-pip install -Ue .[docs,test,dev]
-pre-commit install
+make check-deps \
+	&& pyenv activate sd-connect-dev \
+	&& pushd swift_browser_ui_frontend ; pnpm i ; popd \
+	&& cp .github/config/.env.test .env \
+	&& make
 ```
 
-Set up the environment variables
+> TODO: Reduced installation (without local Ceph):
 
-```bash
-cp .github/config/.env.test .env  # Make any changes you need to the file
+#### Running
+
+In the repository root folder:
+```
+make dev-up
 ```
 
-Open another terminal, and build the `keystone-swift` image
-
-```bash
-git clone git@github.com:CSCfi/docker-keystone-swift.git
-cd docker-keystone-swift
-docker buildx build -t keystone-swift .
+If the ceph environment is already running, or when using an external S3 storage
+for testing, you can get by with just
+```
+make dev-docker-up
 ```
 
-Start the servers
+#### OIDC login provider configuration
 
-```bash
-honcho start
-```
-
-Now you should be able to access the development server at localhost:8081. The login and password are `swift`, and `veryfast`, respectively.
-
-This configuration has both frontend and backend servers running with code reloading features, meaning that after code changes the servers reload.
-
-##### Trusted TLS
-Additionally, when testing with the encrypted upload features, browser
-features are used that **require** a trusted TLS connection. This can
-be achieved by using a development proxy server that can be built from
-files in the `devproxy` folder. [The proxy has it's own instructions for building.](devproxy/README.md)
-
-This guide assumes you're using `devenv` as the domain name. Replace this
-with the domain you're certificate sings, and if necessary, add it to
-`/etc/hosts` so it's resolvable both in docker, and locally.
-
-Additional setup is required in your environment file. You'll need to
-configure the following keys to point to whatever hostname will be used
-to access the service. Additionally you should allow all hosts, assuming
-your machine is in a secure network when developing. In case you trust
-your network and want as easy of a setup as possible, you can use all to
-greenlight all hosts for access.
-
-```
-SWIFT_UI_FRONTEND_ALLOW_HOSTS=devenv
-SWIFT_UI_TLS_PORT=8443
-SWIFT_UI_TLS_HOST=hostname
-```
-
-Additionally you'll need to configure the endpoints to be correct, so that
-the backend APIs work as intended.
-```
-BROWSER_START_SHARING_ENDPOINT_URL=https://devenv:9443
-BROWSER_START_SHARING_INT_ENDPOINT_URL=http://localhost:9090
-BROWSER_START_REQUEST_ENDPOINT_URL=https://devenv:10443
-BROWSER_START_REQUEST_INT_ENDPOINT_URL=http://localhost:9091
-BROWSER_START_RUNNER_ENDPOINT=http://localhost:9092
-BROWSER_START_RUNNER_EXT_ENDPOINT=https://devenv:11443
-```
-
-If your Docker network does not match the default, you'll need to change the
-network configuration to make the proxy aware of the backend services. The
-environment network defaults to the default Docker network, which is:
-```
-DOCKER_NETWORK_SEGMENT=172.17.0.0/24
-DOCKER_NETWORK_GATEWAY=172.17.0.1
-```
-
-If you are using MacOS and Docker Desktop, the network can be defined as:
-```
-DOCKER_NETWORK_SEGMENT=host.docker.internal
-DOCKER_NETWORK_GATEWAY=gateway.docker.internal
-```
-
-After this, comment out the commands to run without trusted TLS in the
-`Procfile`, and uncomment the commands to run with trusted TLS.
-
-You should now be able to run the service with trusted TLS by running
-```bash
-honcho start
-```
-
-##### OIDC login provider
+> TODO: update to take the docker environment into account
 
 To run with OIDC support, set the `OIDC_` environment variables in the `.env` file and restart the services. You'll also need to build the frontend again:
 
@@ -143,6 +90,75 @@ cert_path=$(python -c "import certifi;print(certifi.where())")
 cat oidc-cert.pem >> ${cert_path}
 rm oidc-cert.pem
 ```
-### License
 
-``allas-web-interface`` and all it sources are released under *MIT License*.
+#### Pre-commit
+In your virtual environment, check that the required dependencies have been installed
+and enable pre-commit.
+
+```
+pyenv activate sd-connect-dev
+pip install -Ue .[test,dev]
+pre-commit install
+```
+</details>
+
+### 🛠️  Contributing
+
+<details><summary>Click to expand</summary>
+
+Development team members should check internal [contributing guidelines for Gitlab](https://gitlab.ci.csc.fi/groups/sds-dev/-/wikis/Guides/Contributing).
+
+If you are not part of CSC and our development team, your help is nevertheless very welcome. Please see [contributing guidelines for Github](CONTRIBUTING.md).
+
+#### Repository specific code guidelines
+
+For frontend development, please conform to using [JSDoc](https://jsdoc.app/about-getting-started) doclets for your JavaScript functions. The purpose of using doclets (as of now) is not necessarily for api document generation, but moreso for the developers to stay on track about the ever growing complexity of the codebase.
+
+The doclet should include at least:
+- a short general description of what is the purpose of the function
+- data types for the parameters and return values and
+- if they cannot be expressed with data types and/or descriptive parameter names, a short description
+
+Hint: VSCode offers helpful autocompletion for JSDoc doclets by typing `/**` + `[enter]`.
+
+</details>
+
+### 🧪 Testing
+
+<details><summary>Click to expand</summary>
+
+#### Backend
+The backend `python` tests can be run with `tox`. Start the mock server in one terminal, and run tox in another.
+
+```bash
+pyenv activate sd-connect-dev
+pip install -Ue .[test,dev]
+tox
+```
+
+#### TODO: frontend
+
+#### WebAssembly C Code Unit Tests
+C code is tested using a unit tests collection built using `ceedling`. They can be ran by
+navigating to the `swift_browser_ui_frontend/wasm` directory and running the `ceedling` command.
+You'll have to install `ceedling` first, which can be found [here](https://www.throwtheswitch.org/ceedling)
+
+</details>
+
+### 🚀 Deployment
+
+<details><summary>Click to expand</summary>
+
+Deployment can be done using the `Dockerfile`s in the repository.
+
+TODO: add generic deployment instructions.
+
+</details>
+
+### 📜 License
+
+<details><summary>Click to expand</summary>
+
+Software is released under `MIT`, see [LICENSE](LICENSE).
+
+</details>

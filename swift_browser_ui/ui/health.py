@@ -55,40 +55,6 @@ async def get_x_account_sharing(
         _set_error_status(request, services, "swift-x-account-sharing")
 
 
-async def get_upload_runner(
-    services: typing.Dict[str, typing.Any],
-    request: aiohttp.web.Request,
-    web_client: aiohttp.ClientSession,
-    api_params: dict,
-    performance: typing.Dict[str, typing.Any],
-) -> None:
-    """Poll swiftui-upload-runner API."""
-    try:
-        if setd["upload_internal_endpoint"]:
-            start = time.time()
-            async with web_client.get(
-                str(setd["upload_internal_endpoint"]) + "/health", params=api_params
-            ) as resp:
-                request.app["Log"].debug(resp)
-                if resp.status != 200:
-                    services["swiftui-upload-runner"] = {"status": "Down"}
-                    end = time.time() - start
-                    performance["swiftui-upload-runner"] = {"time": end}
-                else:
-                    status = await resp.json()
-                    services["swiftui-upload-runner"] = status["upload-runner"]
-                    performance["swiftui-upload-runner"] = {
-                        "time": status["start-time"] - start
-                    }
-        else:
-            services["swiftui-upload-runner"] = {"status": "Nonexistent"}
-    except ServerDisconnectedError:
-        _set_error_status(request, services, "swiftui-upload-runner")
-    except Exception as e:
-        request.app["Log"].info(f"Health failed for reason: {e}")
-        _set_error_status(request, services, "swiftui-upload-runner")
-
-
 async def get_redis(
     services: typing.Dict[str, typing.Any],
     request: aiohttp.web.Request,
@@ -178,8 +144,6 @@ async def handle_health_check(request: aiohttp.web.Request) -> aiohttp.web.Respo
     }
 
     await get_x_account_sharing(services, request, web_client, api_params, performance)
-
-    await get_upload_runner(services, request, web_client, api_params, performance)
 
     await get_redis(services, request, performance)
 

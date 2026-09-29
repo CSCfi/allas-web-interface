@@ -1,12 +1,14 @@
 <template>
   <div>
     <h2>Object browser login progress</h2>
-    <p class="maintext">
-      <br>The current login process requires logging in by fetching an
-      unscoped token from the Openstack's keystone API. The server will handle
-      scoping the token, logging in to the Openstack API, fetching all
-      necessary information and revoking the token upon leaving the site.
-      The login process currently goes as follows:
+    <div class="maintext">
+      <p>
+        <br>The current login process requires logging in by fetching an
+        unscoped token from the Openstack's keystone API. The server will handle
+        scoping the token, logging in to the Openstack API, fetching all
+        necessary information and revoking the token upon leaving the site.
+        The login process currently goes as follows:
+      </p>
       <ol id="manlist">
         <li>
           Open a new tab and hit <b>F12</b> to open the console on said tab
@@ -30,7 +32,7 @@
           response
         </li>
       </ol>
-    </p>
+    </div>
     <p class="maintext">
       After successfully copying the response token id header, paste it in the
       following form's text field

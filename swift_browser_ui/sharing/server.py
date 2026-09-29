@@ -17,6 +17,7 @@ from swift_browser_ui.sharing.api import (
     delete_share_handler,
     edit_share_handler,
     gave_access_handler,
+    handle_batch_get_id_cache,
     handle_get_id_cache,
     handle_health_check,
     handle_project_add_ids,
@@ -39,10 +40,10 @@ async def init_server() -> aiohttp.web.Application:
     """Initialize the server."""
     app = aiohttp.web.Application(
         middlewares=[
-            swift_browser_ui.common.common_middleware.add_cors,  # type:ignore
-            swift_browser_ui.common.common_middleware.check_db_conn,  # type:ignore
-            swift_browser_ui.common.common_middleware.handle_validate_authentication,  # type:ignore
-            swift_browser_ui.common.common_middleware.catch_uniqueness_error,  # type:ignore
+            swift_browser_ui.common.common_middleware.add_cors,  # type: ignore
+            swift_browser_ui.common.common_middleware.check_db_conn,  # type: ignore
+            swift_browser_ui.common.common_middleware.handle_validate_authentication,  # type: ignore
+            swift_browser_ui.common.common_middleware.catch_uniqueness_error,  # type: ignore
             swift_browser_ui.common.common_middleware.error_handler,  # type: ignore
         ]
     )
@@ -78,6 +79,7 @@ async def init_server() -> aiohttp.web.Application:
                 "/share/{owner}/{container}",
                 swift_browser_ui.common.common_handlers.handle_delete_preflight,
             ),
+            aiohttp.web.get("/ids", handle_batch_get_id_cache),
             aiohttp.web.get("/ids/{project}", handle_get_id_cache),
             aiohttp.web.put("/ids/{project}", handle_project_add_ids),
             aiohttp.web.options(
