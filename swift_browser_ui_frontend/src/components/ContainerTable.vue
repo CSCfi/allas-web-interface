@@ -269,48 +269,66 @@ export default {
         ) => {
           items.push({
             name: {
-              value: truncate(item.name),
-              component: {
-                tag: "c-link",
-                params: {
-                  href: "javascript:void(0)",
-                  color: "dark-grey",
-                  path: mdiPail,
-                  iconFill: "primary",
-                  iconStyle: {
-                    marginRight: "1rem",
-                    flexShrink: "0",
-                  },
-                  onClick: () => {
-                    const listQuery = { ...this.$route.query };
+              value: null,
+              children: [
+                {
+                  key: "name_link",
+                  value: truncate(item.name),
+                  component: {
+                    tag: "c-link",
+                    params: {
+                      href: "javascript:void(0)",
+                      color: "dark-grey",
+                      path: mdiPail,
+                      iconFill: "primary",
+                      iconStyle: {
+                        marginRight: "1rem",
+                        flexShrink: "0",
+                      },
+                      onClick: () => {
+                        const listQuery = { ...this.$route.query };
 
-                    if(item.owner) {
-                      this.$router.push({
-                        name: "SharedObjects",
-                        params: {
-                          container: item.name,
-                          owner: item.owner,
-                        },
-                        query: {
-                          returnTo: "buckets",
-                          returnQuery: encodeURIComponent(JSON.stringify(listQuery)),
-                        },
-                      });
-                    } else {
-                      this.$router.push({
-                        name: "ObjectsView",
-                        params: {
-                          container: item.name,
-                        },
-                        query: {
-                          returnTo: "buckets",
-                          returnQuery: encodeURIComponent(JSON.stringify(listQuery)),
-                        },
-                      });
-                    }
+                        if(item.owner) {
+                          this.$router.push({
+                            name: "SharedObjects",
+                            params: {
+                              container: item.name,
+                              owner: item.owner,
+                            },
+                            query: {
+                              returnTo: "buckets",
+                              returnQuery: encodeURIComponent(JSON.stringify(listQuery)),
+                            },
+                          });
+                        } else {
+                          this.$router.push({
+                            name: "ObjectsView",
+                            params: {
+                              container: item.name,
+                            },
+                            query: {
+                              returnTo: "buckets",
+                              returnQuery: encodeURIComponent(JSON.stringify(listQuery)),
+                            },
+                          });
+                        }
+                      },
+                    },
                   },
                 },
-              },
+                // label buckets the UI can't list, e.g. due to bucket policy
+                ...(item.restricted ? [{
+                  key: "restricted",
+                  value: this.$t("message.unreachableBucket.label"),
+                  component: {
+                    tag: "c-tag",
+                    params: {
+                      flat: true,
+                      title: this.$t("message.unreachableBucket.tooltip"),
+                    },
+                  },
+                }] : []),
+              ],
             },
             items: {
               value: item.count,

@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## 2026-11-04
+
+### Fixed
+
+- A bucket that the web interface can't list (e.g. a bucket policy blocks it) no longer causes a /browse → /forbid redirect loop. The bucket is labelled "Unreachable" instead.
+
 ## 2025-01-28
 
 ### Changed
