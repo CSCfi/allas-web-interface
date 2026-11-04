@@ -5,6 +5,7 @@ import { isEqual, isEqualWith } from "lodash";
 import {
   getContainers,
   getObjects,
+  BucketForbiddenError,
   getCopyStatus,
   cancelCopy,
   getPublicBaseAddress,
@@ -495,34 +496,45 @@ const store = createStore({
         signal = controller.signal;
       }
 
-      do {
-        if (owner) {
+      try {
+        do {
           objects = await getObjects(
             projectID,
             container.name,
             marker,
             signal,
-            true,
-            owner,
+            !!owner,
+            owner ? owner : "",
+            { background: true },
           );
-        } else {
-          objects = await getObjects(
-            projectID, container.name, marker, signal);
-        }
 
-        if (objects.length > 0) {
-          objects.forEach(obj => {
-            obj.container = container.name;
-            obj.containerID = container.id;
-            obj.tokens = isSegmentsContainer ? [] : tokenize(obj.name);
-            if (owner) {
-              obj.containerOwner = container.owner;
-            }
-          });
-          newObjects = newObjects.concat(objects);
-          marker = objects[objects.length - 1].name;
+          if (objects.length > 0) {
+            objects.forEach(obj => {
+              obj.container = container.name;
+              obj.containerID = container.id;
+              obj.tokens = isSegmentsContainer ? [] : tokenize(obj.name);
+              if (owner) {
+                obj.containerOwner = container.owner;
+              }
+            });
+            newObjects = newObjects.concat(objects);
+            marker = objects[objects.length - 1].name;
+          }
+        } while (objects.length > 0);
+      } catch (e) {
+        if (e instanceof BucketForbiddenError) {
+          // Bucket denies access (e.g. bucket policy blocking the UI),
+          // label it as unreachable and keep the cached objects.
+          await getDB().containers.update(container.id, { restricted: true });
+          return;
         }
-      } while (objects.length > 0);
+        throw e;
+      }
+
+      // Listing works again (e.g. bucket policy changed), clear the label
+      if ((await getDB().containers.get(container.id))?.restricted) {
+        await getDB().containers.update(container.id, { restricted: false });
+      }
 
       let toDelete = [];
 
@@ -547,7 +559,11 @@ const store = createStore({
           signal,
           !!owner,
           owner ? owner : "",
-        );
+          { background: true },
+        ).catch(e => {
+          if (e instanceof BucketForbiddenError) return [];
+          throw e;
+        });
 
         if (!isSegmentsContainer) {
           // Map segments by their parent object for quick lookup

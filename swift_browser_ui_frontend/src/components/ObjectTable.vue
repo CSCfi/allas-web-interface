@@ -147,8 +147,9 @@
         :render-folders="renderFolders"
         :show-timestamp="showTimestamp"
         :access-rights="accessRights"
-        :no-data-text="filtering ?
-          $t('message.search.empty') : $t('message.emptyContainer')"
+        :no-data-text="filtering ? $t('message.search.empty')
+          : restricted ? $t('message.unreachableBucket.message')
+            : $t('message.emptyContainer')"
         @selected-rows="handleSelection"
         @delete-object="confirmDelete"
       />
@@ -217,6 +218,7 @@ export default {
       filteredObjects: [],
       tableOptions: [],
       currentContainer: {},
+      restricted: false,
       breadcrumbClicked: false,
       objsLoading: false,
       filtering: false,
@@ -572,6 +574,8 @@ export default {
 
         await this.$store.dispatch("updateObjects", params);
       }
+      // Set by updateObjects when the bucket can't be listed (403)
+      this.restricted = !!(await this.getCurrentContainer())?.restricted;
 
       this.oList = useObservable(
         liveQuery(() =>
