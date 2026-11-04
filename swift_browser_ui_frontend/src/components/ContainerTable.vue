@@ -269,66 +269,76 @@ export default {
         ) => {
           items.push({
             name: {
-              value: null,
-              children: [
-                {
-                  key: "name_link",
-                  value: truncate(item.name),
-                  component: {
-                    tag: "c-link",
-                    params: {
-                      href: "javascript:void(0)",
-                      color: "dark-grey",
-                      path: mdiPail,
-                      iconFill: "primary",
-                      iconStyle: {
-                        marginRight: "1rem",
-                        flexShrink: "0",
-                      },
-                      onClick: () => {
-                        const listQuery = { ...this.$route.query };
+              value: truncate(item.name),
+              component: {
+                tag: "c-link",
+                params: {
+                  href: "javascript:void(0)",
+                  color: "dark-grey",
+                  path: mdiPail,
+                  iconFill: "primary",
+                  iconStyle: {
+                    marginRight: "1rem",
+                    flexShrink: "0",
+                  },
+                  onClick: () => {
+                    const listQuery = { ...this.$route.query };
 
-                        if(item.owner) {
-                          this.$router.push({
-                            name: "SharedObjects",
-                            params: {
-                              container: item.name,
-                              owner: item.owner,
-                            },
-                            query: {
-                              returnTo: "buckets",
-                              returnQuery: encodeURIComponent(JSON.stringify(listQuery)),
-                            },
-                          });
-                        } else {
-                          this.$router.push({
-                            name: "ObjectsView",
-                            params: {
-                              container: item.name,
-                            },
-                            query: {
-                              returnTo: "buckets",
-                              returnQuery: encodeURIComponent(JSON.stringify(listQuery)),
-                            },
-                          });
-                        }
-                      },
-                    },
+                    if(item.owner) {
+                      this.$router.push({
+                        name: "SharedObjects",
+                        params: {
+                          container: item.name,
+                          owner: item.owner,
+                        },
+                        query: {
+                          returnTo: "buckets",
+                          returnQuery: encodeURIComponent(JSON.stringify(listQuery)),
+                        },
+                      });
+                    } else {
+                      this.$router.push({
+                        name: "ObjectsView",
+                        params: {
+                          container: item.name,
+                        },
+                        query: {
+                          returnTo: "buckets",
+                          returnQuery: encodeURIComponent(JSON.stringify(listQuery)),
+                        },
+                      });
+                    }
                   },
                 },
-                // label buckets the UI can't list, e.g. due to bucket policy
-                ...(item.restricted ? [{
+              },
+              // label buckets the UI can't list, e.g. due to bucket policy
+              ...(item.restricted ? {
+                children: [{
                   key: "restricted",
                   value: this.$t("message.unreachableBucket.label"),
                   component: {
                     tag: "c-tag",
                     params: {
-                      flat: true,
                       title: this.$t("message.unreachableBucket.tooltip"),
+                      // warning colours; the tag fills in on hover
+                      style: {
+                        // line up under the bucket name: icon 18px + its 1rem margin
+                        marginLeft: "calc(18px + 1rem)",
+                        "--csc-primary": "#a33a00",
+                        "--csc-primary-text-hover": "rgba(255, 88, 0, 0.15)",
+                      },
+                      // click/tap shows the same message for touch devices
+                      onClick: () => {
+                        document.querySelector("#container-toasts").addToast({
+                          type: "info",
+                          progress: false,
+                          message: this.$t("message.unreachableBucket.tooltip"),
+                        });
+                      },
                     },
                   },
-                }] : []),
-              ],
+                }],
+              } : {}),
             },
             items: {
               value: item.count,
