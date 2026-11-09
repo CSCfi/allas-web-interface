@@ -214,7 +214,7 @@ let default_translations = {
       },
       emptyContainer: "This bucket/folder has no content.",
       unreachableBucket: {
-        label: "Unreachable",
+        label: "Unavailable",
         tooltip: "The web interface can't access this bucket. " +
           "A bucket policy may be blocking it.",
         message: "The web interface can't access this bucket. " +
