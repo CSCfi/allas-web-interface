@@ -311,6 +311,34 @@ export default {
                   },
                 },
               },
+              // label buckets the UI can't list, e.g. due to bucket policy
+              ...(item.restricted ? {
+                children: [{
+                  key: "restricted",
+                  value: this.$t("message.unreachableBucket.label"),
+                  component: {
+                    tag: "c-tag",
+                    params: {
+                      title: this.$t("message.unreachableBucket.tooltip"),
+                      // warning colours; the tag fills in on hover
+                      style: {
+                        // line up under the bucket name: icon 18px + its 1rem margin
+                        marginLeft: "calc(18px + 1rem)",
+                        "--csc-primary": "#a33a00",
+                        "--csc-primary-text-hover": "rgba(255, 88, 0, 0.15)",
+                      },
+                      // click/tap shows the same message for touch devices
+                      onClick: () => {
+                        document.querySelector("#container-toasts").addToast({
+                          type: "info",
+                          progress: false,
+                          message: this.$t("message.unreachableBucket.tooltip"),
+                        });
+                      },
+                    },
+                  },
+                }],
+              } : {}),
             },
             items: {
               value: item.count,
