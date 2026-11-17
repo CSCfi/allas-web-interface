@@ -6,6 +6,7 @@ import {
   getContainers,
   getObjects,
   BucketForbiddenError,
+  ObjectListingError,
   getCopyStatus,
   cancelCopy,
   getPublicBaseAddress,
@@ -528,6 +529,10 @@ const store = createStore({
           await getDB().containers.update(container.id, { restricted: true });
           return;
         }
+        if (e instanceof ObjectListingError) {
+          // Listing failed or was aborted, keep the cached objects and state
+          return;
+        }
         throw e;
       }
 
@@ -561,7 +566,9 @@ const store = createStore({
           owner ? owner : "",
           { background: true },
         ).catch(e => {
-          if (e instanceof BucketForbiddenError) return [];
+          // no _segments bucket (404) or no access is normal, no segments
+          if (e instanceof BucketForbiddenError ||
+            e instanceof ObjectListingError) return [];
           throw e;
         });
 

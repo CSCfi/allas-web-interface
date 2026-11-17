@@ -183,6 +183,18 @@ export class BucketForbiddenError extends Error {
   }
 }
 
+// Thrown by background object listings that fail for another reason
+// (aborted, 401, 404, 5xx), so callers keep their cached state instead
+// of treating the bucket as empty.
+export class ObjectListingError extends Error {
+  constructor(container, status) {
+    super(`Listing bucket ${container} failed (status ${status})`);
+    this.name = "ObjectListingError";
+    this.container = container;
+    this.status = status;
+  }
+}
+
 export async function getObjects(
   project,
   container,
@@ -214,6 +226,9 @@ export async function getObjects(
 
   if (background && objects?.status == 403) {
     throw new BucketForbiddenError(container);
+  }
+  if (background && (signal?.aborted || objects?.status != 200)) {
+    throw new ObjectListingError(container, objects?.status);
   }
 
   if (objects?.status == 200 && !signal?.aborted) {
