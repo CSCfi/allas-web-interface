@@ -317,15 +317,17 @@ export default {
                   key: "restricted",
                   value: this.$t("message.unreachableBucket.label"),
                   component: {
-                    tag: "c-tag",
+                    tag: "c-status",
                     params: {
+                      // design system warning colours
+                      type: "warning",
                       title: this.$t("message.unreachableBucket.tooltip"),
-                      // warning colours; the tag fills in on hover
                       style: {
                         // line up under the bucket name: icon 18px + its 1rem margin
                         marginLeft: "calc(18px + 1rem)",
-                        "--csc-primary": "#a33a00",
-                        "--csc-primary-text-hover": "rgba(255, 88, 0, 0.15)",
+                        // c-status host is a block, keep the click area to the badge
+                        width: "fit-content",
+                        cursor: "pointer",
                       },
                       // click/tap shows the same message for touch devices
                       onClick: () => {
