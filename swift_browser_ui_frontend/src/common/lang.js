@@ -814,12 +814,12 @@ let default_translations = {
       },
       emptyContainer: "Tämä ämpäri on tyhjä.",
       unreachableBucket: {
-        label: "Ei saatavilla",
-        tooltip: "Verkkokäyttöliittymä ei pääse tähän ämpäriin. " +
-          "Ämpärin käyttöoikeuskäytäntö saattaa estää sen.",
-        message: "Verkkokäyttöliittymä ei pääse tähän ämpäriin. " +
-          "Ämpärin käyttöoikeuskäytäntö saattaa estää sen. Käytä " +
-          "sisällön käsittelyyn muuta työkalua, kuten rclonea tai s3cmd:tä.",
+        label: "Pääsy evätty",
+        tooltip: "Sisältöön ei pääse tästä käyttöliittymästä. " +
+          "Ämpärin käyttöoikeusasetukset saattavat rajoittaa pääsyä.",
+        message: "Sisältöön ei pääse tästä käyttöliittymästä. " +
+          "Ämpärin käyttöoikeusasetukset saattavat rajoittaa pääsyä. Voit kokeilla " +
+          "muita työkaluja, kuten rclonea tai s3cmd:tä.",
       },
       emptyProject: {
         all: "Tässä projektissa ei ole ämpäreitä.",
