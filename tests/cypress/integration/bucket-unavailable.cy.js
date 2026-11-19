@@ -105,6 +105,35 @@ describe("Bucket that the UI can't list", function () {
       .should("not.exist");
   });
 
+  it("clears the label from the bucket list when objects are cached", () => {
+    //open the bucket so its object is listed and cached
+    stubBucket(1);
+    stubListing(200, [OBJECT]);
+    visitAndLogin();
+    cy.get("c-data-table").contains(BUCKET).click();
+    cy.get("[data-testid='object-table']")
+      .contains(OBJECT.name)
+      .should("exist");
+
+    //access is denied, opening the bucket labels it
+    stubListing(403);
+    cy.reload();
+    cy.wait("@listing");
+    cy.contains("back to all buckets").click();
+    cy.get("c-data-table")
+      .contains("c-status", "Unavailable")
+      .should("exist");
+
+    //access works again, same count, bucket not opened
+    stubListing(200, [OBJECT]);
+    cy.reload();
+    cy.wait("@listing");
+    cy.get("c-data-table").contains(BUCKET).should("exist");
+    cy.get("c-data-table")
+      .contains("c-status", "Unavailable")
+      .should("not.exist");
+  });
+
   it("keeps cached objects when listing fails", () => {
     stubBucket(1);
     stubListing(200, [OBJECT]);

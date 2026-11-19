@@ -426,6 +426,12 @@ const store = createStore({
           ) {
             updateObjects = false;
           }
+
+          // List an Unavailable bucket again even if nothing changed,
+          // otherwise the label stays until the bucket is opened
+          if (oldContainer.restricted) {
+            updateObjects = true;
+          }
           await getDB().containers.update(oldContainer.id, container);
         } else {
           key = await getDB().containers.put(container);
