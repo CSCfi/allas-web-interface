@@ -159,6 +159,29 @@ describe("Bucket that the UI can't list", function () {
     cy.location("pathname").should("not.include", "forbid");
   });
 
+  it("doesn't share a bucket the UI can't access", () => {
+    stubBucket(1);
+    stubListing(403);
+    cy.intercept("POST", "/api/access/**", cy.spy().as("acl"));
+    visitAndLogin();
+    cy.wait("@listing");
+    cy.get("c-data-table")
+      .contains("c-status", "Unavailable")
+      .should("exist");
+
+    //share from the bucket view, the bucket list button is disabled
+    cy.get("c-data-table").contains(BUCKET).click();
+    cy.get("[data-testid='edit-sharing']").click({ force: true });
+    cy.share("0123456789abcdef0123456789abcdef", "read");
+
+    cy.get("[data-testid='shareModal-toasts']")
+      .find("c-toast")
+      .should("exist")
+      .and("have.class", "error");
+    cy.get("@acl").should("not.have.been.called");
+    cy.location("pathname").should("not.include", "forbid");
+  });
+
   it("keeps cached objects when listing fails", () => {
     stubBucket(1);
     stubListing(200, [OBJECT]);

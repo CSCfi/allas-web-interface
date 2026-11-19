@@ -172,7 +172,9 @@
 import {
   addAccessControlMeta,
   getSharedContainerAddress,
+  isBucketForbidden,
 } from "@/common/api";
+import { getDB } from "@/common/db";
 
 import {
   addNewTag,
@@ -387,6 +389,24 @@ export default {
             persistent: false,
             progress: false,
             message: msg,
+          },
+        );
+        return false;
+      }
+      // A bucket policy can deny the UI. Check before sharing, otherwise the
+      // share is saved without the bucket ACL and the 403 opens /forbid.
+      if (await isBucketForbidden(this.$route.params.project, bucket)) {
+        await getDB().containers
+          .where({ projectID: this.$store.state.active.id, name: bucket })
+          .modify({ restricted: true });
+        document.querySelector("#shareModal-toasts").addToast(
+          {
+            id: "error-unreachable",
+            type: "error",
+            duration: 5000,
+            persistent: false,
+            progress: false,
+            message: this.$t("message.unreachableBucket.tooltip"),
           },
         );
         return false;

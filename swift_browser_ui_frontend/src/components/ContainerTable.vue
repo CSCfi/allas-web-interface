@@ -474,7 +474,8 @@ export default {
                         if(event.keyCode === 13)
                           this.onOpenShareModal(item.name, true);
                       },
-                      disabled: item.owner,
+                      // can't share a bucket the UI can't access
+                      disabled: item.owner || item.restricted,
                     },
                   },
                 },
