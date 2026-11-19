@@ -416,6 +416,10 @@ export default {
                     tag: "span",
                     params: {
                       class: "public-status",
+                      // look disabled like the toggle next to it, keep the text's own colour
+                      ...(item.restricted ? {
+                        style: { opacity: 0.5 },
+                      } : {}),
                     },
                   },
                 }] : []),
