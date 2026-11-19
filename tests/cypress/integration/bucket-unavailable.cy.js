@@ -182,6 +182,18 @@ describe("Bucket that the UI can't list", function () {
     cy.location("pathname").should("not.include", "forbid");
   });
 
+  it("doesn't change public access of a bucket the UI can't access", () => {
+    stubBucket(1);
+    stubListing(403);
+    visitAndLogin();
+    cy.wait("@listing");
+    cy.get("c-data-table")
+      .contains("tr", BUCKET)
+      .find(".public-switch-input")
+      .should("be.disabled");
+    cy.location("pathname").should("not.include", "forbid");
+  });
+
   it("keeps cached objects when listing fails", () => {
     stubBucket(1);
     stubListing(200, [OBJECT]);

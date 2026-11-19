@@ -58,7 +58,9 @@ import {
   swiftDeleteObjects,
   removeAccessControlMeta,
   setContainerPublic,
+  isBucketForbidden,
 } from "@/common/api";
+import { getDB } from "@/common/db";
 
 export default {
   name: "ContainerTable",
@@ -188,6 +190,16 @@ export default {
       if (idx >= 0) this.contsLocal[idx].is_public = nextEnabled;
 
       try {
+        // a bucket policy can deny the UI, a 403 here would open /forbid
+        if (await isBucketForbidden(this.active.id, containerName)) {
+          if (idx >= 0) this.contsLocal[idx].is_public = prev;
+          await getDB().containers
+            .where({ projectID: this.active.id, name: containerName })
+            .modify({ restricted: true });
+          addErrorToastOnMain(this.$t("message.unreachableBucket.tooltip"));
+          return;
+        }
+
         await this.$store.dispatch("ensurePublicBase", {
           projectID: this.active.id,
           signal: this.abortController.signal,
@@ -381,7 +393,8 @@ export default {
                       type: "checkbox",
                       class: "public-switch-input",
                       checked: !!item.is_public,
-                      disabled: !!item.owner || !!this.publicBusy[item.name],
+                      disabled: !!item.owner || !!item.restricted ||
+                        !!this.publicBusy[item.name],
                       onChange: (ev) => {
                         const host = ev?.currentTarget || ev?.target;
                         const next = !!host?.checked;
