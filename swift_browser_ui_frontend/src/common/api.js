@@ -195,6 +195,26 @@ export class ObjectListingError extends Error {
   }
 }
 
+// Cheap check (one object) whether a bucket denies listing. A bucket
+// policy can change without changing anything the bucket list shows.
+export async function isBucketForbidden(
+  project,
+  container,
+  signal,
+  owner = "",
+) {
+  let url = new URL(
+    "/api/".concat(encodeURI(project), "/", encodeURI(container)),
+    document.location.origin,
+  );
+  url.searchParams.append("limit", "1");
+  if (owner != "") {
+    url.searchParams.append("owner", owner);
+  }
+  const ret = await GET(url, signal, { redirectOnForbidden: false });
+  return !signal?.aborted && ret?.status == 403;
+}
+
 export async function getObjects(
   project,
   container,

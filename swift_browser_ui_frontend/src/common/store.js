@@ -5,6 +5,7 @@ import { isEqual, isEqualWith } from "lodash";
 import {
   getContainers,
   getObjects,
+  isBucketForbidden,
   BucketForbiddenError,
   ObjectListingError,
   getCopyStatus,
@@ -291,7 +292,7 @@ const store = createStore({
   actions: {
     updateContainers: async function (
       { dispatch, state },
-      { projectID, signal, routeContainer = undefined },
+      { projectID, signal, routeContainer = undefined, checkAccess = false },
     ) {
       const existingContainers = await getDB()
         .containers.where({ projectID })
@@ -386,6 +387,7 @@ const store = createStore({
       }
 
       let containers_to_update_objects = [];
+      let containers_to_check_access = [];
       for (let i = 0; i < newContainers.length; i++) {
         const container = newContainers[i];
         const oldContainer = containersFromDB.find(
@@ -450,6 +452,8 @@ const store = createStore({
           // Have a separate array contained containers that
           // their objects should be updated
           containers_to_update_objects.push({ container, key });
+        } else if (checkAccess && !container.name.endsWith("_segments")) {
+          containers_to_check_access.push({ container, key });
         }
       }
 
@@ -458,7 +462,29 @@ const store = createStore({
         containers: newContainers,
         signal,
       });
+      // not awaited, the bucket list shows the label once the check is done
+      dispatch("checkBucketAccess", {
+        projectID,
+        containers: containers_to_check_access,
+        signal,
+      }).catch(() => {});
       return containers_to_update_objects;
+    },
+    checkBucketAccess: async function (_, { projectID, containers, signal }) {
+      // Buckets that are not listed again (nothing changed) could have
+      // got a bucket policy that blocks the UI, label those as Unavailable.
+      // A few at a time, so a project with many buckets doesn't flood the API.
+      for (let i = 0; i < containers.length && !signal?.aborted; i += 5) {
+        await Promise.all(containers.slice(i, i + 5).map(
+          async ({ container, key }) => {
+            if (await isBucketForbidden(
+              projectID, container.name, signal, container.owner || "",
+            )) {
+              await getDB().containers.update(key, { restricted: true });
+            }
+          },
+        ));
+      }
     },
     updateContainerTags: async function (_, {
       projectID, containers, signal,

@@ -332,6 +332,8 @@ export default {
         this.containersToUpdateObjs = await this.$store.dispatch("updateContainers", {
           projectID: this.active.id,
           signal: this.abortController.signal,
+          // only the bucket list checks every bucket for denied access
+          checkAccess: true,
         });
       } catch (error) {
         this.containersToUpdateObjs = [];

@@ -134,6 +134,31 @@ describe("Bucket that the UI can't list", function () {
       .should("not.exist");
   });
 
+  it("labels a cached bucket from the bucket list when access is denied", () => {
+    //open the bucket so its object is listed and cached
+    stubBucket(1);
+    stubListing(200, [OBJECT]);
+    visitAndLogin();
+    cy.get("c-data-table").contains(BUCKET).click();
+    cy.get("[data-testid='object-table']")
+      .contains(OBJECT.name)
+      .should("exist");
+    cy.contains("back to all buckets").click();
+    cy.get("c-data-table").contains(BUCKET).should("exist");
+    cy.get("c-data-table")
+      .contains("c-status", "Unavailable")
+      .should("not.exist");
+
+    //a bucket policy now denies access, count and size stay the same
+    stubListing(403);
+    cy.reload();
+    cy.wait("@listing");
+    cy.get("c-data-table")
+      .contains("c-status", "Unavailable")
+      .should("exist");
+    cy.location("pathname").should("not.include", "forbid");
+  });
+
   it("keeps cached objects when listing fails", () => {
     stubBucket(1);
     stubListing(200, [OBJECT]);
