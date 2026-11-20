@@ -58,7 +58,9 @@ import {
   swiftDeleteObjects,
   removeAccessControlMeta,
   setContainerPublic,
+  isBucketForbidden,
 } from "@/common/api";
+import { getDB } from "@/common/db";
 
 export default {
   name: "ContainerTable",
@@ -188,6 +190,16 @@ export default {
       if (idx >= 0) this.contsLocal[idx].is_public = nextEnabled;
 
       try {
+        // a bucket policy can deny the UI, a 403 here would open /forbid
+        if (await isBucketForbidden(this.active.id, containerName)) {
+          if (idx >= 0) this.contsLocal[idx].is_public = prev;
+          await getDB().containers
+            .where({ projectID: this.active.id, name: containerName })
+            .modify({ restricted: true });
+          addErrorToastOnMain(this.$t("message.unreachableBucket.tooltip"));
+          return;
+        }
+
         await this.$store.dispatch("ensurePublicBase", {
           projectID: this.active.id,
           signal: this.abortController.signal,
@@ -311,6 +323,36 @@ export default {
                   },
                 },
               },
+              // label buckets the UI can't list, e.g. due to bucket policy
+              ...(item.restricted ? {
+                children: [{
+                  key: "restricted",
+                  value: this.$t("message.unreachableBucket.label"),
+                  component: {
+                    tag: "c-status",
+                    params: {
+                      // design system warning colours
+                      type: "warning",
+                      title: this.$t("message.unreachableBucket.tooltip"),
+                      style: {
+                        // line up under the bucket name: icon 18px + its 1rem margin
+                        marginLeft: "calc(18px + 1rem)",
+                        // c-status host is a block, keep the click area to the badge
+                        width: "fit-content",
+                        cursor: "pointer",
+                      },
+                      // click/tap shows the same message for touch devices
+                      onClick: () => {
+                        document.querySelector("#container-toasts").addToast({
+                          type: "info",
+                          progress: false,
+                          message: this.$t("message.unreachableBucket.tooltip"),
+                        });
+                      },
+                    },
+                  },
+                }],
+              } : {}),
             },
             items: {
               value: item.count,
@@ -351,7 +393,8 @@ export default {
                       type: "checkbox",
                       class: "public-switch-input",
                       checked: !!item.is_public,
-                      disabled: !!item.owner || !!this.publicBusy[item.name],
+                      disabled: !!item.owner || !!item.restricted ||
+                        !!this.publicBusy[item.name],
                       onChange: (ev) => {
                         const host = ev?.currentTarget || ev?.target;
                         const next = !!host?.checked;
@@ -373,6 +416,10 @@ export default {
                     tag: "span",
                     params: {
                       class: "public-status",
+                      // look disabled like the toggle next to it, keep the text's own colour
+                      ...(item.restricted ? {
+                        style: { opacity: 0.5 },
+                      } : {}),
                     },
                   },
                 }] : []),
@@ -444,7 +491,8 @@ export default {
                         if(event.keyCode === 13)
                           this.onOpenShareModal(item.name, true);
                       },
-                      disabled: item.owner,
+                      // can't share a bucket the UI can't access
+                      disabled: item.owner || item.restricted,
                     },
                   },
                 },

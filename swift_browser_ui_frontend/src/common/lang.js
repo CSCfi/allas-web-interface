@@ -213,6 +213,14 @@ let default_translations = {
         share_delete_confirm: "Delete permissions",
       },
       emptyContainer: "This bucket/folder has no content.",
+      unreachableBucket: {
+        label: "Unavailable",
+        tooltip: "The web interface can't access this bucket. " +
+          "A bucket policy may be blocking it.",
+        message: "The web interface can't access this bucket. " +
+          "A bucket policy may be blocking it. Use another tool, " +
+          "such as rclone or s3cmd, to access its content.",
+      },
       emptyProject: {
         all: "There are no buckets in this project.",
         sharedFrom: "You haven't shared any buckets.",
@@ -805,6 +813,14 @@ let default_translations = {
         share_delete_confirm: "Poista käyttöoikeus",
       },
       emptyContainer: "Tämä ämpäri on tyhjä.",
+      unreachableBucket: {
+        label: "Pääsy evätty",
+        tooltip: "Sisältöön ei pääse tästä käyttöliittymästä. " +
+          "Ämpärin käyttöoikeusasetukset saattavat rajoittaa pääsyä.",
+        message: "Sisältöön ei pääse tästä käyttöliittymästä. " +
+          "Ämpärin käyttöoikeusasetukset saattavat rajoittaa pääsyä. Voit kokeilla " +
+          "muita työkaluja, kuten rclonea tai s3cmd:tä.",
+      },
       emptyProject: {
         all: "Tässä projektissa ei ole ämpäreitä.",
         sharedFrom: "Et ole jakanut yhtään ämpäriä.",
