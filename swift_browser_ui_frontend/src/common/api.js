@@ -25,7 +25,9 @@ async function sessionStillValid() {
   return sessionCheck;
 }
 
-async function fetchWithCookie({method, url, body, signal}) {
+async function fetchWithCookie({
+  method, url, body, signal, redirectOnForbidden = true,
+}) {
   return fetch(url, {
     method,
     body,
@@ -43,7 +45,9 @@ async function fetchWithCookie({method, url, body, signal}) {
           }
           break;
         case 403:
-          window.location.pathname = "/forbid";
+          if (redirectOnForbidden) {
+            window.location.pathname = "/forbid";
+          }
           break;
         case 503:
           window.location.pathname = "/uidown";
@@ -61,11 +65,12 @@ async function fetchWithCookie({method, url, body, signal}) {
       }
     });
 }
-export async function GET(url, signal) {
+export async function GET(url, signal, { redirectOnForbidden } = {}) {
   return fetchWithCookie({
     url,
     signal,
     method: "GET",
+    redirectOnForbidden,
   });
 }
 export async function POST(url, body) {
@@ -168,6 +173,48 @@ export async function updateContainerMeta(
   return ret;
 }
 
+// Thrown by background object listings when a bucket denies access,
+// e.g. a bucket policy that blocks the UI backend's IP address.
+export class BucketForbiddenError extends Error {
+  constructor(container) {
+    super(`Access to bucket ${container} is forbidden`);
+    this.name = "BucketForbiddenError";
+    this.container = container;
+  }
+}
+
+// Thrown by background object listings that fail for another reason
+// (aborted, 401, 404, 5xx), so callers keep their cached state instead
+// of treating the bucket as empty.
+export class ObjectListingError extends Error {
+  constructor(container, status) {
+    super(`Listing bucket ${container} failed (status ${status})`);
+    this.name = "ObjectListingError";
+    this.container = container;
+    this.status = status;
+  }
+}
+
+// Cheap check (one object) whether a bucket denies listing. A bucket
+// policy can change without changing anything the bucket list shows.
+export async function isBucketForbidden(
+  project,
+  container,
+  signal,
+  owner = "",
+) {
+  let url = new URL(
+    "/api/".concat(encodeURI(project), "/", encodeURI(container)),
+    document.location.origin,
+  );
+  url.searchParams.append("limit", "1");
+  if (owner != "") {
+    url.searchParams.append("owner", owner);
+  }
+  const ret = await GET(url, signal, { redirectOnForbidden: false });
+  return !signal?.aborted && ret?.status == 403;
+}
+
 export async function getObjects(
   project,
   container,
@@ -175,8 +222,11 @@ export async function getObjects(
   signal,
   shared = false,
   owner = "",
+  { background = false } = {},
 ) {
   // Fetch object listing for a container.
+  // Background listings don't redirect to /forbid on 403, so that one
+  // unreachable bucket doesn't lock the user out of the whole UI.
   let objUrl = new URL(
     "/api/".concat(
       encodeURI(project), "/",
@@ -190,7 +240,16 @@ export async function getObjects(
   if (shared && (owner != "")) {
     objUrl.searchParams.append("owner", owner);
   }
-  let objects = await GET(objUrl, signal);
+  let objects = await GET(objUrl, signal, {
+    redirectOnForbidden: !background,
+  });
+
+  if (background && objects?.status == 403) {
+    throw new BucketForbiddenError(container);
+  }
+  if (background && (signal?.aborted || objects?.status != 200)) {
+    throw new ObjectListingError(container, objects?.status);
+  }
 
   if (objects?.status == 200 && !signal?.aborted) {
     objects = await objects.json();

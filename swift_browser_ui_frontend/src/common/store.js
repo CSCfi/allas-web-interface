@@ -5,6 +5,9 @@ import { isEqual, isEqualWith } from "lodash";
 import {
   getContainers,
   getObjects,
+  isBucketForbidden,
+  BucketForbiddenError,
+  ObjectListingError,
   getCopyStatus,
   cancelCopy,
   getPublicBaseAddress,
@@ -289,7 +292,7 @@ const store = createStore({
   actions: {
     updateContainers: async function (
       { dispatch, state },
-      { projectID, signal, routeContainer = undefined },
+      { projectID, signal, routeContainer = undefined, checkAccess = false },
     ) {
       const existingContainers = await getDB()
         .containers.where({ projectID })
@@ -384,6 +387,7 @@ const store = createStore({
       }
 
       let containers_to_update_objects = [];
+      let containers_to_check_access = [];
       for (let i = 0; i < newContainers.length; i++) {
         const container = newContainers[i];
         const oldContainer = containersFromDB.find(
@@ -424,6 +428,12 @@ const store = createStore({
           ) {
             updateObjects = false;
           }
+
+          // List an Unavailable bucket again even if nothing changed,
+          // otherwise the label stays until the bucket is opened
+          if (oldContainer.restricted) {
+            updateObjects = true;
+          }
           await getDB().containers.update(oldContainer.id, container);
         } else {
           key = await getDB().containers.put(container);
@@ -442,6 +452,8 @@ const store = createStore({
           // Have a separate array contained containers that
           // their objects should be updated
           containers_to_update_objects.push({ container, key });
+        } else if (checkAccess && !container.name.endsWith("_segments")) {
+          containers_to_check_access.push({ container, key });
         }
       }
 
@@ -450,7 +462,29 @@ const store = createStore({
         containers: newContainers,
         signal,
       });
+      // not awaited, the bucket list shows the label once the check is done
+      dispatch("checkBucketAccess", {
+        projectID,
+        containers: containers_to_check_access,
+        signal,
+      }).catch(() => {});
       return containers_to_update_objects;
+    },
+    checkBucketAccess: async function (_, { projectID, containers, signal }) {
+      // Buckets that are not listed again (nothing changed) could have
+      // got a bucket policy that blocks the UI, label those as Unavailable.
+      // A few at a time, so a project with many buckets doesn't flood the API.
+      for (let i = 0; i < containers.length && !signal?.aborted; i += 5) {
+        await Promise.all(containers.slice(i, i + 5).map(
+          async ({ container, key }) => {
+            if (await isBucketForbidden(
+              projectID, container.name, signal, container.owner || "",
+            )) {
+              await getDB().containers.update(key, { restricted: true });
+            }
+          },
+        ));
+      }
     },
     updateContainerTags: async function (_, {
       projectID, containers, signal,
@@ -495,34 +529,49 @@ const store = createStore({
         signal = controller.signal;
       }
 
-      do {
-        if (owner) {
+      try {
+        do {
           objects = await getObjects(
             projectID,
             container.name,
             marker,
             signal,
-            true,
-            owner,
+            !!owner,
+            owner ? owner : "",
+            { background: true },
           );
-        } else {
-          objects = await getObjects(
-            projectID, container.name, marker, signal);
-        }
 
-        if (objects.length > 0) {
-          objects.forEach(obj => {
-            obj.container = container.name;
-            obj.containerID = container.id;
-            obj.tokens = isSegmentsContainer ? [] : tokenize(obj.name);
-            if (owner) {
-              obj.containerOwner = container.owner;
-            }
-          });
-          newObjects = newObjects.concat(objects);
-          marker = objects[objects.length - 1].name;
+          if (objects.length > 0) {
+            objects.forEach(obj => {
+              obj.container = container.name;
+              obj.containerID = container.id;
+              obj.tokens = isSegmentsContainer ? [] : tokenize(obj.name);
+              if (owner) {
+                obj.containerOwner = container.owner;
+              }
+            });
+            newObjects = newObjects.concat(objects);
+            marker = objects[objects.length - 1].name;
+          }
+        } while (objects.length > 0);
+      } catch (e) {
+        if (e instanceof BucketForbiddenError) {
+          // Bucket denies access (e.g. bucket policy blocking the UI),
+          // label it as unreachable and keep the cached objects.
+          await getDB().containers.update(container.id, { restricted: true });
+          return;
         }
-      } while (objects.length > 0);
+        if (e instanceof ObjectListingError) {
+          // Listing failed or was aborted, keep the cached objects and state
+          return;
+        }
+        throw e;
+      }
+
+      // Listing works again (e.g. bucket policy changed), clear the label
+      if ((await getDB().containers.get(container.id))?.restricted) {
+        await getDB().containers.update(container.id, { restricted: false });
+      }
 
       let toDelete = [];
 
@@ -547,7 +596,13 @@ const store = createStore({
           signal,
           !!owner,
           owner ? owner : "",
-        );
+          { background: true },
+        ).catch(e => {
+          // no _segments bucket (404) or no access is normal, no segments
+          if (e instanceof BucketForbiddenError ||
+            e instanceof ObjectListingError) return [];
+          throw e;
+        });
 
         if (!isSegmentsContainer) {
           // Map segments by their parent object for quick lookup
