@@ -69,10 +69,25 @@ describe("Bucket that the UI can't list", function () {
       .should("exist");
     cy.location("pathname").should("not.include", "forbid");
 
-    //open the bucket, the reason is shown instead of an empty bucket
-    cy.get("c-data-table").contains(BUCKET).click();
-    cy.contains("The web interface can't access this bucket")
-      .should("exist");
+    //row actions are disabled
+    ["download-container", "share-container", "copy-container"].forEach((id) => {
+      cy.get("c-data-table")
+        .contains("tr", BUCKET)
+        .find(`[testid='${id}']`)
+        .should("have.attr", "disabled");
+    });
+
+    //clicking the bucket tells why instead of opening it
+    cy.get("c-data-table")
+      .contains("tr", BUCKET)
+      .find("c-link")
+      .first()
+      .click();
+    cy.get("[data-testid='container-toasts']")
+      .find("c-toast")
+      .should("exist")
+      .and("have.class", "info");
+    cy.location("pathname").should("not.include", BUCKET);
   });
 
   it("keeps the label when listing fails, clears it when listing works", () => {
@@ -161,16 +176,20 @@ describe("Bucket that the UI can't list", function () {
 
   it("doesn't share a bucket the UI can't access", () => {
     stubBucket(1);
-    stubListing(403);
+    stubListing(200, [OBJECT]);
     cy.intercept("POST", "/api/access/**", cy.spy().as("acl"));
     visitAndLogin();
-    cy.wait("@listing");
-    cy.get("c-data-table")
-      .contains("c-status", "Unavailable")
+    cy.get("c-data-table").contains(BUCKET).click();
+    cy.get("[data-testid='object-table']")
+      .contains(OBJECT.name)
       .should("exist");
 
-    //share from the bucket view, the bucket list button is disabled
-    cy.get("c-data-table").contains(BUCKET).click();
+    //access is denied while in the bucket view,
+    //the bucket can't be opened from the bucket list anymore
+    stubListing(403);
+    cy.reload();
+    cy.wait("@listing");
+
     cy.get("[data-testid='edit-sharing']").click({ force: true });
     cy.share("0123456789abcdef0123456789abcdef", "read");
 
