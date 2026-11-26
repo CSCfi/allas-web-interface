@@ -179,6 +179,13 @@ export default {
         if (e?.name !== "AbortError") throw e;
       }
     },
+    showUnavailableToast() {
+      document.querySelector("#container-toasts").addToast({
+        type: "info",
+        progress: false,
+        message: this.$t("message.unreachableBucket.tooltip"),
+      });
+    },
     async togglePublic(containerName, nextEnabled) {
       if (!containerName) return;
       if (this.publicBusy[containerName]) return;
@@ -279,6 +286,10 @@ export default {
           items,
           item,
         ) => {
+          // fade the cells of a bucket the UI can't access, like the
+          // "Disabled" text below; c-data-table has no per-cell style
+          const faded = item.restricted ? { style: { opacity: 0.5 } } : {};
+
           items.push({
             name: {
               value: truncate(item.name),
@@ -294,6 +305,11 @@ export default {
                     flexShrink: "0",
                   },
                   onClick: () => {
+                    // don't open a bucket the UI can't list, tell why instead
+                    if (item.restricted) {
+                      this.showUnavailableToast();
+                      return;
+                    }
                     const listQuery = { ...this.$route.query };
 
                     if(item.owner) {
@@ -342,13 +358,7 @@ export default {
                         cursor: "pointer",
                       },
                       // click/tap shows the same message for touch devices
-                      onClick: () => {
-                        document.querySelector("#container-toasts").addToast({
-                          type: "info",
-                          progress: false,
-                          message: this.$t("message.unreachableBucket.tooltip"),
-                        });
-                      },
+                      onClick: () => this.showUnavailableToast(),
                     },
                   },
                 }],
@@ -372,14 +382,24 @@ export default {
                         tag: "c-tag",
                         params: {
                           flat: true,
+                          ...faded,
                         },
                       },
-                    })) : [{ key: "no_tags", value: "-" }]),
+                    })) : [{
+                      key: "no_tags",
+                      value: "-",
+                      ...(item.restricted ? {
+                        component: { tag: "span", params: faded },
+                      } : {}),
+                    }]),
                 ],
               },
             }),
             sharing: {
               value: getSharedStatus(item.name),
+              ...(item.restricted ? {
+                component: { tag: "span", params: faded },
+              } : {}),
             },
             public: {
               value: null,
@@ -417,9 +437,7 @@ export default {
                     params: {
                       class: "public-status",
                       // look disabled like the toggle next to it, keep the text's own colour
-                      ...(item.restricted ? {
-                        style: { opacity: 0.5 },
-                      } : {}),
+                      ...faded,
                     },
                   },
                 }] : []),
@@ -436,6 +454,13 @@ export default {
                       target: "_blank",
                       rel: "noopener noreferrer",
                       color: "primary",
+                      ...(item.restricted ? {
+                        ...faded,
+                        onClick: ({ event }) => {
+                          event.preventDefault();
+                          this.showUnavailableToast();
+                        },
+                      } : {}),
                     },
                   },
                 }] : []),
@@ -445,6 +470,9 @@ export default {
               value: this.showTimestamp? parseDateTime(
                 this.locale, item.last_modified, this.$t, false) :
                 parseDateFromNow(this.locale, item.last_modified, this.$t),
+              ...(item.restricted ? {
+                component: { tag: "span", params: faded },
+              } : {}),
             },
             actions: {
               value: null,
@@ -470,7 +498,7 @@ export default {
                       target: "_blank",
                       path: mdiTrayArrowDown,
                       disabled: (item.owner && item.accessRights?.length === 0)
-                        || !item.bytes,
+                        || !item.bytes || item.restricted,
                     },
                   },
                 },
@@ -512,7 +540,7 @@ export default {
                           this.openCopyBucketModal(item.name, item.owner, true);
                         }
                       },
-                      disabled: !item.bytes,
+                      disabled: !item.bytes || item.restricted,
                     },
                   },
                 },
@@ -555,7 +583,7 @@ export default {
                             size: "small",
                             disabled: (item.owner &&
                               (item.accessRights?.length === 0 ||
-                                !item.bytes)),
+                                !item.bytes)) || item.restricted,
                           },
                         },
                       },
